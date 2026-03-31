@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM — Bruno Gómez</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#fff;--bg2:#f8f8f7;--bg3:#f0f0ee;--border:rgba(0,0,0,.07);--border2:rgba(0,0,0,.13);--text:#111;--text2:#555;--text3:#999;--blue:#1a6bdb;--blue-l:#eff6ff;--green:#057a55;--green-l:#f0fdf4;--amber:#b45309;--amber-l:#fffbeb;--red:#c81e1e;--red-l:#fef2f2;--purple:#6d28d9;--purple-l:#f5f3ff;--sidebar:232px;--font:'Inter',sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+/* LOGIN */
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg2);padding:24px}
+.login-wrap{width:100%;max-width:380px}
+.login-brand{font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);margin-bottom:28px;text-align:center}
+.login-card{background:var(--bg);border:1px solid var(--border2);border-radius:14px;padding:36px;display:flex;flex-direction:column;gap:14px}
+.login-title{font-size:22px;font-weight:600}
+.login-sub{font-size:13px;color:var(--text2);margin-top:-6px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text2)}
+.field input{padding:10px 12px;border:1px solid var(--border2);border-radius:8px;font-family:var(--font);font-size:14px;color:var(--text);background:var(--bg);transition:border-color .15s}
+.field input:focus{outline:none;border-color:var(--blue)}
+.btn-login{padding:11px;background:var(--text);color:#fff;border:none;border-radius:8px;font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s;margin-top:4px}
+.btn-login:hover{opacity:.85}
+.btn-login:disabled{opacity:.5;cursor:not-allowed}
+.login-error{font-size:12px;color:var(--red);background:var(--red-l);border-radius:7px;padding:8px 12px;display:none}
+/* APP */
+#shell{display:none;height:100vh}
+.shell{display:flex;height:100%}
+aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.sb-brand{padding:16px 14px 12px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border)}
+.sb-nav{flex:1;overflow-y:auto;padding:8px}
+.nav-g{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);padding:12px 8px 4px}
+.nav-i{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text2);transition:all .12s;margin-bottom:1px;user-select:none}
+.nav-i:hover{background:var(--bg3);color:var(--text)}
+.nav-i.active{background:var(--text);color:#fff}
+.nav-i svg{opacity:.5;flex-shrink:0}
+.nav-i.active svg{opacity:1}
+.nav-gh{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text2);transition:all .12s;margin-bottom:1px;user-select:none}
+.nav-gh:hover{background:var(--bg3)}
+.nav-gh svg{opacity:.5}
+.nav-arr{transition:transform .2s}
+.nav-gh.open .nav-arr{transform:rotate(180deg)}
+.nav-sub{display:none;padding-left:6px}
+.nav-sub.open{display:block}
+.nav-sub .nav-i{font-size:12px;padding:6px 10px}
+.sb-foot{padding:10px 14px;border-top:1px solid var(--border)}
+.sb-user{font-size:11px;color:var(--text3);margin-bottom:8px;font-family:monospace}
+.sb-sync{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:11px;color:var(--text3)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0}
+.sync-dot.ok{background:var(--green)}.sync-dot.err{background:var(--red)}.sync-dot.saving{background:var(--amber);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.btn-logout{width:100%;padding:7px;border:1px solid var(--border2);background:var(--bg);border-radius:7px;font-family:var(--font);font-size:12px;color:var(--text2);cursor:pointer}
+.btn-logout:hover{background:var(--bg3)}
+.topbar{height:50px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:10px;flex-shrink:0;background:var(--bg)}
+.topbar-title{font-size:14px;font-weight:600;flex:1}
+.content{flex:1;overflow-y:auto;padding:22px;background:var(--bg2)}
+.btn{padding:7px 13px;border:1px solid var(--border2);border-radius:7px;background:var(--bg);font-family:var(--font);font-size:13px;font-weight:500;color:var(--text);cursor:pointer;transition:all .12s;white-space:nowrap}
+.btn:hover{background:var(--bg3)}
+.btn-p{background:var(--text);color:#fff;border-color:transparent}
+.btn-p:hover{opacity:.85;background:var(--text)}
+.btn-xs{padding:3px 8px;font-size:11px}
+.btn-red{background:var(--red-l);color:var(--red);border-color:#fecaca}
+.btn-red:hover{background:#fee2e2}
+.card{background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:18px 20px;margin-bottom:14px}
+.card-title{font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.metric{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.ml{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:7px}
+.mv{font-size:22px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.mv.blue{color:var(--blue)}.mv.green{color:var(--green)}.mv.amber{color:var(--amber)}.mv.red{color:var(--red)}.mv.purple{color:var(--purple)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 9px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap;background:var(--bg2)}
+td{padding:5px 6px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--bg2)}
+.ce{background:transparent;border:none;font-family:var(--font);font-size:13px;color:var(--text);width:100%;padding:3px 5px;border-radius:5px;min-width:55px}
+.ce:focus{outline:none;background:#f0f4ff;box-shadow:0 0 0 1px var(--blue)}
+.ce:hover:not(:focus){background:var(--bg3)}
+select.ce{cursor:pointer}
+input[type=number].ce::-webkit-inner-spin-button,input[type=number].ce::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number].ce{-moz-appearance:textfield}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.b-green{background:var(--green-l);color:var(--green)}.b-amber{background:var(--amber-l);color:var(--amber)}.b-red{background:var(--red-l);color:var(--red)}.b-blue{background:var(--blue-l);color:var(--blue)}.b-gray{background:var(--bg3);color:var(--text2)}.b-purple{background:var(--purple-l);color:var(--purple)}
+.sec-title{font-size:16px;font-weight:600;margin-bottom:18px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.empty{text-align:center;padding:32px;color:var(--text3);font-size:13px}
+.moverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:300;align-items:center;justify-content:center;padding:16px}
+.moverlay.open{display:flex}
+.mbox{background:var(--bg);border-radius:12px;padding:26px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;border:1px solid var(--border2);box-shadow:0 8px 32px rgba(0,0,0,.1)}
+.mtitle{font-size:15px;font-weight:600;margin-bottom:18px}
+.mfooter{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.fl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text2)}
+.fi{padding:8px 11px;border:1px solid var(--border2);border-radius:7px;font-family:var(--font);font-size:13px;color:var(--text);background:var(--bg);width:100%}
+.fi:focus{outline:none;border-color:var(--blue)}
+.fr2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ai{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;border-radius:8px;margin-bottom:7px;font-size:13px;border:1px solid transparent}
+.ai.amber{background:var(--amber-l);border-color:#fde68a}.ai.red{background:var(--red-l);border-color:#fecaca}
+.cpaid{background:var(--green-l);color:var(--green);border-radius:4px;padding:2px 5px;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
+.cpen{color:var(--text3);font-size:12px}
+.rv-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:10px}
+.rv-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.rv-name{font-weight:600;font-size:14px}
+.rv-meta{font-size:12px;color:var(--text3)}
+.ad-card{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start}
+.ad-num{background:var(--amber-l);color:var(--amber);font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;margin-top:2px}
+tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;font-variant-numeric:tabular-nums;border-top:1px solid var(--border2)}
+.kpi-m{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:10px 12px}
+.kpi-m .ml{font-size:9px;margin-bottom:4px}
+.kpi-m .mv{font-size:18px}
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
+.spinner{width:32px;height:32px;border:3px solid var(--bg3);border-top-color:var(--text);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="font-size:13px;color:var(--text3)">Iniciando...</div>
+</div>
+
+<div id="login-screen" style="display:none">
+  <div class="login-wrap">
+    <div class="login-brand">Agencia Legado · CRM</div>
+    <div class="login-card">
+      <div>
+        <div class="login-title">Acceder</div>
+        <div class="login-sub">Introduce tus credenciales para entrar a tu panel</div>
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input id="li-email" type="email" placeholder="tu@email.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input id="li-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn-login" id="btn-login" onclick="doLogin()">Entrar →</button>
+      <div class="login-error" id="li-error">Email o contraseña incorrectos</div>
+    </div>
+  </div>
+</div>
+
+<div id="shell">
+  <div class="shell">
+    <aside>
+      <div class="sb-brand">CRM · Bruno Gómez</div>
+      <nav class="sb-nav">
+        <div class="nav-g">Principal</div>
+        <div class="nav-i active" id="ni-dashboard" onclick="goTo('dashboard')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Dashboard</div>
+        <div class="nav-i" id="ni-objetivos" onclick="goTo('objetivos')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7"/><circle cx="8" cy="8" r="3"/><line x1="8" y1="1" x2="8" y2="3"/></svg>Objetivos</div>
+        <div class="nav-g">Registros</div>
+        <div class="nav-gh" id="nhdr-mes" onclick="toggleG('mes')">
+          <div style="display:flex;align-items:center;gap:8px">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="13" rx="1.5"/><line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/><line x1="1" y1="7" x2="15" y2="7"/></svg>Llamadas por mes</div>
+          <svg class="nav-arr" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><polyline points="2,4 6,8 10,4"/></svg>
+        </div>
+        <div class="nav-sub" id="nsub-mes"></div>
+        <div class="nav-gh" id="nhdr-kd" onclick="toggleG('kd')">
+          <div style="display:flex;align-items:center;gap:8px">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><polyline points="1,12 5,7 8,10 12,4 15,6"/></svg>KPIs diarios</div>
+          <svg class="nav-arr" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><polyline points="2,4 6,8 10,4"/></svg>
+        </div>
+        <div class="nav-sub" id="nsub-kd"></div>
+        <div class="nav-g">Seguimiento</div>
+        <div class="nav-i" id="ni-cuotas" onclick="goTo('cuotas')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><rect x="1" y="3" width="14" height="2" rx="1"/><rect x="1" y="7" width="14" height="2" rx="1"/><rect x="1" y="11" width="14" height="2" rx="1"/></svg>Cuotas</div>
+        <div class="nav-i" id="ni-renovaciones" onclick="goTo('renovaciones')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M13.5 6A6 6 0 102.5 10m0 0v3m0-3h3"/></svg>Renovaciones</div>
+      </nav>
+      <div class="sb-foot">
+        <div class="sb-sync"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Conectando...</span></div>
+        <div class="sb-user" id="sb-user"></div>
+        <button class="btn-logout" onclick="doLogout()">Cerrar sesión</button>
+      </div>
+    </aside>
+    <div class="main">
+      <div class="topbar"><div class="topbar-title" id="topbar-title">Dashboard</div><div id="topbar-extra"></div></div>
+      <div class="content" id="content"></div>
+    </div>
+  </div>
+</div>
+
+<div class="moverlay" id="moverlay" onclick="handleMO(event)"><div class="mbox" id="mbox"></div></div>
+
+<script>
+const SB_URL='https://obeopzavwnquapjdjwrx.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9iZW9wemF2d25xdWFwamRqd3J4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MDc0NzgsImV4cCI6MjA5MDQ4MzQ3OH0.mQqBvJbZokc-ZVHQn1LsLf6QBxRdEjoqT-3aoB5-VGQ';
+const RECORD_ID='bruno_2026';
+
+const {createClient}=supabase;
+const sb=createClient(SB_URL,SB_KEY);
+
+const MONTHS=['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+const MFULL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const CANALES=['YOUTUBE','SOCIAL','VSL','REFERIDOS'];
+const ESTADOS=['Venta','Reserva','En seguimiento','Perdido'];
+
+let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{}};
+let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null;
+
+// ── AUTH ──────────────────────────────────────────────────
+async function init(){
+  const{data:{session}}=await sb.auth.getSession();
+  document.getElementById('loading').style.display='none';
+  if(session){
+    currentUser=session.user;
+    showApp();
+  } else {
+    document.getElementById('login-screen').style.display='flex';
+  }
+}
+
+async function doLogin(){
+  const email=document.getElementById('li-email').value.trim();
+  const pass=document.getElementById('li-pass').value;
+  const btn=document.getElementById('btn-login');
+  const err=document.getElementById('li-error');
+  err.style.display='none';
+  btn.disabled=true;btn.textContent='Entrando...';
+  const{data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error){
+    err.style.display='block';
+    btn.disabled=false;btn.textContent='Entrar →';
+    return;
+  }
+  currentUser=data.user;
+  document.getElementById('login-screen').style.display='none';
+  showApp();
+}
+
+async function doLogout(){
+  await sb.auth.signOut();
+  document.getElementById('shell').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('li-pass').value='';
+  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{}};
+}
+
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')doLogin();});
+
+// ── SUPABASE DATA ─────────────────────────────────────────
+async function showApp(){
+  document.getElementById('shell').style.display='block';
+  document.getElementById('sb-user').textContent=currentUser?.email||'';
+  setSyncStatus('saving','Cargando...');
+  await loadData();
+  buildSidebar();
+  goTo('dashboard');
+}
+
+async function loadData(){
+  try{
+    const{data,error}=await sb.from('crm_data').select('data').eq('id',RECORD_ID).single();
+    if(error&&error.code!=='PGRST116') throw error;
+    if(data?.data&&Object.keys(data.data).length>0){
+      S={...S,...data.data};
+    } else {
+      const bk=localStorage.getItem('crm_bruno_bk');
+      if(bk) S={...S,...JSON.parse(bk)};
+    }
+    setSyncStatus('ok','Sincronizado ✓');
+  }catch(e){
+    const bk=localStorage.getItem('crm_bruno_bk');
+    if(bk) S={...S,...JSON.parse(bk)};
+    setSyncStatus('err','Backup local');
+  }
+  if(!S.ads)S.ads={};
+  seed();
+}
+
+async function sbSave(){
+  setSyncStatus('saving','Guardando...');
+  try{
+    localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
+    const{error}=await sb.from('crm_data').upsert({id:RECORD_ID,data:S,updated_at:new Date().toISOString()},{onConflict:'id'});
+    if(error) throw error;
+    setSyncStatus('ok','Guardado ✓');
+  }catch(e){
+    setSyncStatus('err','Error — guardado local');
+  }
+}
+
+function save(){
+  localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
+  clearTimeout(saveTimer);
+  setSyncStatus('saving','Guardando...');
+  saveTimer=setTimeout(sbSave,1500);
+}
+
+function setSyncStatus(state,label){
+  const dot=document.getElementById('sync-dot');const lbl=document.getElementById('sync-label');
+  if(!dot||!lbl)return;
+  dot.className='sync-dot '+(state==='ok'?'ok':state==='err'?'err':'saving');
+  lbl.textContent=label;
+}
+
+function seed(){
+  const mk='2026-03';
+  if(!S.llamadas[mk]){
+    S.llamadas[mk]=[];
+    [{n:'YENISLEIDY',f:'2026-03-01',t:1800,c:600,q:3,e:'YOUTUBE'},{n:'SAMAEL',f:'2026-03-01',t:1500,c:250,q:6,e:'YOUTUBE'},
+     {n:'DANIEL MORENO',f:'2026-03-04',t:1500,c:1500,q:1,e:'YOUTUBE'},{n:'RUBEN ESPINOSA',f:'2026-03-10',t:1500,c:1500,q:1,e:'YOUTUBE'},
+     {n:'CAMILA',f:'2026-03-10',t:1500,c:250,q:6,e:'YOUTUBE'},{n:'STALIN CARRION',f:'2026-03-12',t:1200,c:200,q:6,e:'YOUTUBE'},
+     {n:'CARMEN (MAICA)',f:'2026-03-13',t:1800,c:600,q:3,e:'SOCIAL'},{n:'FLAVIO',f:'2026-03-25',t:1500,c:250,q:6,e:'REFERIDOS'},
+     {n:'RUDI PONCE',f:'2026-03-25',t:1500,c:1500,q:1,e:'REFERIDOS'}].forEach(v=>{
+      S.llamadas[mk].push({nombre:v.n,fecha:v.f,telefono:'',embudo:v.e,closer:'Bruno',asistencia:'SI',incidencia:'',estado:'Venta',facturacion:v.t,caja:v.c,nCuotas:v.q,comentarios:''});
+      const k=v.n.toUpperCase();
+      if(!S.cuotas.find(c=>c.nombre===k)){const pv=Math.round(v.t/v.q*100)/100;const pagos={};for(let i=0;i<v.q&&(2+i)<12;i++)pagos[MONTHS[2+i]]=pv;S.cuotas.push({nombre:k,fechaInicio:v.f,ticket:v.t,nCuotas:v.q,pagos,embudo:v.e});}
+    });
+    [{n:'CHRISTIAN AZUAGA',f:'2026-03-16',e:'SOCIAL'},{n:'NOELIA LAZO',f:'2026-03-18',e:'SOCIAL'},{n:'ANA GONZALO',f:'2026-03-20',e:'YOUTUBE'},{n:'JUAN PABLO (JOTA)',f:'2026-03-18',e:'SOCIAL'},{n:'TATIANA',f:'2026-03-23',e:'YOUTUBE'}].forEach(v=>{
+      S.llamadas[mk].push({nombre:v.n,fecha:v.f,telefono:'',embudo:v.e,closer:'Bruno',asistencia:'SI',incidencia:'',estado:'Perdido',facturacion:0,caja:0,nCuotas:0,comentarios:''});
+    });
+    save();
+  }
+}
+
+// ── HELPERS ───────────────────────────────────────────────
+function fmt(n,dec=0){return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:dec}).format(n||0)}
+function pct(a,b){return b?Math.round(a/b*100):0}
+function edate(d,m){const dt=new Date(d);dt.setMonth(dt.getMonth()+m);return dt.toISOString().split('T')[0]}
+function daysDiff(d){return Math.round((new Date(d)-new Date())/86400000)}
+function alertInfo(v){const d=daysDiff(v);if(d<0)return{label:'Vencido',cls:'b-red',ai:'red'};if(d<30)return{label:'Renovar ya',cls:'b-amber',ai:'amber'};if(d<60)return{label:'Próximo',cls:'b-blue',ai:''};return{label:'Activo',cls:'b-green',ai:''};}
+function getVenc(c){const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);if(rs.length){const last=rs.sort((a,b)=>new Date(b.fechaInicio)-new Date(a.fechaInicio))[0];return edate(last.fechaInicio,6);}return edate(c.fechaInicio,6);}
+function isActive(c){const v=getVenc(c),t=new Date();return new Date(c.fechaInicio)<=t&&new Date(v)>=t;}
+function mKey(i){return`2026-${String(i+1).padStart(2,'0')}`}
+function esc(s){return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function todayMonth(){return new Date().getMonth();}
+function todayDayOfMonth(){return new Date().getDate();}
+function canalStats(canal,mk){
+  const lAll=mk?(S.llamadas[mk]||[]):Object.values(S.llamadas).flat();
+  const kAll=mk?(S.kpis_diarios[mk]||[]):Object.values(S.kpis_diarios).flat();
+  const cl=lAll.filter(l=>l.embudo===canal);const cv=cl.filter(l=>l.estado==='Venta');
+  const realizadas=cl.filter(l=>l.asistencia==='SI').length;
+  const inv=kAll.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);
+  const leads=kAll.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0),0);
+  const fact=cv.reduce((s,l)=>s+Number(l.facturacion||0),0);
+  const caja=cv.reduce((s,l)=>s+Number(l.caja||0),0);
+  const llamadasAgend=cl.length;
+  return{canal,inv,leads,cpl:leads&&inv?inv/leads:null,llamadasAgend,costeLlamada:llamadasAgend&&inv?inv/llamadasAgend:null,
+    pctAgend:leads?llamadasAgend/leads:null,realizadas,pctAsist:llamadasAgend?realizadas/llamadasAgend:null,
+    pctCierre:realizadas?cv.length/realizadas:null,ventas:cv.length,fact,caja,
+    roas:inv?fact/inv:null,roi:inv?caja/inv:null,cpa:cv.length&&inv?inv/cv.length:null};
+}
+
+// ── NAV ───────────────────────────────────────────────────
+function buildSidebar(){
+  const sm=document.getElementById('nsub-mes'),sk=document.getElementById('nsub-kd');
+  sm.innerHTML='';sk.innerHTML='';
+  MONTHS.forEach((m,i)=>{
+    const d=document.createElement('div');d.className='nav-i';d.id=`ni-mes-${m}`;d.textContent=m;d.onclick=()=>goTo('mes',i);sm.appendChild(d);
+    const k=document.createElement('div');k.className='nav-i';k.id=`ni-kd-${m}`;k.textContent=m;k.onclick=()=>goTo('kpis_d',i);sk.appendChild(k);
+  });
+}
+function toggleG(id){document.getElementById(`nhdr-${id}`).classList.toggle('open');document.getElementById(`nsub-${id}`).classList.toggle('open');}
+function goTo(page,month){
+  if(month!==undefined)curMonth=month;curPage=page;
+  document.querySelectorAll('.nav-i').forEach(el=>el.classList.remove('active'));
+  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones'};
+  if(ids[page])document.getElementById(ids[page])?.classList.add('active');
+  if(page==='mes')document.getElementById(`ni-mes-${MONTHS[curMonth]}`)?.classList.add('active');
+  if(page==='kpis_d')document.getElementById(`ni-kd-${MONTHS[curMonth]}`)?.classList.add('active');
+  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones'};
+  document.getElementById('topbar-title').textContent=titles[page]||(page==='mes'?`Llamadas — ${MFULL[curMonth]} 2026`:`KPIs diarios — ${MFULL[curMonth]} 2026`);
+  const ex=document.getElementById('topbar-extra');ex.innerHTML='';
+  if(page==='mes'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLlamadaRow(curMonth);ex.appendChild(b);}
+  if(page==='cuotas'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Añadir cliente';b.onclick=openAddCuota;ex.appendChild(b);}
+  if(page==='renovaciones'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva renovación';b.onclick=openAddRenov;ex.appendChild(b);}
+  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,mes:renderMes,kpis_d:renderKpisD}[page]||renderDashboard)();
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────
+function renderDashboard(){
+  const allL=Object.values(S.llamadas).flat();
+  const ventas=allL.filter(l=>l.estado==='Venta');const reservas=allL.filter(l=>l.estado==='Reserva');
+  const totalFact=S.cuotas.reduce((s,c)=>s+Number(c.ticket||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
+  const totalCaja=ventas.reduce((s,l)=>s+Number(l.caja||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
+  const activos=S.cuotas.filter(isActive).length;
+  const proximos=S.cuotas.filter(c=>{const d=daysDiff(getVenc(c));return d>=0&&d<30;}).length;
+  const ltv_med=S.cuotas.length?Math.round(S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);return s+Number(c.ticket||0)+rs.reduce((x,r)=>x+Number(r.ticket||0),0);},0)/S.cuotas.length):0;
+  const alertas=S.cuotas.filter(c=>{const d=daysDiff(getVenc(c));return d<60&&d>=0;}).sort((a,b)=>daysDiff(getVenc(a))-daysDiff(getVenc(b)));
+  const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
+  const statsAll=CANALES.map(c=>canalStats(c,null));
+  document.getElementById('content').innerHTML=`
+    <div class="sec-title">Resumen global 2026</div>
+    <div class="mg">
+      <div class="metric"><div class="ml">Facturación total</div><div class="mv blue">${fmt(totalFact)}</div></div>
+      <div class="metric"><div class="ml">Caja cobrada</div><div class="mv green">${fmt(totalCaja)}</div></div>
+      <div class="metric"><div class="ml">Bola de nieve</div><div class="mv amber">${fmt(totalFact-totalCaja)}</div></div>
+      <div class="metric"><div class="ml">Ventas cerradas</div><div class="mv green">${ventas.length}</div></div>
+      <div class="metric"><div class="ml">Reservas</div><div class="mv blue">${reservas.length}</div></div>
+      <div class="metric"><div class="ml">Activos hoy</div><div class="mv">${activos}</div></div>
+      <div class="metric"><div class="ml">Próx. vencimiento</div><div class="mv ${proximos?'red':''}">${proximos}</div></div>
+      <div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${S.renovaciones.length}</div></div>
+      <div class="metric"><div class="ml">LTV medio</div><div class="mv">${fmt(ltv_med)}</div></div>
+      <div class="metric"><div class="ml">% Cierre global</div><div class="mv">${pct(ventas.length,allL.length)}%</div></div>
+    </div>
+    <div class="sec-title">KPIs por canal</div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="tw"><table>
+        <thead><tr><th>Canal</th><th>Inversión</th><th>Leads</th><th>CPL</th><th>Llamadas</th><th>% Agenda.</th><th>€/Llamada</th><th>Realizadas</th><th>% Asist.</th><th>% Cierre</th><th>Ventas</th><th>Facturación</th><th>Caja</th><th>ROAS</th><th>ROI</th><th>CPA</th></tr></thead>
+        <tbody>${statsAll.map(cs=>`<tr>
+          <td><span class="badge ${cbc[cs.canal]}">${cs.canal}</span></td>
+          <td>${fmt(cs.inv)}</td><td>${cs.leads}</td><td>${cs.cpl?fmt(cs.cpl,2):'-'}</td>
+          <td>${cs.llamadasAgend}</td><td>${cs.pctAgend!=null?(cs.pctAgend*100).toFixed(1)+'%':'-'}</td>
+          <td>${cs.costeLlamada?fmt(cs.costeLlamada,2):'-'}</td><td>${cs.realizadas}</td>
+          <td>${cs.pctAsist!=null?(cs.pctAsist*100).toFixed(1)+'%':'-'}</td>
+          <td>${cs.pctCierre!=null?(cs.pctCierre*100).toFixed(1)+'%':'-'}</td>
+          <td style="font-weight:600;color:var(--green)">${cs.ventas}</td>
+          <td style="color:var(--blue)">${fmt(cs.fact)}</td><td style="color:var(--green)">${fmt(cs.caja)}</td>
+          <td style="color:var(--amber)">${cs.roas?cs.roas.toFixed(2)+'x':'-'}</td>
+          <td style="color:var(--purple)">${cs.roi?cs.roi.toFixed(2)+'x':'-'}</td>
+          <td>${cs.cpa?fmt(cs.cpa,2):'-'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>
+    ${alertas.length?`<div class="card"><div class="card-title">Alertas de renovación</div>${alertas.map(c=>{const inf=alertInfo(getVenc(c));const d=daysDiff(getVenc(c));return`<div class="ai ${inf.ai}"><span style="font-weight:600">${c.nombre}</span><span style="color:var(--text2);font-size:12px">${d<0?'Venció hace '+Math.abs(d)+' días':'Vence en '+d+' días'}</span><span class="badge ${inf.cls}">${inf.label}</span></div>`;}).join('')}</div>`:''}`;
+}
+
+// ── MES ───────────────────────────────────────────────────
+function renderMes(){
+  const mk=mKey(curMonth);if(!S.llamadas[mk])S.llamadas[mk]=[];
+  const rows=S.llamadas[mk];const ventas=rows.filter(r=>r.estado==='Venta');
+  const realizadas=rows.filter(r=>r.asistencia==='SI').length;
+  const inv=Object.values(S.kpis_diarios[mk]||[]).reduce((s,k)=>s+Number(k.inversion||0),0);
+  const leads=Object.values(S.kpis_diarios[mk]||[]).reduce((s,k)=>s+Number(k.leads||0),0);
+  const fact=ventas.reduce((s,r)=>s+Number(r.facturacion||0),0);
+  const caja=ventas.reduce((s,r)=>s+Number(r.caja||0),0);
+  const llamadasTotal=rows.length;
+  const cpl=leads&&inv?inv/leads:null;const costeLlamada=llamadasTotal&&inv?inv/llamadasTotal:null;
+  const pctAgend=leads?llamadasTotal/leads:null;const pctAsist=llamadasTotal?realizadas/llamadasTotal:null;
+  const pctCierre=realizadas?ventas.length/realizadas:null;
+  const roas=inv?fact/inv:null;const roi=inv?caja/inv:null;const cpa=ventas.length&&inv?inv/ventas.length:null;
+  document.getElementById('content').innerHTML=`
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text2)">KPIs del mes — ${MFULL[curMonth]} 2026</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px">
+        ${[['Inversión',fmt(inv),''],['Leads/Seg.',leads,''],['CPL',cpl?fmt(cpl,2):'-','amber'],
+           ['Llamadas agend.',llamadasTotal,''],['% Agendamiento',pctAgend!=null?(pctAgend*100).toFixed(1)+'%':'-',''],
+           ['€/Llamada',costeLlamada?fmt(costeLlamada,2):'-','amber'],['% Asistencia',pctAsist!=null?(pctAsist*100).toFixed(1)+'%':'-',''],
+           ['Realizadas',realizadas,''],['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue'],
+           ['Ventas',ventas.length,'green'],['Facturación',fmt(fact),'blue'],['Caja',fmt(caja),'green'],
+           ['ROAS',roas?roas.toFixed(2)+'x':'-','amber'],['ROI',roi?roi.toFixed(2)+'x':'-','purple'],['CPA',cpa?fmt(cpa,2):'-','']
+        ].map(([l,v,c])=>`<div class="kpi-m"><div class="ml">${l}</div><div class="mv ${c}" style="font-size:16px">${v}</div></div>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="tw"><table id="lt">
+        <thead><tr><th style="min-width:150px">Nombre</th><th style="min-width:108px">Fecha</th><th style="min-width:108px">Teléfono</th><th>Embudo</th><th>Closer</th><th>Asistencia</th><th>Incidencia</th><th>Estado</th><th style="min-width:90px">Facturación</th><th style="min-width:90px">Caja</th><th>Cuotas</th><th style="min-width:180px">Comentarios</th><th></th></tr></thead>
+        <tbody id="lb"></tbody>
+      </table></div>
+    </div>`;
+  renderLlamadasRows(mk);
+}
+function renderLlamadasRows(mk){
+  const rows=S.llamadas[mk]||[];const tbody=document.getElementById('lb');if(!tbody)return;
+  tbody.innerHTML=rows.map((r,i)=>`<tr id="lr-${i}" style="${r.estado==='Venta'?'background:#f0fdf4':r.estado==='Perdido'?'background:#fef2f2':r.estado==='Reserva'?'background:#eff6ff':''}">
+    <td><input class="ce" value="${esc(r.nombre)}" oninput="upL('${mk}',${i},'nombre',this.value)" placeholder="Nombre completo"></td>
+    <td><input class="ce" type="date" value="${r.fecha||''}" oninput="upL('${mk}',${i},'fecha',this.value)"></td>
+    <td><input class="ce" value="${esc(r.telefono)}" oninput="upL('${mk}',${i},'telefono',this.value)" placeholder="+34..."></td>
+    <td><select class="ce" onchange="upL('${mk}',${i},'embudo',this.value)">${CANALES.map(c=>`<option${r.embudo===c?' selected':''}>${c}</option>`).join('')}</select></td>
+    <td><input class="ce" value="${esc(r.closer||'Bruno')}" oninput="upL('${mk}',${i},'closer',this.value)" style="min-width:60px"></td>
+    <td><select class="ce" onchange="upL('${mk}',${i},'asistencia',this.value)">${['SI','NO','PENDIENTE'].map(v=>`<option${r.asistencia===v?' selected':''}>${v}</option>`).join('')}</select></td>
+    <td><input class="ce" value="${esc(r.incidencia)}" oninput="upL('${mk}',${i},'incidencia',this.value)" placeholder="-" style="min-width:70px"></td>
+    <td><select class="ce" onchange="upLEstado('${mk}',${i},this.value)">${ESTADOS.map(v=>`<option${r.estado===v?' selected':''}>${v}</option>`).join('')}</select></td>
+    <td><input class="ce" type="number" inputmode="numeric" value="${r.facturacion||''}" oninput="upLNum('${mk}',${i},'facturacion',this.value)" placeholder="0" style="text-align:right"></td>
+    <td><input class="ce" type="number" inputmode="numeric" value="${r.caja||''}" oninput="upLNum('${mk}',${i},'caja',this.value)" placeholder="0" style="text-align:right"></td>
+    <td><select class="ce" onchange="upLNum('${mk}',${i},'nCuotas',this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${Number(r.nCuotas)===n?' selected':''}>${n===1?'1 (único)':n}</option>`).join('')}</select></td>
+    <td><input class="ce" value="${esc(r.comentarios)}" oninput="upL('${mk}',${i},'comentarios',this.value)" placeholder="Notas..."></td>
+    <td><button class="btn btn-red btn-xs" onclick="delL('${mk}',${i})">✕</button></td>
+  </tr>`).join('');
+}
+function upL(mk,i,f,v){S.llamadas[mk][i][f]=v;save();}
+function upLNum(mk,i,f,v){S.llamadas[mk][i][f]=parseFloat(v)||0;save();}
+function upLEstado(mk,i,val){
+  S.llamadas[mk][i].estado=val;
+  if(val==='Venta'){const r=S.llamadas[mk][i];const key=(r.nombre||'').toUpperCase().trim();
+    if(key&&!S.cuotas.find(c=>c.nombre===key)){const q=Number(r.nCuotas)||1;const pv=Math.round((r.facturacion||0)/q*100)/100;const mStart=new Date(r.fecha||mKey(curMonth)+'-01').getMonth();const pagos={};for(let j=0;j<q&&(mStart+j)<12;j++)pagos[MONTHS[mStart+j]]=pv;S.cuotas.push({nombre:key,fechaInicio:r.fecha||mKey(curMonth)+'-01',ticket:r.facturacion||0,nCuotas:q,pagos,embudo:r.embudo||'YOUTUBE'});}}
+  save();const tr=document.getElementById(`lr-${i}`);if(tr)tr.style.background=val==='Venta'?'#f0fdf4':val==='Perdido'?'#fef2f2':val==='Reserva'?'#eff6ff':'';renderMes();
+}
+function delL(mk,i){if(!confirm('¿Eliminar fila?'))return;S.llamadas[mk].splice(i,1);save();renderMes();}
+function addLlamadaRow(mi){
+  const mk=mKey(mi);if(!S.llamadas[mk])S.llamadas[mk]=[];
+  S.llamadas[mk].push({nombre:'',fecha:`2026-${String(mi+1).padStart(2,'0')}-01`,telefono:'',embudo:'YOUTUBE',closer:'Bruno',asistencia:'SI',incidencia:'',estado:'En seguimiento',facturacion:0,caja:0,nCuotas:1,comentarios:''});
+  save();renderMes();
+  setTimeout(()=>{const lb=document.getElementById('lb');if(lb){const last=lb.querySelector('tr:last-child');if(last){last.scrollIntoView({behavior:'smooth',block:'nearest'});const inp=last.querySelector('input');if(inp)inp.focus();}}},80);
+}
+
+// ── KPIs DIARIOS ──────────────────────────────────────────
+function renderKpisD(){
+  const mk=mKey(curMonth);if(!S.kpis_diarios[mk])S.kpis_diarios[mk]=[];if(!S.ads[mk])S.ads[mk]=[];
+  const rows=S.kpis_diarios[mk];
+  const canalTotals=CANALES.map(canal=>{const cr=rows.filter(r=>r.canal===canal);const inv=cr.reduce((s,r)=>s+Number(r.inversion||0),0);const leads=cr.reduce((s,r)=>s+Number(r.leads||0),0);return{canal,inv,leads,cpl:leads&&inv?inv/leads:null};}).filter(c=>c.inv>0||c.leads>0);
+  const totalInv=rows.reduce((s,r)=>s+Number(r.inversion||0),0);
+  const totalLeads=rows.reduce((s,r)=>s+Number(r.leads||0),0);
+  const totalCpl=totalLeads&&totalInv?totalInv/totalLeads:null;
+  const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
+  document.getElementById('content').innerHTML=`
+    ${canalTotals.length?`<div class="card" style="margin-bottom:14px"><div class="card-title">Resumen por canal — ${MFULL[curMonth]}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+        ${canalTotals.map(c=>`<div style="background:var(--bg2);border-radius:9px;padding:12px"><div style="margin-bottom:8px"><span class="badge ${cbc[c.canal]}">${c.canal}</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+            <div><div class="ml">Inversión</div><div style="font-weight:600;font-size:14px">${fmt(c.inv)}</div></div>
+            <div><div class="ml">Leads</div><div style="font-weight:600;font-size:14px">${c.leads}</div></div>
+            <div><div class="ml">CPL</div><div style="font-weight:600;font-size:14px;color:var(--amber)">${c.cpl?fmt(c.cpl,2):'-'}</div></div>
+          </div></div>`).join('')}
+      </div></div>`:''}
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="metric"><div class="ml">Inversión total</div><div class="mv blue">${fmt(totalInv)}</div></div>
+      <div class="metric"><div class="ml">Leads / Seguidores</div><div class="mv">${totalLeads}</div></div>
+      <div class="metric"><div class="ml">CPL total</div><div class="mv amber">${totalCpl?fmt(totalCpl,2):'-'}</div></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
+      <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:13px;font-weight:600">Registro diario — ${MFULL[curMonth]} 2026</div>
+        <button class="btn btn-p btn-xs" onclick="addKpiRow('${mk}')">+ Añadir día</button>
+      </div>
+      <div class="tw"><table>
+        <thead><tr><th>Día</th><th>Canal</th><th>Inversión (€)</th><th>Leads / Seg.</th><th>CPL</th><th></th></tr></thead>
+        <tbody id="kpid-body"></tbody>
+        <tfoot><tr><td colspan="2">Total</td><td>${fmt(totalInv)}</td><td>${totalLeads}</td><td>${totalCpl?fmt(totalCpl,2)+'€':'-'}</td><td></td></tr></tfoot>
+      </table></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Ads Ganadores — ${MFULL[curMonth]}<button class="btn btn-xs" onclick="addAd('${mk}')">+ Añadir</button></div>
+      <div id="ads-list">
+        ${(S.ads[mk]||[]).length===0?'<div class="empty" style="padding:16px">Sin ads este mes.</div>':''}
+        ${(S.ads[mk]||[]).map((ad,i)=>`<div class="ad-card">
+          <span class="ad-num">TOP ${i+1}</span>
+          <div style="flex:1">
+            <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:6px;align-items:center">
+              <input class="ce" value="${esc(ad.nombre)}" oninput="upAd('${mk}',${i},'nombre',this.value)" placeholder="Nombre del ad" style="font-weight:600;font-size:13px">
+              <select class="ce" onchange="upAd('${mk}',${i},'canal',this.value)" style="min-width:100px;font-size:12px">${CANALES.map(c=>`<option value="${c}"${ad.canal===c?' selected':''}>${c}</option>`).join('')}</select>
+            </div>
+            <input class="ce" value="${esc(ad.url)}" oninput="upAd('${mk}',${i},'url',this.value)" placeholder="URL del anuncio" style="font-size:12px;color:var(--blue);display:block;width:100%;margin-bottom:8px">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div><div class="ml" style="font-size:10px">Inversión (€)</div><input class="ce" type="number" inputmode="numeric" value="${ad.inversion||''}" oninput="upAdNum('${mk}',${i},'inversion',this.value)" placeholder="0" style="font-size:12px"></div>
+              <div><div class="ml" style="font-size:10px">Leads</div><input class="ce" type="number" inputmode="numeric" value="${ad.leads||''}" oninput="upAdNum('${mk}',${i},'leads',this.value)" placeholder="0" style="font-size:12px"></div>
+              <div><div class="ml" style="font-size:10px">CPL</div><div style="font-size:13px;font-weight:600;padding-top:6px;color:var(--amber)">${ad.leads&&ad.inversion?fmt(ad.inversion/ad.leads,2):'-'}</div></div>
+            </div>
+          </div>
+          <button class="btn btn-red btn-xs" onclick="delAd('${mk}',${i})">✕</button>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  renderKpiDRows(mk);
+}
+function renderKpiDRows(mk){
+  const rows=S.kpis_diarios[mk]||[];const tbody=document.getElementById('kpid-body');if(!tbody)return;
+  tbody.innerHTML=rows.map((r,i)=>{const cpl=r.leads&&r.inversion?(r.inversion/r.leads).toFixed(2):'-';
+    return`<tr><td><input class="ce" value="${r.dia||''}" oninput="upKD('${mk}',${i},'dia',this.value)" placeholder="Día" style="text-align:center;max-width:50px"></td>
+      <td><select class="ce" onchange="upKD('${mk}',${i},'canal',this.value)">${CANALES.map(c=>`<option${r.canal===c?' selected':''}>${c}</option>`).join('')}</select></td>
+      <td><input class="ce" type="number" inputmode="numeric" value="${r.inversion||''}" oninput="upKDNum('${mk}',${i},'inversion',this.value)" placeholder="0" style="text-align:right"></td>
+      <td><input class="ce" type="number" inputmode="numeric" value="${r.leads||''}" oninput="upKDNum('${mk}',${i},'leads',this.value)" placeholder="0" style="text-align:right"></td>
+      <td style="font-size:12px;font-weight:600;color:var(--amber);text-align:right">${cpl!=='-'?cpl+'€':'-'}</td>
+      <td><button class="btn btn-red btn-xs" onclick="delKD('${mk}',${i})">✕</button></td>
+    </tr>`;}).join('');
+}
+function upKD(mk,i,f,v){S.kpis_diarios[mk][i][f]=v;save();renderKpisD();}
+function upKDNum(mk,i,f,v){S.kpis_diarios[mk][i][f]=parseFloat(v)||0;save();renderKpisD();}
+function delKD(mk,i){S.kpis_diarios[mk].splice(i,1);save();renderKpisD();}
+function addKpiRow(mk){if(!S.kpis_diarios[mk])S.kpis_diarios[mk]=[];S.kpis_diarios[mk].push({dia:'',canal:'YOUTUBE',inversion:0,leads:0});save();renderKpisD();setTimeout(()=>{const b=document.getElementById('kpid-body');if(b){const last=b.querySelector('tr:last-child');if(last){const inp=last.querySelector('input');if(inp)inp.focus();}}},80);}
+function upAd(mk,i,f,v){if(!S.ads[mk])S.ads[mk]=[];S.ads[mk][i][f]=v;save();}
+function upAdNum(mk,i,f,v){if(!S.ads[mk])S.ads[mk]=[];S.ads[mk][i][f]=parseFloat(v)||0;save();renderKpisD();}
+function delAd(mk,i){S.ads[mk].splice(i,1);save();renderKpisD();}
+function addAd(mk){if(!S.ads[mk])S.ads[mk]=[];S.ads[mk].push({nombre:'',url:'',canal:'YOUTUBE',inversion:0,leads:0});save();renderKpisD();}
+
+// ── OBJETIVOS ─────────────────────────────────────────────
+function renderObjetivos(){
+  const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
+  let html=`<div class="sec-title">Objetivos vs Real</div>`;
+  CANALES.forEach(canal=>{
+    html+=`<div class="card"><div class="card-title"><span class="badge ${cbc[canal]}">${canal}</span></div><div class="tw"><table>
+      <thead><tr><th style="min-width:160px">Métrica</th>${MONTHS.map(m=>`<th style="min-width:80px;text-align:right">${m}</th>`).join('')}</tr></thead><tbody>`;
+    [{key:'inversion',label:'Inversión obj. (€)'},{key:'leads_obj',label:'Leads obj.'},{key:'llamadas_obj',label:'Llamadas obj.'},{key:'cierre_obj',label:'% Cierre obj.'},{key:'ticket_obj',label:'Ticket obj. (€)'}].forEach(m=>{
+      html+=`<tr><td style="font-weight:500">${m.label}</td>`;
+      MONTHS.forEach((_,mi)=>{const mk=mKey(mi);if(!S.objetivos[mk])S.objetivos[mk]={};if(!S.objetivos[mk][canal])S.objetivos[mk][canal]={};const val=S.objetivos[mk][canal][m.key]||'';
+        html+=`<td><input class="ce" type="number" inputmode="numeric" value="${val}" oninput="upObj('${mk}','${canal}','${m.key}',this.value)" placeholder="-" style="text-align:right;min-width:70px"></td>`;});html+=`</tr>`;});
+    html+=`<tr style="background:var(--bg2)"><td colspan="${MONTHS.length+1}" style="padding:5px 9px;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Real</td></tr>`;
+    [{label:'Leads real',fn:mk=>(S.kpis_diarios[mk]||[]).filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0),0)},
+     {label:'Llamadas real',fn:mk=>(S.llamadas[mk]||[]).filter(l=>l.embudo===canal).length},
+     {label:'Ventas real',fn:mk=>(S.llamadas[mk]||[]).filter(l=>l.embudo===canal&&l.estado==='Venta').length},
+     {label:'Facturación real',fn:mk=>fmt((S.llamadas[mk]||[]).filter(l=>l.embudo===canal&&l.estado==='Venta').reduce((s,l)=>s+Number(l.facturacion||0),0))}].forEach(rm=>{
+      html+=`<tr style="background:var(--green-l)"><td style="font-weight:500;font-size:12px">${rm.label}</td>`;
+      MONTHS.forEach((_,mi)=>{html+=`<td style="font-size:12px;font-weight:600;color:var(--green);text-align:right">${rm.fn(mKey(mi))}</td>`;});html+=`</tr>`;});
+    html+=`</tbody></table></div></div>`;});
+  document.getElementById('content').innerHTML=html;
+}
+function upObj(mk,canal,key,val){if(!S.objetivos[mk])S.objetivos[mk]={};if(!S.objetivos[mk][canal])S.objetivos[mk][canal]={};S.objetivos[mk][canal][key]=parseFloat(val)||0;save();}
+
+// ── CUOTAS ────────────────────────────────────────────────
+function renderCuotas(){
+  const allVentas=Object.values(S.llamadas).flat().filter(l=>l.estado==='Venta');
+  const totalFact=S.cuotas.reduce((s,c)=>s+Number(c.ticket||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
+  const totalCaja=allVentas.reduce((s,l)=>s+Number(l.caja||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
+  const todayM=todayMonth();
+  const cajaPendiente=S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const allP={...c.pagos};rs.forEach(r=>{Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);});});return s+MONTHS.reduce((ms,m,mi)=>mi>=todayM?ms+(allP[m]||0):ms,0);},0);
+  document.getElementById('content').innerHTML=`
+    <div class="mg">
+      <div class="metric"><div class="ml">Facturación comprometida</div><div class="mv blue">${fmt(totalFact)}</div></div>
+      <div class="metric"><div class="ml">Caja cobrada</div><div class="mv green">${fmt(totalCaja)}</div></div>
+      <div class="metric"><div class="ml">Caja por cobrar</div><div class="mv amber">${fmt(cajaPendiente)}</div></div>
+      <div class="metric"><div class="ml">Clientes activos</div><div class="mv">${S.cuotas.filter(isActive).length}</div></div>
+      <div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${S.renovaciones.length}</div></div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Caja por cobrar desde ${MFULL[todayM]} (día ${todayDayOfMonth()}) en adelante.</div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:14px 18px 10px;font-size:13px;font-weight:600">Detalle por cliente</div>
+      <div class="tw"><table style="min-width:1100px">
+        <thead><tr><th>Cliente</th><th>Inicio</th><th>Cuotas</th><th>Ticket</th><th>Cuota/mes</th>
+          ${MONTHS.map(m=>`<th style="text-align:center">${m}</th>`).join('')}
+          <th>Vencimiento</th><th>Alerta</th><th>Renov.</th><th>LTV</th></tr></thead>
+        <tbody>${S.cuotas.map((c,ci)=>{
+          const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const ltv=Number(c.ticket||0)+rs.reduce((s,r)=>s+Number(r.ticket||0),0);
+          const venc=getVenc(c);const inf=alertInfo(venc);const cm=c.nCuotas?Math.round(Number(c.ticket||0)/c.nCuotas):Number(c.ticket||0);
+          return`<tr><td><input class="ce" value="${esc(c.nombre)}" oninput="upCuota(${ci},'nombre',this.value)" style="font-weight:600;min-width:120px"></td>
+            <td><input class="ce" type="date" value="${c.fechaInicio}" oninput="upCuota(${ci},'fechaInicio',this.value)"></td>
+            <td style="text-align:center">${c.nCuotas}</td>
+            <td><input class="ce" type="number" inputmode="numeric" value="${c.ticket}" oninput="upCuotaNum(${ci},'ticket',this.value)" style="text-align:right;min-width:70px"></td>
+            <td style="text-align:right">${fmt(cm)}</td>
+            ${MONTHS.map((m,mi)=>{const orig=Number(c.pagos?.[m]||0);const rv=rs.reduce((s,r)=>s+Number(r.pagos?.[m]||0),0);const total=orig+rv;return`<td style="text-align:center;${mi<todayM?'opacity:.5':mi===todayM?'background:#fff9e6':''}">${total>0?`<span class="cpaid">${fmt(total)}</span>`:`<span class="cpen">—</span>`}</td>`;}).join('')}
+            <td style="font-size:12px;white-space:nowrap">${venc}</td><td><span class="badge ${inf.cls}">${inf.label}</span></td>
+            <td style="text-align:center">${rs.length}</td><td style="font-weight:600">${fmt(ltv)}</td></tr>`;}).join('')}
+        </tbody>
+        <tfoot><tr><td colspan="5">Total en caja por mes</td>
+          ${MONTHS.map((m,mi)=>{const t=S.cuotas.reduce((s,c)=>{const orig=Number(c.pagos?.[m]||0);const rv=S.renovaciones.filter(r=>r.nombre===c.nombre).reduce((x,r)=>x+Number(r.pagos?.[m]||0),0);return s+orig+rv;},0);return`<td style="text-align:center;${mi<todayM?'opacity:.5':mi===todayM?'background:#fff9e6':''}">${t>0?fmt(t):''}</td>`;}).join('')}<td colspan="4"></td></tr></tfoot>
+      </table></div>
+    </div>`;
+}
+function upCuota(i,f,v){S.cuotas[i][f]=v;save();}
+function upCuotaNum(i,f,v){S.cuotas[i][f]=parseFloat(v)||0;save();}
+function openAddCuota(){openModal(`<div class="mtitle">Añadir cliente a cuotas</div>
+  <div class="fr2"><div class="fg"><label class="fl">Nombre</label><input class="fi" id="cn" placeholder="Nombre completo"></div>
+  <div class="fg"><label class="fl">Fecha inicio</label><input class="fi" id="cf" type="date" value="${new Date().toISOString().split('T')[0]}"></div></div>
+  <div class="fr2"><div class="fg"><label class="fl">Ticket (€)</label><input class="fi" id="ct" type="number" placeholder="0"></div>
+  <div class="fg"><label class="fl">Nº cuotas</label><select class="fi" id="cq">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}">${n===1?'1 (pago único)':n}</option>`).join('')}</select></div></div>
+  <div class="mfooter"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="saveCuota()">Guardar</button></div>`);}
+function saveCuota(){const n=document.getElementById('cn').value.trim().toUpperCase();const f=document.getElementById('cf').value;const t=parseFloat(document.getElementById('ct').value)||0;const q=parseInt(document.getElementById('cq').value)||1;if(!n){alert('Introduce un nombre');return;}const ms=new Date(f).getMonth();const pv=Math.round(t/q*100)/100;const pagos={};for(let i=0;i<q&&(ms+i)<12;i++)pagos[MONTHS[ms+i]]=pv;S.cuotas.push({nombre:n,fechaInicio:f,ticket:t,nCuotas:q,pagos});save();closeModal();renderCuotas();}
+
+// ── RENOVACIONES ──────────────────────────────────────────
+function renderRenovaciones(){
+  document.getElementById('content').innerHTML=`<div class="card"><div class="card-title">Renovaciones</div>
+    ${S.renovaciones.length===0?'<div class="empty">Sin renovaciones. Usa el botón superior para añadir.</div>':''}
+    ${S.renovaciones.map((r,i)=>{const venc=edate(r.fechaInicio,6);const inf=alertInfo(venc);const cm=r.nCuotas?Math.round(Number(r.ticket||0)/r.nCuotas):Number(r.ticket||0);return`
+      <div class="rv-card"><div class="rv-head"><div><div class="rv-name">${r.nombre}</div><div class="rv-meta">${r.nRenov}ª renovación · Inicio: ${r.fechaInicio} · Vence: ${venc}</div></div>
+        <div style="display:flex;align-items:center;gap:8px"><span class="badge ${inf.cls}">${inf.label}</span><button class="btn btn-red btn-xs" onclick="delRenov(${i})">Eliminar</button></div></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:13px">
+          <div><div class="ml">Ticket</div><div style="font-weight:600">${fmt(r.ticket)}</div></div>
+          <div><div class="ml">Cuotas</div><div style="font-weight:600">${r.nCuotas||1}</div></div>
+          <div><div class="ml">Cuota/mes</div><div style="font-weight:600">${fmt(cm)}</div></div>
+          <div><div class="ml">Días restantes</div><div style="font-weight:600;color:${daysDiff(venc)<30?'var(--red)':'var(--green)'}">${Math.max(0,daysDiff(venc))}</div></div>
+        </div></div>`;}).join('')}</div>`;
+}
+function delRenov(i){if(!confirm('¿Eliminar?'))return;S.renovaciones.splice(i,1);save();renderRenovaciones();}
+function openAddRenov(){const opts=S.cuotas.map(c=>`<option value="${esc(c.nombre)}">${c.nombre}</option>`).join('');openModal(`<div class="mtitle">Nueva renovación</div>
+  <div class="fr2"><div class="fg"><label class="fl">Cliente</label><select class="fi" id="rn">${opts}</select></div>
+  <div class="fg"><label class="fl">Fecha inicio</label><input class="fi" id="rf" type="date" value="${new Date().toISOString().split('T')[0]}"></div></div>
+  <div class="fr2"><div class="fg"><label class="fl">Ticket (€)</label><input class="fi" id="rt" type="number" placeholder="0"></div>
+  <div class="fg"><label class="fl">Nº cuotas</label><select class="fi" id="rq">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}">${n===1?'1 (pago único)':n}</option>`).join('')}</select></div></div>
+  <div class="mfooter"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="saveRenov()">Guardar</button></div>`);}
+function saveRenov(){const nombre=document.getElementById('rn').value;const fecha=document.getElementById('rf').value;const ticket=parseFloat(document.getElementById('rt').value)||0;const cuotas=parseInt(document.getElementById('rq').value)||1;const nRenov=S.renovaciones.filter(r=>r.nombre===nombre).length+1;const mStart=new Date(fecha).getMonth();const pv=Math.round(ticket/cuotas*100)/100;const pagos={};for(let i=0;i<cuotas&&(mStart+i)<12;i++)pagos[MONTHS[mStart+i]]=pv;S.renovaciones.push({nombre,nRenov,ticket,nCuotas:cuotas,fechaInicio:fecha,pagos});save();closeModal();renderRenovaciones();}
+
+function openModal(html){document.getElementById('mbox').innerHTML=html;document.getElementById('moverlay').classList.add('open');}
+function closeModal(){document.getElementById('moverlay').classList.remove('open');}
+function handleMO(e){if(e.target===document.getElementById('moverlay'))closeModal();}
+
+init();
+</script>
+</body>
+</html>
