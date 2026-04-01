@@ -601,15 +601,15 @@ function renderKpisD(){
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
         ${canalTotals.map(c=>`<div style="background:var(--bg2);border-radius:9px;padding:12px"><div style="margin-bottom:8px"><span class="badge ${cbc[c.canal]}">${c.canal}</span></div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-            <div><div class="ml">Inversión</div><div style="font-weight:600;font-size:14px">${fmt(c.inv)}</div></div>
-            <div><div class="ml">Leads</div><div style="font-weight:600;font-size:14px">${c.leads}</div></div>
-            <div><div class="ml">CPL</div><div style="font-weight:600;font-size:14px;color:var(--amber)">${c.cpl?fmt(c.cpl,2):'-'}</div></div>
+            <div><div class="ml">Inversión</div><div id="canal-inv-${c.canal}" style="font-weight:600;font-size:14px">${fmt(c.inv)}</div></div>
+            <div><div class="ml">Leads</div><div id="canal-leads-${c.canal}" style="font-weight:600;font-size:14px">${c.leads}</div></div>
+            <div><div class="ml">CPL</div><div id="canal-cpl-${c.canal}" style="font-weight:600;font-size:14px;color:var(--amber)">${c.cpl?fmt(c.cpl,2):'-'}</div></div>
           </div></div>`).join('')}
       </div></div>`:''}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
-      <div class="metric"><div class="ml">Inversión total</div><div class="mv blue">${fmt(totalInv)}</div></div>
-      <div class="metric"><div class="ml">Leads / Seguidores</div><div class="mv">${totalLeads}</div></div>
-      <div class="metric"><div class="ml">CPL total</div><div class="mv amber">${totalCpl?fmt(totalCpl,2):'-'}</div></div>
+      <div class="metric"><div class="ml">Inversión total</div><div class="mv blue" id="kpid-sum-inv">${fmt(totalInv)}</div></div>
+      <div class="metric"><div class="ml">Leads / Seguidores</div><div class="mv" id="kpid-sum-leads">${totalLeads}</div></div>
+      <div class="metric"><div class="ml">CPL total</div><div class="mv amber" id="kpid-sum-cpl">${totalCpl?fmt(totalCpl,2):'-'}</div></div>
     </div>
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
       <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
@@ -619,7 +619,7 @@ function renderKpisD(){
       <div class="tw"><table>
         <thead><tr><th>Día</th><th>Canal</th><th>Inversión (€)</th><th>Leads / Seg.</th><th>CPL</th><th></th></tr></thead>
         <tbody id="kpid-body"></tbody>
-        <tfoot><tr><td colspan="2">Total</td><td>${fmt(totalInv)}</td><td>${totalLeads}</td><td>${totalCpl?fmt(totalCpl,2)+'€':'-'}</td><td></td></tr></tfoot>
+        <tfoot><tr><td colspan="2">Total</td><td id="kpid-total-inv">${fmt(totalInv)}</td><td id="kpid-total-leads">${totalLeads}</td><td id="kpid-total-cpl">${totalCpl?fmt(totalCpl,2)+'€':'-'}</td><td></td></tr></tfoot>
       </table></div>
     </div>
     <div class="card">
@@ -653,12 +653,56 @@ function renderKpiDRows(mk){
       <td><select class="ce" onchange="upKD('${mk}',${i},'canal',this.value)">${CANALES.map(c=>`<option${r.canal===c?' selected':''}>${c}</option>`).join('')}</select></td>
       <td><input class="ce" type="number" inputmode="numeric" value="${r.inversion||''}" oninput="upKDNum('${mk}',${i},'inversion',this.value)" placeholder="0" style="text-align:right"></td>
       <td><input class="ce" type="number" inputmode="numeric" value="${r.leads||''}" oninput="upKDNum('${mk}',${i},'leads',this.value)" placeholder="0" style="text-align:right"></td>
-      <td style="font-size:12px;font-weight:600;color:var(--amber);text-align:right">${cpl!=='-'?cpl+'€':'-'}</td>
+      <td id="cpl-${i}" style="font-size:12px;font-weight:600;color:var(--amber);text-align:right">${cpl!=='-'?cpl+'€':'-'}</td>
       <td><button class="btn btn-red btn-xs" onclick="delKD('${mk}',${i})">✕</button></td>
     </tr>`;}).join('');
 }
 function upKD(mk,i,f,v){S.kpis_diarios[mk][i][f]=v;save();renderKpisD();}
-function upKDNum(mk,i,f,v){S.kpis_diarios[mk][i][f]=parseFloat(v)||0;save();renderKpisD();}
+function upKDNum(mk,i,f,v){
+  S.kpis_diarios[mk][i][f]=parseFloat(v)||0;
+  save();
+  // Only update CPL cell for this row + totals — no full re-render
+  const r=S.kpis_diarios[mk][i];
+  const cpl=r.leads&&r.inversion?(r.inversion/r.leads).toFixed(2):'-';
+  const cplCell=document.getElementById(`cpl-${i}`);
+  if(cplCell)cplCell.textContent=cpl!=='-'?cpl+'€':'-';
+  updateKpiTotalsOnly(mk);
+}
+function updateKpiTotalsOnly(mk){
+  const rows=S.kpis_diarios[mk]||[];
+  const totalInv=rows.reduce((s,r)=>s+Number(r.inversion||0),0);
+  const totalLeads=rows.reduce((s,r)=>s+Number(r.leads||0),0);
+  const totalCpl=totalLeads&&totalInv?totalInv/totalLeads:null;
+  // Update total row in table
+  const tf=document.getElementById('kpid-total-inv');
+  const tl=document.getElementById('kpid-total-leads');
+  const tc=document.getElementById('kpid-total-cpl');
+  if(tf)tf.textContent=fmt(totalInv);
+  if(tl)tl.textContent=totalLeads;
+  if(tc)tc.textContent=totalCpl?fmt(totalCpl,2)+'€':'-';
+  // Update top summary metrics
+  const si=document.getElementById('kpid-sum-inv');
+  const sl=document.getElementById('kpid-sum-leads');
+  const sc=document.getElementById('kpid-sum-cpl');
+  if(si)si.textContent=fmt(totalInv);
+  if(sl)sl.textContent=totalLeads;
+  if(sc)sc.textContent=totalCpl?fmt(totalCpl,2):'-';
+  // Update canal blocks
+  const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
+  const CANALES_ALL=['YOUTUBE','SOCIAL','VSL','REFERIDOS'];
+  CANALES_ALL.forEach(canal=>{
+    const cr=rows.filter(r=>r.canal===canal);
+    const inv=cr.reduce((s,r)=>s+Number(r.inversion||0),0);
+    const leads=cr.reduce((s,r)=>s+Number(r.leads||0),0);
+    const cpl=leads&&inv?inv/leads:null;
+    const bi=document.getElementById(`canal-inv-${canal}`);
+    const bl=document.getElementById(`canal-leads-${canal}`);
+    const bc=document.getElementById(`canal-cpl-${canal}`);
+    if(bi)bi.textContent=fmt(inv);
+    if(bl)bl.textContent=leads;
+    if(bc)bc.textContent=cpl?fmt(cpl,2):'-';
+  });
+}
 function delKD(mk,i){S.kpis_diarios[mk].splice(i,1);save();renderKpisD();}
 function addKpiRow(mk){if(!S.kpis_diarios[mk])S.kpis_diarios[mk]=[];S.kpis_diarios[mk].push({dia:'',canal:'YOUTUBE',inversion:0,leads:0});save();renderKpisD();setTimeout(()=>{const b=document.getElementById('kpid-body');if(b){const last=b.querySelector('tr:last-child');if(last){const inp=last.querySelector('input');if(inp)inp.focus();}}},80);}
 function upAd(mk,i,f,v){if(!S.ads[mk])S.ads[mk]=[];S.ads[mk][i][f]=v;save();}
