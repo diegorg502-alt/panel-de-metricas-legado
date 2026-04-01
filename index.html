@@ -284,12 +284,85 @@ async function sbSave(){
   setSyncStatus('saving','Guardando...');
   try{
     localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
+    // Save backup of previous version before overwriting
+    await saveBackup();
     const{error}=await sb.from('crm_data').upsert({id:RECORD_ID,data:S,updated_at:new Date().toISOString()},{onConflict:'id'});
     if(error) throw error;
     setSyncStatus('ok','Guardado ✓');
   }catch(e){
     setSyncStatus('err','Error — guardado local');
   }
+}
+
+async function saveBackup(){
+  try{
+    // Keep one backup per hour max — check last backup time
+    const lastBk=localStorage.getItem('crm_last_backup');
+    const now=Date.now();
+    if(lastBk&&now-parseInt(lastBk)<3600000) return; // less than 1 hour ago
+    await sb.from('crm_backups').insert({client_id:RECORD_ID,data:S});
+    localStorage.setItem('crm_last_backup',String(now));
+    // Keep only last 30 backups
+    const{data:bks}=await sb.from('crm_backups').select('id').eq('client_id',RECORD_ID).order('created_at',{ascending:true});
+    if(bks&&bks.length>30){
+      const toDelete=bks.slice(0,bks.length-30).map(b=>b.id);
+      await sb.from('crm_backups').delete().in('id',toDelete);
+    }
+  }catch(e){ console.warn('Backup error:',e); }
+}
+
+async function listBackups(){
+  try{
+    const{data}=await sb.from('crm_backups').select('id,created_at').eq('client_id',RECORD_ID).order('created_at',{ascending:false}).limit(10);
+    return data||[];
+  }catch(e){return[];}
+}
+
+async function restoreBackup(id){
+  if(!confirm('¿Restaurar este backup? Los datos actuales se guardarán como backup antes de restaurar.')) return;
+  try{
+    const{data}=await sb.from('crm_backups').select('data').eq('id',id).single();
+    if(!data) return alert('No se pudo cargar el backup');
+    await saveBackup(); // save current state first
+    S={...S,...data.data};
+    save();
+    closeModal();
+    goTo(curPage);
+    alert('Backup restaurado correctamente');
+  }catch(e){alert('Error al restaurar: '+e.message);}
+}
+
+function exportBackup(){
+  const json=JSON.stringify(S,null,2);
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`crm-bruno-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function openBackupsModal(){
+  openModal(`<div class="mtitle">Copias de seguridad</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Se guarda una copia automática cada hora. Puedes restaurar cualquier punto anterior.</p>
+    <div id="bk-list" style="margin-bottom:16px"><div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">Cargando...</div></div>
+    <div class="mfooter">
+      <button class="btn" onclick="closeModal()">Cerrar</button>
+      <button class="btn btn-p" onclick="exportBackup()">⬇ Exportar JSON</button>
+    </div>`);
+  const bks=await listBackups();
+  const el=document.getElementById('bk-list');
+  if(!el) return;
+  if(!bks.length){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">Sin backups automáticos aún. Se crearán cada hora mientras uses la app.</div>';return;}
+  el.innerHTML=bks.map(b=>{
+    const d=new Date(b.created_at);
+    const label=d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:8px;background:var(--bg2);margin-bottom:6px;font-size:12px">
+      <span style="color:var(--text2)">${label}</span>
+      <button class="btn btn-xs" onclick="restoreBackup(${b.id})">Restaurar</button>
+    </div>`;
+  }).join('');
 }
 
 function save(){
