@@ -602,13 +602,13 @@ function renderKpisD(){
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
         ${canalTotals.map(c=>`<div style="background:var(--bg2);border-radius:9px;padding:12px"><div style="margin-bottom:8px"><span class="badge ${cbc[c.canal]}">${c.canal}</span></div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-            <div><div class="ml">Inversión</div><div id="canal-inv-${c.canal}" style="font-weight:600;font-size:14px">${fmt(c.inv)}</div></div>
+            <div><div class="ml">Inversión</div><div id="canal-inv-${c.canal}" style="font-weight:600;font-size:14px">${fmt(c.inv,2)}</div></div>
             <div><div class="ml">Leads</div><div id="canal-leads-${c.canal}" style="font-weight:600;font-size:14px">${c.leads}</div></div>
             <div><div class="ml">CPL</div><div id="canal-cpl-${c.canal}" style="font-weight:600;font-size:14px;color:var(--amber)">${c.cpl?fmt(c.cpl,2):'-'}</div></div>
           </div></div>`).join('')}
       </div></div>`:''}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
-      <div class="metric"><div class="ml">Inversión total</div><div class="mv blue" id="kpid-sum-inv">${fmt(totalInv)}</div></div>
+      <div class="metric"><div class="ml">Inversión total</div><div class="mv blue" id="kpid-sum-inv">${fmt(totalInv,2)}</div></div>
       <div class="metric"><div class="ml">Leads / Seguidores</div><div class="mv" id="kpid-sum-leads">${totalLeads}</div></div>
       <div class="metric"><div class="ml">CPL total</div><div class="mv amber" id="kpid-sum-cpl">${totalCpl?fmt(totalCpl,2):'-'}</div></div>
     </div>
@@ -620,7 +620,7 @@ function renderKpisD(){
       <div class="tw"><table>
         <thead><tr><th>Día</th><th>Canal</th><th>Inversión (€)</th><th>Leads / Seg.</th><th>CPL</th><th></th></tr></thead>
         <tbody id="kpid-body"></tbody>
-        <tfoot><tr><td colspan="2">Total</td><td id="kpid-total-inv">${fmt(totalInv)}</td><td id="kpid-total-leads">${totalLeads}</td><td id="kpid-total-cpl">${totalCpl?fmt(totalCpl,2)+'€':'-'}</td><td></td></tr></tfoot>
+        <tfoot><tr><td colspan="2">Total</td><td id="kpid-total-inv">${fmt(totalInv,2)}</td><td id="kpid-total-leads">${totalLeads}</td><td id="kpid-total-cpl">${totalCpl?fmt(totalCpl,2)+'€':'-'}</td><td></td></tr></tfoot>
       </table></div>
     </div>
     <div class="card">
@@ -679,14 +679,14 @@ function updateKpiTotalsOnly(mk){
   const tf=document.getElementById('kpid-total-inv');
   const tl=document.getElementById('kpid-total-leads');
   const tc=document.getElementById('kpid-total-cpl');
-  if(tf)tf.textContent=fmt(totalInv);
+  if(tf)tf.textContent=fmt(totalInv,2);
   if(tl)tl.textContent=totalLeads;
   if(tc)tc.textContent=totalCpl?fmt(totalCpl,2)+'€':'-';
   // Update top summary metrics
   const si=document.getElementById('kpid-sum-inv');
   const sl=document.getElementById('kpid-sum-leads');
   const sc=document.getElementById('kpid-sum-cpl');
-  if(si)si.textContent=fmt(totalInv);
+  if(si)si.textContent=fmt(totalInv,2);
   if(sl)sl.textContent=totalLeads;
   if(sc)sc.textContent=totalCpl?fmt(totalCpl,2):'-';
   // Update canal blocks
@@ -700,7 +700,7 @@ function updateKpiTotalsOnly(mk){
     const bi=document.getElementById(`canal-inv-${canal}`);
     const bl=document.getElementById(`canal-leads-${canal}`);
     const bc=document.getElementById(`canal-cpl-${canal}`);
-    if(bi)bi.textContent=fmt(inv);
+    if(bi)bi.textContent=fmt(inv,2);
     if(bl)bl.textContent=leads;
     if(bc)bc.textContent=cpl?fmt(cpl,2):'-';
   });
