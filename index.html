@@ -574,26 +574,231 @@ function addAd(mk){if(!S.ads[mk])S.ads[mk]=[];S.ads[mk].push({nombre:'',url:'',c
 
 // ── OBJETIVOS ─────────────────────────────────────────────
 function renderObjetivos(){
-  const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
-  let html=`<div class="sec-title">Objetivos vs Real</div>`;
-  CANALES.forEach(canal=>{
-    html+=`<div class="card"><div class="card-title"><span class="badge ${cbc[canal]}">${canal}</span></div><div class="tw"><table>
-      <thead><tr><th style="min-width:160px">Métrica</th>${MONTHS.map(m=>`<th style="min-width:80px;text-align:right">${m}</th>`).join('')}</tr></thead><tbody>`;
-    [{key:'inversion',label:'Inversión obj. (€)'},{key:'leads_obj',label:'Leads obj.'},{key:'llamadas_obj',label:'Llamadas obj.'},{key:'cierre_obj',label:'% Cierre obj.'},{key:'ticket_obj',label:'Ticket obj. (€)'}].forEach(m=>{
-      html+=`<tr><td style="font-weight:500">${m.label}</td>`;
-      MONTHS.forEach((_,mi)=>{const mk=mKey(mi);if(!S.objetivos[mk])S.objetivos[mk]={};if(!S.objetivos[mk][canal])S.objetivos[mk][canal]={};const val=S.objetivos[mk][canal][m.key]||'';
-        html+=`<td><input class="ce" type="number" inputmode="numeric" value="${val}" oninput="upObj('${mk}','${canal}','${m.key}',this.value)" placeholder="-" style="text-align:right;min-width:70px"></td>`;});html+=`</tr>`;});
-    html+=`<tr style="background:var(--bg2)"><td colspan="${MONTHS.length+1}" style="padding:5px 9px;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Real</td></tr>`;
-    [{label:'Leads real',fn:mk=>(S.kpis_diarios[mk]||[]).filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0),0)},
-     {label:'Llamadas real',fn:mk=>(S.llamadas[mk]||[]).filter(l=>l.embudo===canal).length},
-     {label:'Ventas real',fn:mk=>(S.llamadas[mk]||[]).filter(l=>l.embudo===canal&&l.estado==='Venta').length},
-     {label:'Facturación real',fn:mk=>fmt((S.llamadas[mk]||[]).filter(l=>l.embudo===canal&&l.estado==='Venta').reduce((s,l)=>s+Number(l.facturacion||0),0))}].forEach(rm=>{
-      html+=`<tr style="background:var(--green-l)"><td style="font-weight:500;font-size:12px">${rm.label}</td>`;
-      MONTHS.forEach((_,mi)=>{html+=`<td style="font-size:12px;font-weight:600;color:var(--green);text-align:right">${rm.fn(mKey(mi))}</td>`;});html+=`</tr>`;});
-    html+=`</tbody></table></div></div>`;});
+  const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple'};
+  const CANALES_OBJ=['YOUTUBE','SOCIAL','VSL'];
+  // Row styles
+  const RS_INPUT='';
+  const RS_CALC='background:#f0f9ff';
+  const RS_SEP='background:var(--bg2)';
+  const RS_REAL='background:var(--green-l)';
+  const RS_REAL_CALC='background:#e6f4ea';
+
+  let html=`<div class="sec-title">Objetivos vs Real</div>
+  <div style="font-size:12px;color:var(--text2);margin-bottom:16px;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px">
+    <strong>Celdas editables</strong> → Inversión, CPL, % Agendamiento, % Asistencia, % Cierre, Ticket total, Ticket medio pagado.
+    El resto se calcula automáticamente.
+  </div>`;
+
+  CANALES_OBJ.forEach(canal=>{
+    html+=`<div class="card" style="padding:0;overflow:hidden;margin-bottom:16px">
+      <div style="padding:14px 18px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)">
+        <span class="badge ${cbc[canal]}">${canal}</span>
+        <span style="font-size:12px;font-weight:600">Objetivos vs Real — ${canal}</span>
+      </div>
+      <div class="tw"><table>
+        <thead><tr>
+          <th style="min-width:200px">Métrica</th>
+          ${MONTHS.map(m=>`<th style="min-width:90px;text-align:right">${m}</th>`).join('')}
+        </tr></thead>
+        <tbody>`;
+
+    // ── BLOQUE OBJETIVOS ──
+    html+=`<tr style="${RS_SEP}"><td colspan="${MONTHS.length+1}" style="padding:5px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">OBJETIVOS</td></tr>`;
+
+    // 1. Inversión (manual)
+    html+=`<tr style="${RS_INPUT}"><td style="font-weight:500;padding:4px 8px">Inversión (€)</td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);const v=S.objetivos[mk][canal].inversion||'';
+      html+=`<td><input class="ce" type="number" inputmode="numeric" value="${v}" oninput="upObjCalc('${mk}','${canal}','inversion',this.value)" placeholder="-" style="text-align:right"></td>`;
+    });html+=`</tr>`;
+
+    // 2. CPL objetivo (manual)
+    html+=`<tr style="${RS_INPUT}"><td style="font-weight:500;padding:4px 8px">CPL objetivo (€)</td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);const v=S.objetivos[mk][canal].cpl_obj||'';
+      html+=`<td><input class="ce" type="number" inputmode="numeric" value="${v}" oninput="upObjCalc('${mk}','${canal}','cpl_obj',this.value)" placeholder="-" style="text-align:right"></td>`;
+    });html+=`</tr>`;
+
+    // 3. Leads = inversión / CPL (calculado)
+    html+=`<tr style="${RS_CALC}"><td style="padding:4px 8px;color:var(--blue)">Leads <span style="font-size:10px;color:var(--text3)">(auto)</span></td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);
+      const inv=Number(S.objetivos[mk][canal].inversion||0);
+      const cpl=Number(S.objetivos[mk][canal].cpl_obj||0);
+      const leads=cpl>0?Math.round(inv/cpl):'-';
+      html+=`<td style="text-align:right;font-weight:600;color:var(--blue)">${leads}</td>`;
+    });html+=`</tr>`;
+
+    // 4. % Agendamiento (manual)
+    html+=`<tr style="${RS_INPUT}"><td style="font-weight:500;padding:4px 8px">% Agendamiento</td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);const v=S.objetivos[mk][canal].pct_agend||'';
+      html+=`<td><input class="ce" type="number" inputmode="numeric" value="${v}" oninput="upObjCalc('${mk}','${canal}','pct_agend',this.value)" placeholder="-" style="text-align:right"></td>`;
+    });html+=`</tr>`;
+
+    // 5. Llamadas = leads * % agendamiento (calculado)
+    html+=`<tr style="${RS_CALC}"><td style="padding:4px 8px;color:var(--blue)">Llamadas <span style="font-size:10px;color:var(--text3)">(auto)</span></td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);
+      const inv=Number(S.objetivos[mk][canal].inversion||0);
+      const cpl=Number(S.objetivos[mk][canal].cpl_obj||0);
+      const leads=cpl>0?inv/cpl:0;
+      const pctA=Number(S.objetivos[mk][canal].pct_agend||0)/100;
+      const llamadas=leads&&pctA?Math.round(leads*pctA):'-';
+      html+=`<td style="text-align:right;font-weight:600;color:var(--blue)">${llamadas}</td>`;
+    });html+=`</tr>`;
+
+    // 6. % Asistencia (manual)
+    html+=`<tr style="${RS_INPUT}"><td style="font-weight:500;padding:4px 8px">% Asistencia</td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);const v=S.objetivos[mk][canal].pct_asist||'';
+      html+=`<td><input class="ce" type="number" inputmode="numeric" value="${v}" oninput="upObjCalc('${mk}','${canal}','pct_asist',this.value)" placeholder="-" style="text-align:right"></td>`;
+    });html+=`</tr>`;
+
+    // 7. Realizadas = llamadas * % asistencia (calculado)
+    html+=`<tr style="${RS_CALC}"><td style="padding:4px 8px;color:var(--blue)">Realizadas <span style="font-size:10px;color:var(--text3)">(auto)</span></td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);
+      const inv=Number(S.objetivos[mk][canal].inversion||0);
+      const cpl=Number(S.objetivos[mk][canal].cpl_obj||0);
+      const leads=cpl>0?inv/cpl:0;
+      const pctA=Number(S.objetivos[mk][canal].pct_agend||0)/100;
+      const llamadas=leads*pctA;
+      const pctAs=Number(S.objetivos[mk][canal].pct_asist||0)/100;
+      const realizadas=llamadas&&pctAs?Math.round(llamadas*pctAs):'-';
+      html+=`<td style="text-align:right;font-weight:600;color:var(--blue)">${realizadas}</td>`;
+    });html+=`</tr>`;
+
+    // 8. % Cierre (manual)
+    html+=`<tr style="${RS_INPUT}"><td style="font-weight:500;padding:4px 8px">% Cierre</td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);const v=S.objetivos[mk][canal].pct_cierre||'';
+      html+=`<td><input class="ce" type="number" inputmode="numeric" value="${v}" oninput="upObjCalc('${mk}','${canal}','pct_cierre',this.value)" placeholder="-" style="text-align:right"></td>`;
+    });html+=`</tr>`;
+
+    // 9. Ventas = realizadas * % cierre (calculado)
+    html+=`<tr style="${RS_CALC}"><td style="padding:4px 8px;color:var(--blue)">Ventas <span style="font-size:10px;color:var(--text3)">(auto)</span></td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);
+      const inv=Number(S.objetivos[mk][canal].inversion||0);
+      const cpl=Number(S.objetivos[mk][canal].cpl_obj||0);
+      const leads=cpl>0?inv/cpl:0;
+      const pctA=Number(S.objetivos[mk][canal].pct_agend||0)/100;
+      const llamadas=leads*pctA;
+      const pctAs=Number(S.objetivos[mk][canal].pct_asist||0)/100;
+      const realizadas=llamadas*pctAs;
+      const pctC=Number(S.objetivos[mk][canal].pct_cierre||0)/100;
+      const ventas=realizadas&&pctC?Math.round(realizadas*pctC):'-';
+      html+=`<td style="text-align:right;font-weight:600;color:var(--green)">${ventas}</td>`;
+    });html+=`</tr>`;
+
+    // 10. Ticket total (manual)
+    html+=`<tr style="${RS_INPUT}"><td style="font-weight:500;padding:4px 8px">Ticket total (€)</td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);const v=S.objetivos[mk][canal].ticket_total||'';
+      html+=`<td><input class="ce" type="number" inputmode="numeric" value="${v}" oninput="upObjCalc('${mk}','${canal}','ticket_total',this.value)" placeholder="-" style="text-align:right"></td>`;
+    });html+=`</tr>`;
+
+    // 11. Ticket medio pagado (manual)
+    html+=`<tr style="${RS_INPUT}"><td style="font-weight:500;padding:4px 8px">Ticket medio pagado (€)</td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);const v=S.objetivos[mk][canal].ticket_medio||'';
+      html+=`<td><input class="ce" type="number" inputmode="numeric" value="${v}" oninput="upObjCalc('${mk}','${canal}','ticket_medio',this.value)" placeholder="-" style="text-align:right"></td>`;
+    });html+=`</tr>`;
+
+    // 12. Facturación = ventas * ticket total (calculado)
+    html+=`<tr style="${RS_CALC}"><td style="padding:4px 8px;color:var(--blue)">Facturación (€) <span style="font-size:10px;color:var(--text3)">(auto)</span></td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);
+      const ventas=calcVentas(mk,canal);
+      const tt=Number(S.objetivos[mk][canal].ticket_total||0);
+      const fact=ventas&&tt?fmt(Math.round(ventas*tt)):'-';
+      html+=`<td style="text-align:right;font-weight:600;color:var(--blue)">${fact}</td>`;
+    });html+=`</tr>`;
+
+    // 13. ROAS = facturación / inversión (calculado)
+    html+=`<tr style="${RS_CALC}"><td style="padding:4px 8px;color:var(--amber)">ROAS <span style="font-size:10px;color:var(--text3)">(auto)</span></td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);
+      const ventas=calcVentas(mk,canal);
+      const tt=Number(S.objetivos[mk][canal].ticket_total||0);
+      const fact=ventas*tt;
+      const inv=Number(S.objetivos[mk][canal].inversion||0);
+      const roas=fact&&inv?(fact/inv).toFixed(2)+'x':'-';
+      html+=`<td style="text-align:right;font-weight:600;color:var(--amber)">${roas}</td>`;
+    });html+=`</tr>`;
+
+    // 14. Caja = ventas * ticket medio pagado (calculado)
+    html+=`<tr style="${RS_CALC}"><td style="padding:4px 8px;color:var(--green)">Caja (€) <span style="font-size:10px;color:var(--text3)">(auto)</span></td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);
+      const ventas=calcVentas(mk,canal);
+      const tm=Number(S.objetivos[mk][canal].ticket_medio||0);
+      const caja=ventas&&tm?fmt(Math.round(ventas*tm)):'-';
+      html+=`<td style="text-align:right;font-weight:600;color:var(--green)">${caja}</td>`;
+    });html+=`</tr>`;
+
+    // 15. ROI = caja / inversión (calculado)
+    html+=`<tr style="${RS_CALC}"><td style="padding:4px 8px;color:var(--purple)">ROI <span style="font-size:10px;color:var(--text3)">(auto)</span></td>`;
+    MONTHS.forEach((_,mi)=>{
+      const mk=mKey(mi);ensureObj(mk,canal);
+      const ventas=calcVentas(mk,canal);
+      const tm=Number(S.objetivos[mk][canal].ticket_medio||0);
+      const caja=ventas*tm;
+      const inv=Number(S.objetivos[mk][canal].inversion||0);
+      const roi=caja&&inv?(caja/inv).toFixed(2)+'x':'-';
+      html+=`<td style="text-align:right;font-weight:600;color:var(--purple)">${roi}</td>`;
+    });html+=`</tr>`;
+
+    // ── BLOQUE REAL ──
+    html+=`<tr style="${RS_SEP}"><td colspan="${MONTHS.length+1}" style="padding:5px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">REAL</td></tr>`;
+
+    const realRows=[
+      {label:'Leads real',fn:mk=>(S.kpis_diarios[mk]||[]).filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0),0),fmt:false},
+      {label:'CPL real',fn:mk=>{const inv=(S.kpis_diarios[mk]||[]).filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);const leads=(S.kpis_diarios[mk]||[]).filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0),0);return leads?fmt(inv/leads,2):'-';},fmt:false,raw:true},
+      {label:'Llamadas real',fn:mk=>(S.llamadas[mk]||[]).filter(l=>l.embudo===canal).length,fmt:false},
+      {label:'Realizadas real',fn:mk=>(S.llamadas[mk]||[]).filter(l=>l.embudo===canal&&l.asistencia==='SI').length,fmt:false},
+      {label:'Ventas real',fn:mk=>(S.llamadas[mk]||[]).filter(l=>l.embudo===canal&&l.estado==='Venta').length,fmt:false},
+      {label:'Facturación real',fn:mk=>fmt((S.llamadas[mk]||[]).filter(l=>l.embudo===canal&&l.estado==='Venta').reduce((s,l)=>s+Number(l.facturacion||0),0)),fmt:false,raw:true},
+      {label:'Caja real',fn:mk=>fmt((S.llamadas[mk]||[]).filter(l=>l.embudo===canal&&l.estado==='Venta').reduce((s,l)=>s+Number(l.caja||0),0)),fmt:false,raw:true},
+      {label:'ROAS real',fn:mk=>{const inv=(S.kpis_diarios[mk]||[]).filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);const fact=(S.llamadas[mk]||[]).filter(l=>l.embudo===canal&&l.estado==='Venta').reduce((s,l)=>s+Number(l.facturacion||0),0);return inv&&fact?(fact/inv).toFixed(2)+'x':'-';},fmt:false,raw:true},
+      {label:'ROI real',fn:mk=>{const inv=(S.kpis_diarios[mk]||[]).filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);const caja=(S.llamadas[mk]||[]).filter(l=>l.embudo===canal&&l.estado==='Venta').reduce((s,l)=>s+Number(l.caja||0),0);return inv&&caja?(caja/inv).toFixed(2)+'x':'-';},fmt:false,raw:true},
+    ];
+    realRows.forEach(rm=>{
+      html+=`<tr style="${RS_REAL}"><td style="font-weight:500;font-size:12px;padding:4px 8px">${rm.label}</td>`;
+      MONTHS.forEach((_,mi)=>{const val=rm.fn(mKey(mi));html+=`<td style="font-size:12px;font-weight:600;color:var(--green);text-align:right">${val}</td>`;});
+      html+=`</tr>`;
+    });
+
+    html+=`</tbody></table></div></div>`;
+  });
   document.getElementById('content').innerHTML=html;
 }
-function upObj(mk,canal,key,val){if(!S.objetivos[mk])S.objetivos[mk]={};if(!S.objetivos[mk][canal])S.objetivos[mk][canal]={};S.objetivos[mk][canal][key]=parseFloat(val)||0;save();}
+
+function ensureObj(mk,canal){
+  if(!S.objetivos[mk])S.objetivos[mk]={};
+  if(!S.objetivos[mk][canal])S.objetivos[mk][canal]={};
+}
+
+function calcVentas(mk,canal){
+  const inv=Number(S.objetivos[mk][canal].inversion||0);
+  const cpl=Number(S.objetivos[mk][canal].cpl_obj||0);
+  const leads=cpl>0?inv/cpl:0;
+  const pctA=Number(S.objetivos[mk][canal].pct_agend||0)/100;
+  const llamadas=leads*pctA;
+  const pctAs=Number(S.objetivos[mk][canal].pct_asist||0)/100;
+  const realizadas=llamadas*pctAs;
+  const pctC=Number(S.objetivos[mk][canal].pct_cierre||0)/100;
+  return realizadas*pctC;
+}
+
+function upObjCalc(mk,canal,key,val){
+  ensureObj(mk,canal);
+  S.objetivos[mk][canal][key]=parseFloat(val)||0;
+  save();
+  renderObjetivos();
+}
+function upObj(mk,canal,key,val){ensureObj(mk,canal);S.objetivos[mk][canal][key]=parseFloat(val)||0;save();}
 
 // ── CUOTAS ────────────────────────────────────────────────
 function renderCuotas(){
