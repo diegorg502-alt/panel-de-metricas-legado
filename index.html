@@ -649,7 +649,7 @@ function renderKpisD(){
 function renderKpiDRows(mk){
   const rows=S.kpis_diarios[mk]||[];const tbody=document.getElementById('kpid-body');if(!tbody)return;
   tbody.innerHTML=rows.map((r,i)=>{const cpl=r.leads&&r.inversion?(r.inversion/r.leads).toFixed(2):'-';
-    return`<tr><td><input class="ce" value="${r.dia||''}" oninput="upKD('${mk}',${i},'dia',this.value)" placeholder="Día" style="text-align:center;max-width:50px"></td>
+    return`<tr><td><input class="ce" value="${r.dia||''}" oninput="upKDText('${mk}',${i},'dia',this.value)" placeholder="Día" style="text-align:center;max-width:50px"></td>
       <td><select class="ce" onchange="upKD('${mk}',${i},'canal',this.value)">${CANALES.map(c=>`<option${r.canal===c?' selected':''}>${c}</option>`).join('')}</select></td>
       <td><input class="ce" type="number" inputmode="numeric" value="${r.inversion||''}" oninput="upKDNum('${mk}',${i},'inversion',this.value)" placeholder="0" style="text-align:right"></td>
       <td><input class="ce" type="number" inputmode="numeric" value="${r.leads||''}" oninput="upKDNum('${mk}',${i},'leads',this.value)" placeholder="0" style="text-align:right"></td>
@@ -658,6 +658,7 @@ function renderKpiDRows(mk){
     </tr>`;}).join('');
 }
 function upKD(mk,i,f,v){S.kpis_diarios[mk][i][f]=v;save();renderKpisD();}
+function upKDText(mk,i,f,v){S.kpis_diarios[mk][i][f]=v;save();}
 function upKDNum(mk,i,f,v){
   S.kpis_diarios[mk][i][f]=parseFloat(v)||0;
   save();
