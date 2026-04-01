@@ -174,6 +174,10 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><rect x="1" y="3" width="14" height="2" rx="1"/><rect x="1" y="7" width="14" height="2" rx="1"/><rect x="1" y="11" width="14" height="2" rx="1"/></svg>Cuotas</div>
         <div class="nav-i" id="ni-renovaciones" onclick="goTo('renovaciones')">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M13.5 6A6 6 0 102.5 10m0 0v3m0-3h3"/></svg>Renovaciones</div>
+        <div class="nav-i" id="ni-alertas" onclick="goTo('alertas')" style="position:relative">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M8 1a5 5 0 015 5v3l1.5 2.5H1.5L3 9V6a5 5 0 015-5zM6.5 13.5a1.5 1.5 0 003 0"/></svg>Alertas
+          <span id="alerta-badge" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px"></span>
+        </div>
       </nav>
       <div class="sb-foot">
         <div class="sb-sync"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Conectando...</span></div>
@@ -363,17 +367,18 @@ function toggleG(id){document.getElementById(`nhdr-${id}`).classList.toggle('ope
 function goTo(page,month){
   if(month!==undefined)curMonth=month;curPage=page;
   document.querySelectorAll('.nav-i').forEach(el=>el.classList.remove('active'));
-  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones'};
+  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas'};
   if(ids[page])document.getElementById(ids[page])?.classList.add('active');
   if(page==='mes')document.getElementById(`ni-mes-${MONTHS[curMonth]}`)?.classList.add('active');
   if(page==='kpis_d')document.getElementById(`ni-kd-${MONTHS[curMonth]}`)?.classList.add('active');
-  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones'};
+  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación'};
+  updateAlertaBadge();
   document.getElementById('topbar-title').textContent=titles[page]||(page==='mes'?`Llamadas — ${MFULL[curMonth]} 2026`:`KPIs diarios — ${MFULL[curMonth]} 2026`);
   const ex=document.getElementById('topbar-extra');ex.innerHTML='';
   if(page==='mes'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLlamadaRow(curMonth);ex.appendChild(b);}
   if(page==='cuotas'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Añadir cliente';b.onclick=openAddCuota;ex.appendChild(b);}
   if(page==='renovaciones'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva renovación';b.onclick=openAddRenov;ex.appendChild(b);}
-  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,mes:renderMes,kpis_d:renderKpisD}[page]||renderDashboard)();
+  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,mes:renderMes,kpis_d:renderKpisD}[page]||renderDashboard)();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────
@@ -425,31 +430,118 @@ function renderDashboard(){
 }
 
 // ── MES ───────────────────────────────────────────────────
+function kpisCanal(mk, canal){
+  const rows=S.llamadas[mk]||[];
+  const cl=rows.filter(r=>r.embudo===canal);
+  const cv=cl.filter(r=>r.estado==='Venta');
+  const realizadas=cl.filter(r=>r.asistencia==='SI').length;
+  const kd=S.kpis_diarios[mk]||[];
+  const inv=kd.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);
+  const leads=kd.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0),0);
+  const fact=cv.reduce((s,r)=>s+Number(r.facturacion||0),0);
+  const caja=cv.reduce((s,r)=>s+Number(r.caja||0),0);
+  const llamadas=cl.length;
+  return{inv,leads,llamadas,realizadas,ventas:cv.length,fact,caja,
+    cpl:leads&&inv?inv/leads:null,
+    costeLlamada:llamadas&&inv?inv/llamadas:null,
+    pctAgend:leads?llamadas/leads:null,
+    pctAsist:llamadas?realizadas/llamadas:null,
+    pctCierre:realizadas?cv.length/realizadas:null,
+    roas:inv?fact/inv:null,roi:inv?caja/inv:null,cpa:cv.length&&inv?inv/cv.length:null};
+}
+
+function kpiCard(label,val,cls,small){
+  return`<div class="kpi-m"><div class="ml">${label}</div><div class="mv ${cls||''}" style="font-size:${small?'14px':'16px'}">${val}</div></div>`;
+}
+
+function acordeon(id,title,badgeCls,content,open){
+  return`<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden">
+    <div onclick="toggleAcordeon('${id}')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:var(--bg);user-select:none">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600">
+        <span class="badge ${badgeCls}">${title}</span>
+      </div>
+      <svg id="arr-${id}" style="transition:transform .2s;${open?'transform:rotate(180deg)':''}" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><polyline points="2,4 6,8 10,4"/></svg>
+    </div>
+    <div id="ac-${id}" style="display:${open?'block':'none'};padding:14px 16px;background:var(--bg2);border-top:1px solid var(--border)">${content}</div>
+  </div>`;
+}
+
+function toggleAcordeon(id){
+  const el=document.getElementById('ac-'+id);
+  const arr=document.getElementById('arr-'+id);
+  const open=el.style.display==='block';
+  el.style.display=open?'none':'block';
+  arr.style.transform=open?'':'rotate(180deg)';
+}
+
 function renderMes(){
   const mk=mKey(curMonth);if(!S.llamadas[mk])S.llamadas[mk]=[];
-  const rows=S.llamadas[mk];const ventas=rows.filter(r=>r.estado==='Venta');
+  const rows=S.llamadas[mk];
+  const ventas=rows.filter(r=>r.estado==='Venta');
   const realizadas=rows.filter(r=>r.asistencia==='SI').length;
-  const inv=Object.values(S.kpis_diarios[mk]||[]).reduce((s,k)=>s+Number(k.inversion||0),0);
-  const leads=Object.values(S.kpis_diarios[mk]||[]).reduce((s,k)=>s+Number(k.leads||0),0);
+  const kd=S.kpis_diarios[mk]||[];
+  const inv=kd.reduce((s,k)=>s+Number(k.inversion||0),0);
+  const leads=kd.reduce((s,k)=>s+Number(k.leads||0),0);
   const fact=ventas.reduce((s,r)=>s+Number(r.facturacion||0),0);
   const caja=ventas.reduce((s,r)=>s+Number(r.caja||0),0);
   const llamadasTotal=rows.length;
-  const cpl=leads&&inv?inv/leads:null;const costeLlamada=llamadasTotal&&inv?inv/llamadasTotal:null;
-  const pctAgend=leads?llamadasTotal/leads:null;const pctAsist=llamadasTotal?realizadas/llamadasTotal:null;
+  const cpl=leads&&inv?inv/leads:null;
+  const costeLlamada=llamadasTotal&&inv?inv/llamadasTotal:null;
+  const pctAgend=leads?llamadasTotal/leads:null;
+  const pctAsist=llamadasTotal?realizadas/llamadasTotal:null;
   const pctCierre=realizadas?ventas.length/realizadas:null;
   const roas=inv?fact/inv:null;const roi=inv?caja/inv:null;const cpa=ventas.length&&inv?inv/ventas.length:null;
+
+  const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
+
+  // Per-canal accordions
+  const CANALES_FULL=['YOUTUBE','SOCIAL','VSL'];
+  let acordeonesHTML='';
+
+  CANALES_FULL.forEach(canal=>{
+    const ks=kpisCanal(mk,canal);
+    const metricas=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
+      ${[
+        ['Inversión',fmt(ks.inv),'blue'],['Leads',ks.leads,''],['CPL',ks.cpl?fmt(ks.cpl,2):'-','amber'],
+        ['Llamadas',ks.llamadas,''],['% Agenda.',ks.pctAgend!=null?(ks.pctAgend*100).toFixed(1)+'%':'-',''],
+        ['€/Llamada',ks.costeLlamada?fmt(ks.costeLlamada,2):'-','amber'],
+        ['% Asistencia',ks.pctAsist!=null?(ks.pctAsist*100).toFixed(1)+'%':'-',''],
+        ['Realizadas',ks.realizadas,''],['% Cierre',ks.pctCierre!=null?(ks.pctCierre*100).toFixed(1)+'%':'-','blue'],
+        ['Ventas',ks.ventas,'green'],['Facturación',fmt(ks.fact),'blue'],['Caja',fmt(ks.caja),'green'],
+        ['ROAS',ks.roas?ks.roas.toFixed(2)+'x':'-','amber'],['ROI',ks.roi?ks.roi.toFixed(2)+'x':'-','purple'],['CPA',ks.cpa?fmt(ks.cpa,2):'-','']
+      ].map(([l,v,c])=>kpiCard(l,v,c,true)).join('')}
+    </div>`;
+    acordeonesHTML+=acordeon(canal,canal,cbc[canal],metricas,false);
+  });
+
+  // Referidos accordion (reduced metrics)
+  const kr=kpisCanal(mk,'REFERIDOS');
+  const refMetricas=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
+    ${[
+      ['Llamadas',kr.llamadas,''],['% Asistencia',kr.pctAsist!=null?(kr.pctAsist*100).toFixed(1)+'%':'-',''],
+      ['Realizadas',kr.realizadas,''],['% Cierre',kr.pctCierre!=null?(kr.pctCierre*100).toFixed(1)+'%':'-','blue'],
+      ['Ventas',kr.ventas,'green'],['Facturación',fmt(kr.fact),'blue'],['Caja',fmt(kr.caja),'green']
+    ].map(([l,v,c])=>kpiCard(l,v,c,true)).join('')}
+  </div>`;
+  acordeonesHTML+=acordeon('REFERIDOS','REFERIDOS',cbc['REFERIDOS'],refMetricas,false);
+
   document.getElementById('content').innerHTML=`
     <div class="card" style="margin-bottom:14px">
-      <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text2)">KPIs del mes — ${MFULL[curMonth]} 2026</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text2)">KPIs totales — ${MFULL[curMonth]} 2026</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px">
-        ${[['Inversión',fmt(inv),''],['Leads/Seg.',leads,''],['CPL',cpl?fmt(cpl,2):'-','amber'],
-           ['Llamadas agend.',llamadasTotal,''],['% Agendamiento',pctAgend!=null?(pctAgend*100).toFixed(1)+'%':'-',''],
-           ['€/Llamada',costeLlamada?fmt(costeLlamada,2):'-','amber'],['% Asistencia',pctAsist!=null?(pctAsist*100).toFixed(1)+'%':'-',''],
-           ['Realizadas',realizadas,''],['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue'],
-           ['Ventas',ventas.length,'green'],['Facturación',fmt(fact),'blue'],['Caja',fmt(caja),'green'],
-           ['ROAS',roas?roas.toFixed(2)+'x':'-','amber'],['ROI',roi?roi.toFixed(2)+'x':'-','purple'],['CPA',cpa?fmt(cpa,2):'-','']
+        ${[
+          ['Inversión',fmt(inv),'blue'],['Leads/Seg.',leads,''],['CPL',cpl?fmt(cpl,2):'-','amber'],
+          ['Llamadas agend.',llamadasTotal,''],['% Agendamiento',pctAgend!=null?(pctAgend*100).toFixed(1)+'%':'-',''],
+          ['€/Llamada',costeLlamada?fmt(costeLlamada,2):'-','amber'],['% Asistencia',pctAsist!=null?(pctAsist*100).toFixed(1)+'%':'-',''],
+          ['Realizadas',realizadas,''],['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue'],
+          ['Ventas',ventas.length,'green'],['Facturación',fmt(fact),'blue'],['Caja',fmt(caja),'green'],
+          ['ROAS',roas?roas.toFixed(2)+'x':'-','amber'],['ROI',roi?roi.toFixed(2)+'x':'-','purple'],['CPA',cpa?fmt(cpa,2):'-','']
         ].map(([l,v,c])=>`<div class="kpi-m"><div class="ml">${l}</div><div class="mv ${c}" style="font-size:16px">${v}</div></div>`).join('')}
       </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--text2)">KPIs por canal</div>
+      ${acordeonesHTML}
     </div>
     <div class="card" style="padding:0;overflow:hidden">
       <div class="tw"><table id="lt">
@@ -492,6 +584,8 @@ function addLlamadaRow(mi){
   save();renderMes();
   setTimeout(()=>{const lb=document.getElementById('lb');if(lb){const last=lb.querySelector('tr:last-child');if(last){last.scrollIntoView({behavior:'smooth',block:'nearest'});const inp=last.querySelector('input');if(inp)inp.focus();}}},80);
 }
+
+// ── KPIs DIARIOS
 
 // ── KPIs DIARIOS ──────────────────────────────────────────
 function renderKpisD(){
@@ -801,12 +895,14 @@ function upObjCalc(mk,canal,key,val){
 function upObj(mk,canal,key,val){ensureObj(mk,canal);S.objetivos[mk][canal][key]=parseFloat(val)||0;save();}
 
 // ── CUOTAS ────────────────────────────────────────────────
+let cuotaSearch='';
 function renderCuotas(){
   const allVentas=Object.values(S.llamadas).flat().filter(l=>l.estado==='Venta');
   const totalFact=S.cuotas.reduce((s,c)=>s+Number(c.ticket||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
   const totalCaja=allVentas.reduce((s,l)=>s+Number(l.caja||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
   const todayM=todayMonth();
   const cajaPendiente=S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const allP={...c.pagos};rs.forEach(r=>{Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);});});return s+MONTHS.reduce((ms,m,mi)=>mi>=todayM?ms+(allP[m]||0):ms,0);},0);
+  const filtered=S.cuotas.filter(c=>!cuotaSearch||c.nombre.toLowerCase().includes(cuotaSearch.toLowerCase()));
   document.getElementById('content').innerHTML=`
     <div class="mg">
       <div class="metric"><div class="ml">Facturación comprometida</div><div class="mv blue">${fmt(totalFact)}</div></div>
@@ -817,12 +913,15 @@ function renderCuotas(){
     </div>
     <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Caja por cobrar desde ${MFULL[todayM]} (día ${todayDayOfMonth()}) en adelante.</div>
     <div class="card" style="padding:0;overflow:hidden">
-      <div style="padding:14px 18px 10px;font-size:13px;font-weight:600">Detalle por cliente</div>
+      <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:13px;font-weight:600">Detalle por cliente <span style="font-size:11px;color:var(--text3);font-weight:400">(${filtered.length} de ${S.cuotas.length})</span></div>
+        <input placeholder="Buscar cliente..." value="${cuotaSearch}" oninput="cuotaSearch=this.value;renderCuotas()" style="padding:5px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;width:200px;font-family:var(--font)">
+      </div>
       <div class="tw"><table style="min-width:1100px">
         <thead><tr><th>Cliente</th><th>Inicio</th><th>Cuotas</th><th>Ticket</th><th>Cuota/mes</th>
           ${MONTHS.map(m=>`<th style="text-align:center">${m}</th>`).join('')}
           <th>Vencimiento</th><th>Alerta</th><th>Renov.</th><th>LTV</th></tr></thead>
-        <tbody>${S.cuotas.map((c,ci)=>{
+        <tbody>${filtered.map((c,ci)=>{
           const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const ltv=Number(c.ticket||0)+rs.reduce((s,r)=>s+Number(r.ticket||0),0);
           const venc=getVenc(c);const inf=alertInfo(venc);const cm=c.nCuotas?Math.round(Number(c.ticket||0)/c.nCuotas):Number(c.ticket||0);
           return`<tr><td><input class="ce" value="${esc(c.nombre)}" oninput="upCuota(${ci},'nombre',this.value)" style="font-weight:600;min-width:120px"></td>
@@ -850,18 +949,28 @@ function openAddCuota(){openModal(`<div class="mtitle">Añadir cliente a cuotas<
 function saveCuota(){const n=document.getElementById('cn').value.trim().toUpperCase();const f=document.getElementById('cf').value;const t=parseFloat(document.getElementById('ct').value)||0;const q=parseInt(document.getElementById('cq').value)||1;if(!n){alert('Introduce un nombre');return;}const ms=new Date(f).getMonth();const pv=Math.round(t/q*100)/100;const pagos={};for(let i=0;i<q&&(ms+i)<12;i++)pagos[MONTHS[ms+i]]=pv;S.cuotas.push({nombre:n,fechaInicio:f,ticket:t,nCuotas:q,pagos});save();closeModal();renderCuotas();}
 
 // ── RENOVACIONES ──────────────────────────────────────────
+let renovSearch='';
 function renderRenovaciones(){
-  document.getElementById('content').innerHTML=`<div class="card"><div class="card-title">Renovaciones</div>
-    ${S.renovaciones.length===0?'<div class="empty">Sin renovaciones. Usa el botón superior para añadir.</div>':''}
-    ${S.renovaciones.map((r,i)=>{const venc=edate(r.fechaInicio,6);const inf=alertInfo(venc);const cm=r.nCuotas?Math.round(Number(r.ticket||0)/r.nCuotas):Number(r.ticket||0);return`
-      <div class="rv-card"><div class="rv-head"><div><div class="rv-name">${r.nombre}</div><div class="rv-meta">${r.nRenov}ª renovación · Inicio: ${r.fechaInicio} · Vence: ${venc}</div></div>
-        <div style="display:flex;align-items:center;gap:8px"><span class="badge ${inf.cls}">${inf.label}</span><button class="btn btn-red btn-xs" onclick="delRenov(${i})">Eliminar</button></div></div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:13px">
-          <div><div class="ml">Ticket</div><div style="font-weight:600">${fmt(r.ticket)}</div></div>
-          <div><div class="ml">Cuotas</div><div style="font-weight:600">${r.nCuotas||1}</div></div>
-          <div><div class="ml">Cuota/mes</div><div style="font-weight:600">${fmt(cm)}</div></div>
-          <div><div class="ml">Días restantes</div><div style="font-weight:600;color:${daysDiff(venc)<30?'var(--red)':'var(--green)'}">${Math.max(0,daysDiff(venc))}</div></div>
-        </div></div>`;}).join('')}</div>`;
+  const filtered=S.renovaciones.filter(r=>!renovSearch||r.nombre.toLowerCase().includes(renovSearch.toLowerCase()));
+  document.getElementById('content').innerHTML=`
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
+      <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:13px;font-weight:600">Renovaciones <span style="font-size:11px;color:var(--text3);font-weight:400">(${filtered.length} de ${S.renovaciones.length})</span></div>
+        <input placeholder="Buscar cliente..." value="${renovSearch}" oninput="renovSearch=this.value;renderRenovaciones()" style="padding:5px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;width:200px;font-family:var(--font)">
+      </div>
+      <div style="padding:0 18px 14px">
+        ${filtered.length===0?'<div class="empty" style="padding:20px">Sin renovaciones que coincidan.</div>':''}
+        ${filtered.map((r,i)=>{const venc=edate(r.fechaInicio,6);const inf=alertInfo(venc);const cm=r.nCuotas?Math.round(Number(r.ticket||0)/r.nCuotas):Number(r.ticket||0);const origIdx=S.renovaciones.indexOf(r);return`
+          <div class="rv-card"><div class="rv-head"><div><div class="rv-name">${r.nombre}</div><div class="rv-meta">${r.nRenov}ª renovación · Inicio: ${r.fechaInicio} · Vence: ${venc}</div></div>
+            <div style="display:flex;align-items:center;gap:8px"><span class="badge ${inf.cls}">${inf.label}</span><button class="btn btn-red btn-xs" onclick="delRenov(${origIdx})">Eliminar</button></div></div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:13px">
+              <div><div class="ml">Ticket</div><div style="font-weight:600">${fmt(r.ticket)}</div></div>
+              <div><div class="ml">Cuotas</div><div style="font-weight:600">${r.nCuotas||1}</div></div>
+              <div><div class="ml">Cuota/mes</div><div style="font-weight:600">${fmt(cm)}</div></div>
+              <div><div class="ml">Días restantes</div><div style="font-weight:600;color:${daysDiff(venc)<30?'var(--red)':'var(--green)'}">${Math.max(0,daysDiff(venc))}</div></div>
+            </div></div>`;}).join('')}
+      </div>
+    </div>`;
 }
 function delRenov(i){if(!confirm('¿Eliminar?'))return;S.renovaciones.splice(i,1);save();renderRenovaciones();}
 function openAddRenov(){const opts=S.cuotas.map(c=>`<option value="${esc(c.nombre)}">${c.nombre}</option>`).join('');openModal(`<div class="mtitle">Nueva renovación</div>
@@ -871,6 +980,66 @@ function openAddRenov(){const opts=S.cuotas.map(c=>`<option value="${esc(c.nombr
   <div class="fg"><label class="fl">Nº cuotas</label><select class="fi" id="rq">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}">${n===1?'1 (pago único)':n}</option>`).join('')}</select></div></div>
   <div class="mfooter"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="saveRenov()">Guardar</button></div>`);}
 function saveRenov(){const nombre=document.getElementById('rn').value;const fecha=document.getElementById('rf').value;const ticket=parseFloat(document.getElementById('rt').value)||0;const cuotas=parseInt(document.getElementById('rq').value)||1;const nRenov=S.renovaciones.filter(r=>r.nombre===nombre).length+1;const mStart=new Date(fecha).getMonth();const pv=Math.round(ticket/cuotas*100)/100;const pagos={};for(let i=0;i<cuotas&&(mStart+i)<12;i++)pagos[MONTHS[mStart+i]]=pv;S.renovaciones.push({nombre,nRenov,ticket,nCuotas:cuotas,fechaInicio:fecha,pagos});save();closeModal();renderRenovaciones();}
+
+// ── ALERTAS ───────────────────────────────────────────────
+function proximosAVencer(){
+  // Clients whose vencimiento is within 21 days (3 weeks before end)
+  return S.cuotas.filter(c=>{
+    const d=daysDiff(getVenc(c));
+    return d>=0&&d<=21;
+  }).sort((a,b)=>daysDiff(getVenc(a))-daysDiff(getVenc(b)));
+}
+
+function updateAlertaBadge(){
+  const badge=document.getElementById('alerta-badge');
+  if(!badge)return;
+  const count=proximosAVencer().length;
+  if(count>0){badge.style.display='inline';badge.textContent=count;}
+  else{badge.style.display='none';}
+}
+
+function renderAlertas(){
+  const proximos=proximosAVencer();
+  const expired=S.cuotas.filter(c=>daysDiff(getVenc(c))<0);
+  document.getElementById('content').innerHTML=`
+    <div class="sec-title">Alertas de renovación</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;padding:10px 14px;background:var(--amber-l);border:1px solid #fde68a;border-radius:8px">
+      Clientes que vencen en los próximos <strong>21 días</strong> — contacta para agendar llamada de renovación.
+    </div>
+    ${proximos.length===0&&expired.length===0?`<div class="card"><div class="empty">Sin alertas activas. Todos los clientes están dentro de su periodo.</div></div>`:''}
+    ${proximos.length>0?`
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title" style="color:var(--amber)">⚠️ Próximos a vencer (${proximos.length})</div>
+      ${proximos.map(c=>{
+        const d=daysDiff(getVenc(c));const venc=getVenc(c);
+        return`<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:9px;background:var(--amber-l);border:1px solid #fde68a;margin-bottom:8px">
+          <div>
+            <div style="font-weight:600;font-size:14px">${c.nombre}</div>
+            <div style="font-size:12px;color:var(--text2)">Vence el ${venc} · <strong style="color:var(--amber)">En ${d} días</strong></div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">LTV acumulado</div>
+            <div style="font-weight:600">${fmt(Number(c.ticket||0)+S.renovaciones.filter(r=>r.nombre===c.nombre).reduce((s,r)=>s+Number(r.ticket||0),0))}</div>
+          </div>
+        </div>`;}).join('')}
+    </div>`:''}
+    ${expired.length>0?`
+    <div class="card">
+      <div class="card-title" style="color:var(--red)">🔴 Vencidos sin renovar (${expired.length})</div>
+      ${expired.map(c=>{
+        const d=Math.abs(daysDiff(getVenc(c)));const venc=getVenc(c);
+        return`<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:9px;background:var(--red-l);border:1px solid #fecaca;margin-bottom:8px">
+          <div>
+            <div style="font-weight:600;font-size:14px">${c.nombre}</div>
+            <div style="font-size:12px;color:var(--text2)">Venció el ${venc} · <strong style="color:var(--red)">Hace ${d} días</strong></div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Renovaciones</div>
+            <div style="font-weight:600">${S.renovaciones.filter(r=>r.nombre===c.nombre).length}</div>
+          </div>
+        </div>`;}).join('')}
+    </div>`:''}`;
+}
 
 function openModal(html){document.getElementById('mbox').innerHTML=html;document.getElementById('moverlay').classList.add('open');}
 function closeModal(){document.getElementById('moverlay').classList.remove('open');}
