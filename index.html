@@ -344,14 +344,43 @@ function exportBackup(){
   URL.revokeObjectURL(url);
 }
 
+function triggerImport(){
+  document.getElementById('import-file')?.click();
+}
+
+function importBackup(event){
+  const file=event.target.files[0];
+  if(!file) return;
+  if(!confirm('¿Importar este backup? Los datos actuales se guardarán como copia de seguridad antes de restaurar.')) return;
+  const reader=new FileReader();
+  reader.onload=async(e)=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data.llamadas&&!data.cuotas) throw new Error('Archivo no válido');
+      await saveBackup(); // save current state first
+      S={...S,...data};
+      save();
+      closeModal();
+      goTo(curPage);
+      alert('✓ Backup importado correctamente. Todos los datos han sido restaurados.');
+    }catch(err){
+      alert('Error al importar: el archivo no es un backup válido del CRM.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value=''; // reset input
+}
+
 async function openBackupsModal(){
   openModal(`<div class="mtitle">Copias de seguridad</div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Se guarda una copia automática cada hora. Puedes restaurar cualquier punto anterior.</p>
     <div id="bk-list" style="margin-bottom:16px"><div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">Cargando...</div></div>
     <div class="mfooter">
       <button class="btn" onclick="closeModal()">Cerrar</button>
+      <button class="btn" onclick="triggerImport()">⬆ Importar JSON</button>
       <button class="btn btn-p" onclick="exportBackup()">⬇ Exportar JSON</button>
-    </div>`);
+    </div>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importBackup(event)">`);
   const bks=await listBackups();
   const el=document.getElementById('bk-list');
   if(!el) return;
