@@ -1064,7 +1064,7 @@ function renderCuotas(){
     <div class="card" style="padding:0;overflow:hidden">
       <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
         <div style="font-size:13px;font-weight:600">Detalle por cliente <span style="font-size:11px;color:var(--text3);font-weight:400">(${filtered.length} de ${S.cuotas.length})</span></div>
-        <input placeholder="Buscar cliente..." value="${cuotaSearch}" oninput="cuotaSearch=this.value;renderCuotas()" style="padding:5px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;width:200px;font-family:var(--font)">
+        <input id="cuota-search-input" placeholder="Buscar cliente..." value="${cuotaSearch}" oninput="cuotaSearch=this.value;renderCuotasFiltered()" style="padding:5px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;width:200px;font-family:var(--font)">
       </div>
       <div class="tw"><table style="min-width:1100px">
         <thead><tr><th>Cliente</th><th>Inicio</th><th>Cuotas</th><th>Ticket</th><th>Cuota/mes</th>
@@ -1087,6 +1087,51 @@ function renderCuotas(){
       </table></div>
     </div>`;
 }
+function renderCuotasFiltered(){
+  // Only re-render table rows without rebuilding the whole page
+  const todayM=todayMonth();
+  const filtered=S.cuotas.filter(c=>!cuotaSearch||c.nombre.toLowerCase().includes(cuotaSearch.toLowerCase()));
+  const countEl=document.querySelector('#content .card [style*="font-size:13px"] span');
+  if(countEl) countEl.textContent=`(${filtered.length} de ${S.cuotas.length})`;
+  const tbody=document.querySelector('#content tbody');
+  if(!tbody){renderCuotas();return;}
+  tbody.innerHTML=filtered.map((c,ci)=>{
+    const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const ltv=Number(c.ticket||0)+rs.reduce((s,r)=>s+Number(r.ticket||0),0);
+    const venc=getVenc(c);const inf=alertInfo(venc);const cm=c.nCuotas?Math.round(Number(c.ticket||0)/c.nCuotas):Number(c.ticket||0);
+    const origIdx=S.cuotas.indexOf(c);
+    return`<tr><td><input class="ce" value="${esc(c.nombre)}" oninput="upCuota(${origIdx},'nombre',this.value)" style="font-weight:600;min-width:120px"></td>
+      <td><input class="ce" type="date" value="${c.fechaInicio}" oninput="upCuota(${origIdx},'fechaInicio',this.value)"></td>
+      <td style="text-align:center">${c.nCuotas}</td>
+      <td><input class="ce" type="number" inputmode="numeric" value="${c.ticket}" oninput="upCuotaNum(${origIdx},'ticket',this.value)" style="text-align:right;min-width:70px"></td>
+      <td style="text-align:right">${fmt(cm)}</td>
+      ${MONTHS.map((m,mi)=>{const orig=Number(c.pagos?.[m]||0);const rv=rs.reduce((s,r)=>s+Number(r.pagos?.[m]||0),0);const total=orig+rv;
+        return`<td style="text-align:center;${mi<todayM?'opacity:.5':mi===todayM?'background:#fff9e6':''}">${total>0?`<span class="cpaid">${fmt(total)}</span>`:`<span class="cpen">—</span>`}</td>`;}).join('')}
+      <td style="font-size:12px;white-space:nowrap">${venc}</td><td><span class="badge ${inf.cls}">${inf.label}</span></td>
+      <td style="text-align:center">${rs.length}</td><td style="font-weight:600">${fmt(ltv)}</td></tr>`;
+  }).join('');
+  // restore focus
+  const inp=document.getElementById('cuota-search-input');
+  if(inp){const v=inp.value;const pos=inp.selectionStart;setTimeout(()=>{const el=document.getElementById('cuota-search-input');if(el){el.focus();try{el.setSelectionRange(pos,pos);}catch(e){}}},0);}
+}
+
+function renderRenovFiltered(){
+  const filtered=S.renovaciones.filter(r=>!renovSearch||r.nombre.toLowerCase().includes(renovSearch.toLowerCase()));
+  const listEl=document.getElementById('rv-filtered-list');
+  if(!listEl){renderRenovaciones();return;}
+  listEl.innerHTML=filtered.length===0?'<div class="empty" style="padding:20px">Sin renovaciones que coincidan.</div>':
+    filtered.map((r)=>{const venc=edate(r.fechaInicio,6);const inf=alertInfo(venc);const cm=r.nCuotas?Math.round(Number(r.ticket||0)/r.nCuotas):Number(r.ticket||0);const origIdx=S.renovaciones.indexOf(r);return`
+      <div class="rv-card"><div class="rv-head"><div><div class="rv-name">${r.nombre}</div><div class="rv-meta">${r.nRenov}ª renovación · Inicio: ${r.fechaInicio} · Vence: ${venc}</div></div>
+        <div style="display:flex;align-items:center;gap:8px"><span class="badge ${inf.cls}">${inf.label}</span><button class="btn btn-red btn-xs" onclick="delRenov(${origIdx})">Eliminar</button></div></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:13px">
+          <div><div class="ml">Ticket</div><div style="font-weight:600">${fmt(r.ticket)}</div></div>
+          <div><div class="ml">Cuotas</div><div style="font-weight:600">${r.nCuotas||1}</div></div>
+          <div><div class="ml">Cuota/mes</div><div style="font-weight:600">${fmt(cm)}</div></div>
+          <div><div class="ml">Días restantes</div><div style="font-weight:600;color:${daysDiff(venc)<30?'var(--red)':'var(--green)'}">${Math.max(0,daysDiff(venc))}</div></div>
+        </div></div>`;}).join('');
+  const inp=document.getElementById('renov-search-input');
+  if(inp){const pos=inp.selectionStart;setTimeout(()=>{const el=document.getElementById('renov-search-input');if(el){el.focus();try{el.setSelectionRange(pos,pos);}catch(e){}}},0);}
+}
+
 function upCuota(i,f,v){S.cuotas[i][f]=v;save();}
 function upCuotaNum(i,f,v){S.cuotas[i][f]=parseNum(v);save();}
 function openAddCuota(){openModal(`<div class="mtitle">Añadir cliente a cuotas</div>
@@ -1105,9 +1150,9 @@ function renderRenovaciones(){
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
       <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
         <div style="font-size:13px;font-weight:600">Renovaciones <span style="font-size:11px;color:var(--text3);font-weight:400">(${filtered.length} de ${S.renovaciones.length})</span></div>
-        <input placeholder="Buscar cliente..." value="${renovSearch}" oninput="renovSearch=this.value;renderRenovaciones()" style="padding:5px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;width:200px;font-family:var(--font)">
+        <input id="renov-search-input" placeholder="Buscar cliente..." value="${renovSearch}" oninput="renovSearch=this.value;renderRenovFiltered()" style="padding:5px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;width:200px;font-family:var(--font)">
       </div>
-      <div style="padding:0 18px 14px">
+      <div id="rv-filtered-list" style="padding:0 18px 14px">
         ${filtered.length===0?'<div class="empty" style="padding:20px">Sin renovaciones que coincidan.</div>':''}
         ${filtered.map((r,i)=>{const venc=edate(r.fechaInicio,6);const inf=alertInfo(venc);const cm=r.nCuotas?Math.round(Number(r.ticket||0)/r.nCuotas):Number(r.ticket||0);const origIdx=S.renovaciones.indexOf(r);return`
           <div class="rv-card"><div class="rv-head"><div><div class="rv-name">${r.nombre}</div><div class="rv-meta">${r.nRenov}ª renovación · Inicio: ${r.fechaInicio} · Vence: ${venc}</div></div>
