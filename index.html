@@ -690,7 +690,7 @@ function renderLlamadasRows(mk){
     <td><input class="ce" type="number" inputmode="numeric" value="${r.facturacion||''}" oninput="upLNum('${mk}',${i},'facturacion',this.value)" placeholder="0" style="text-align:right"></td>
     <td><input class="ce" type="number" inputmode="numeric" value="${r.caja||''}" oninput="upLNum('${mk}',${i},'caja',this.value)" placeholder="0" style="text-align:right"></td>
     <td><select class="ce" onchange="upLNum('${mk}',${i},'nCuotas',this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${Number(r.nCuotas)===n?' selected':''}>${n===1?'1 (único)':n}</option>`).join('')}</select></td>
-    <td><input class="ce" value="${esc(r.comentarios)}" oninput="upL('${mk}',${i},'comentarios',this.value)" placeholder="Notas..."></td>
+    <td><input class="ce" value="${esc(r.comentarios)}" oninput="upL('${mk}',${i},'comentarios',this.value)" placeholder="Notas..." style="min-width:260px"></td>
     <td><button class="btn btn-red btn-xs" onclick="delL('${mk}',${i})">✕</button></td>
   </tr>`).join('');
 }
