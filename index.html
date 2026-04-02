@@ -221,7 +221,7 @@ const ENTRENADORES=['','Bruno','Carlos'];
 const CLOSERS=['Bruno'];
 const ENTRENADOR_EMAIL='entrenadores@brunogarcia.com';
 
-let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{}};
+let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[]};
 let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null;
 let isEntrenador=false;
 let curYear=new Date().getFullYear();
@@ -543,7 +543,7 @@ function renderDashboard(){
   const activos=S.cuotas.filter(isActive).length;
   const proximos=S.cuotas.filter(c=>{const d=daysDiff(getVenc(c));return d>=0&&d<30;}).length;
   const ltv_med=S.cuotas.length?Math.round(S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);return s+Number(c.ticket||0)+rs.reduce((x,r)=>x+Number(r.ticket||0),0);},0)/S.cuotas.length):0;
-  const alertas=S.cuotas.filter(c=>{const d=daysDiff(getVenc(c));return d<60&&d>=0;}).sort((a,b)=>daysDiff(getVenc(a))-daysDiff(getVenc(b)));
+  if(!S.contactados)S.contactados=[];const alertas=S.cuotas.filter(c=>{const d=daysDiff(getVenc(c));return d<60&&d>=0&&!S.contactados.includes(c.nombre);}).sort((a,b)=>daysDiff(getVenc(a))-daysDiff(getVenc(b)));
   const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
   const statsAll=CANALES.map(c=>canalStats(c,null));
   document.getElementById('content').innerHTML=`
@@ -1286,10 +1286,10 @@ function saveRenov(){const nombre=document.getElementById('rn').value;const fech
 
 // ── ALERTAS ───────────────────────────────────────────────
 function proximosAVencer(){
-  // Clients whose vencimiento is within 21 days (3 weeks before end)
+  if(!S.contactados) S.contactados=[];
   return S.cuotas.filter(c=>{
     const d=daysDiff(getVenc(c));
-    return d>=0&&d<=21;
+    return d>=0&&d<=21&&!S.contactados.includes(c.nombre);
   }).sort((a,b)=>daysDiff(getVenc(a))-daysDiff(getVenc(b)));
 }
 
@@ -1316,14 +1316,29 @@ function renderAlertas(){
       ${proximos.map(c=>{
         const d=daysDiff(getVenc(c));const venc=getVenc(c);
         return`<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:9px;background:var(--amber-l);border:1px solid #fde68a;margin-bottom:8px">
-          <div>
+          <div style="flex:1">
             <div style="font-weight:600;font-size:14px">${c.nombre}</div>
             <div style="font-size:12px;color:var(--text2)">Vence el ${venc} · <strong style="color:var(--amber)">En ${d} días</strong></div>
           </div>
-          <div style="text-align:right">
+          <div style="text-align:right;margin-right:12px">
             <div style="font-size:11px;color:var(--text3);margin-bottom:4px">LTV acumulado</div>
             <div style="font-weight:600">${fmt(Number(c.ticket||0)+S.renovaciones.filter(r=>r.nombre===c.nombre).reduce((s,r)=>s+Number(r.ticket||0),0))}</div>
           </div>
+          <button onclick="marcarContactado('${c.nombre}')" style="padding:7px 12px;background:#057a55;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">✓ Contactado</button>
+        </div>`;}).join('')}
+    </div>`:''}
+    ${S.contactados&&S.contactados.length>0?`
+    <div class="card" style="margin-top:14px">
+      <div class="card-title" style="color:var(--green)">✓ Contactados (${S.contactados.length})</div>
+      ${S.contactados.map(nombre=>{
+        const c=S.cuotas.find(cu=>cu.nombre===nombre);
+        const venc=c?getVenc(c):'-';
+        return`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:9px;background:var(--green-l);border:1px solid #bbf7d0;margin-bottom:8px">
+          <div>
+            <div style="font-weight:600;font-size:13px">${nombre}</div>
+            <div style="font-size:12px;color:var(--text3)">Vence: ${venc}</div>
+          </div>
+          <button onclick="desmarcarContactado('${nombre}')" style="padding:5px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:7px;font-size:11px;cursor:pointer;color:var(--text2)">Desmarcar</button>
         </div>`;}).join('')}
     </div>`:''}
     ${expired.length>0?`
@@ -1347,6 +1362,24 @@ function renderAlertas(){
 function openModal(html){document.getElementById('mbox').innerHTML=html;document.getElementById('moverlay').classList.add('open');}
 function closeModal(){document.getElementById('moverlay').classList.remove('open');}
 function handleMO(e){if(e.target===document.getElementById('moverlay'))closeModal();}
+
+function marcarContactado(nombre){
+  if(!S.contactados) S.contactados=[];
+  if(!S.contactados.includes(nombre)){
+    S.contactados.push(nombre);
+    save();
+  }
+  renderAlertas();
+  updateAlertaBadge();
+}
+
+function desmarcarContactado(nombre){
+  if(!S.contactados) S.contactados=[];
+  S.contactados=S.contactados.filter(n=>n!==nombre);
+  save();
+  renderAlertas();
+  updateAlertaBadge();
+}
 
 function changeYear(y){
   curYear=parseInt(y);
