@@ -429,46 +429,7 @@ function setSyncStatus(state,label){
   lbl.textContent=label;
 }
 
-function migratePagos(){
-  // Regenerate pagos from scratch based on ticket, nCuotas, fechaInicio
-  // This runs on every load to ensure correct year-prefixed format
-  let changed=false;
-  S.cuotas.forEach(c=>{
-    if(!c.ticket||!c.nCuotas||!c.fechaInicio) return;
-    const pv=Math.round(Number(c.ticket)/Number(c.nCuotas)*100)/100;
-    const startY=new Date(c.fechaInicio).getFullYear();
-    const startM=new Date(c.fechaInicio).getMonth();
-    const newPagos={};
-    for(let i=0;i<Number(c.nCuotas);i++){
-      const totalM=startM+i;
-      const y=startY+Math.floor(totalM/12);
-      const m=totalM%12;
-      newPagos[`${y}-${MONTHS[m]}`]=pv;
-    }
-    c.pagos=newPagos;
-    changed=true;
-  });
-  S.renovaciones.forEach(r=>{
-    if(!r.ticket||!r.nCuotas||!r.fechaInicio) return;
-    const pv=Math.round(Number(r.ticket)/Number(r.nCuotas)*100)/100;
-    const startY=new Date(r.fechaInicio).getFullYear();
-    const startM=new Date(r.fechaInicio).getMonth();
-    const newPagos={};
-    for(let i=0;i<Number(r.nCuotas);i++){
-      const totalM=startM+i;
-      const y=startY+Math.floor(totalM/12);
-      const m=totalM%12;
-      newPagos[`${y}-${MONTHS[m]}`]=pv;
-    }
-    r.pagos=newPagos;
-    changed=true;
-  });
-  if(changed){
-    try{localStorage.setItem('crm_bruno_bk',JSON.stringify(S));}catch(e){}
-    clearTimeout(saveTimer);
-    sbSave(); // force immediate save after migration
-  }
-}
+function migratePagos(){/* pagos now computed on the fly via getPagos() */}
 
 function seed(){
   const mk=`${new Date().getFullYear()}-03`;
@@ -1146,16 +1107,11 @@ function upObj(mk,canal,key,val){ensureObj(mk,canal);S.objetivos[mk][canal][key]
 // ── CUOTAS ────────────────────────────────────────────────
 let cuotaSearch='';
 function renderCuotas(){
-  const allVentas=Object.values(S.llamadas).flat().filter(l=>l.estado==='Venta');
-  const totalFact=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear).reduce((s,c)=>{
-    const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);
-    const cp=getPagos(c);
-    return s+MONTHS.reduce((ms,m)=>{const rv=rs.reduce((x,r)=>x+Number(getPagos(r)[`${curYear}-${m}`]||0),0);return ms+(cp[`${curYear}-${m}`]||0)+rv;},0);
-  },0);
-  const allVentasYear=Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))).map(([,v])=>v).flat().filter(l=>l.estado==='Venta');
-  const totalCaja=allVentasYear.reduce((s,l)=>s+Number(l.caja||0),0);
+  const allVentas=Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))).map(([,v])=>v).flat().filter(l=>l.estado==='Venta');
+    const totalFact=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear).reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const cp=getPagos(c);return s+MONTHS.reduce((ms,m)=>{const rv=rs.reduce((x,r)=>x+Number(getPagos(r)[`${curYear}-${m}`]||0),0);return ms+(cp[`${curYear}-${m}`]||0)+rv;},0);},0);
+  const totalCaja=allVentas.reduce((s,l)=>s+Number(l.caja||0),0);
   const todayM=todayMonth();
-  const cajaPendiente=S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const allP={...c.pagos};rs.forEach(r=>{Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);});});return s+MONTHS.reduce((ms,m,mi)=>{return mi>=todayM?ms+(allP[`${curYear}-${m}`]||0):ms;},0);},0);
+  const cajaPendiente=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear).reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const cp=getPagos(c);return s+MONTHS.reduce((ms,m,mi)=>{const rv=rs.reduce((x,r)=>x+Number(getPagos(r)[`${curYear}-${m}`]||0),0);return mi>=todayM?ms+(cp[`${curYear}-${m}`]||0)+rv:ms;},0);},0);
   const filtered=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear&&(!cuotaSearch||c.nombre.toLowerCase().includes(cuotaSearch.toLowerCase())));
   document.getElementById('content').innerHTML=`
     ${!isEntrenador?`<div class="mg">
@@ -1189,7 +1145,7 @@ function renderCuotas(){
             <td style="text-align:center">${rs.length}</td><td style="font-weight:600">${fmt(ltv)}</td></tr>`;}).join('')}
         </tbody>
         <tfoot><tr><td colspan="6">Total en caja por mes</td>
-          ${MONTHS.map((m,mi)=>{const key=`${curYear}-${m}`;const isPast=curYear<new Date().getFullYear()||(curYear===new Date().getFullYear()&&mi<todayM);const isCur=curYear===new Date().getFullYear()&&mi===todayM;const filtClients=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear);const t=filtClients.reduce((s,c)=>{const cp=getPagos(c);const orig=Number(cp[key]||0);const rv=S.renovaciones.filter(r=>r.nombre===c.nombre).reduce((x,r)=>s+Number(getPagos(r)[key]||0),0);return s+orig+rv;},0);return`<td style="text-align:center;${isPast?'opacity:.5':isCur?'background:#fff9e6':''}">${t>0?fmt(t):''}</td>`;}).join('')}<td colspan="4"></td></tr></tfoot>
+          ${MONTHS.map((m,mi)=>{const key=`${curYear}-${m}`;const isPast=curYear<new Date().getFullYear()||(curYear===new Date().getFullYear()&&mi<todayM);const isCur=curYear===new Date().getFullYear()&&mi===todayM;const filtClients=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear);const t=filtClients.reduce((s,c)=>{const cp=getPagos(c);const orig=Number(cp[key]||0);const rv=S.renovaciones.filter(r=>r.nombre===c.nombre).reduce((x,r)=>x+Number(getPagos(r)[key]||0),0);return s+orig+rv;},0);return`<td style="text-align:center;${isPast?'opacity:.5':isCur?'background:#fff9e6':''}">${t>0?fmt(t):''}</td>`;}).join('')}<td colspan="4"></td></tr></tfoot>
       </table></div>
     </div>`;
 }
