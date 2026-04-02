@@ -462,8 +462,8 @@ function esc(s){return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')
 function todayMonth(){return new Date().getMonth();}
 function todayDayOfMonth(){return new Date().getDate();}
 function canalStats(canal,mk){
-  const lAll=mk?(S.llamadas[mk]||[]):Object.values(S.llamadas).flat();
-  const kAll=mk?(S.kpis_diarios[mk]||[]):Object.values(S.kpis_diarios).flat();
+  const lAll=mk?(S.llamadas[mk]||[]):Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))).map(([,v])=>v).flat();
+  const kAll=mk?(S.kpis_diarios[mk]||[]):Object.entries(S.kpis_diarios).filter(([k])=>k.startsWith(String(curYear))).map(([,v])=>v).flat();
   const cl=lAll.filter(l=>l.embudo===canal);const cv=cl.filter(l=>l.estado==='Venta');
   const realizadas=cl.filter(l=>l.asistencia==='SI').length;
   const inv=kAll.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);
@@ -517,7 +517,7 @@ function goTo(page,month){
 
 // ── DASHBOARD ─────────────────────────────────────────────
 function renderDashboard(){
-  const allL=Object.values(S.llamadas).flat();
+  const allL=Object.values(S.llamadas).filter((_,idx)=>{const key=Object.keys(S.llamadas)[idx];return key.startsWith(String(curYear));}).flat();
   const ventas=allL.filter(l=>l.estado==='Venta');const reservas=allL.filter(l=>l.estado==='Reserva');
   const totalFact=S.cuotas.reduce((s,c)=>s+Number(c.ticket||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
   const totalCaja=ventas.reduce((s,l)=>s+Number(l.caja||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
@@ -528,7 +528,7 @@ function renderDashboard(){
   const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
   const statsAll=CANALES.map(c=>canalStats(c,null));
   document.getElementById('content').innerHTML=`
-    <div class="sec-title">Resumen global ${curYear}</div>
+    <div class="sec-title" id="dash-title">Resumen ${curYear}</div>
     <div class="mg">
       <div class="metric"><div class="ml">Facturación total</div><div class="mv blue">${fmt(totalFact)}</div></div>
       <div class="metric"><div class="ml">Caja cobrada</div><div class="mv green">${fmt(totalCaja)}</div></div>
@@ -1089,7 +1089,12 @@ function upObj(mk,canal,key,val){ensureObj(mk,canal);S.objetivos[mk][canal][key]
 let cuotaSearch='';
 function renderCuotas(){
   const allVentas=Object.values(S.llamadas).flat().filter(l=>l.estado==='Venta');
-  const totalFact=S.cuotas.reduce((s,c)=>s+Number(c.ticket||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
+  // Facturación comprometida: sum all pagos for curYear across all clients
+  const totalFact=S.cuotas.reduce((s,c)=>{
+    const allP={...c.pagos};
+    S.renovaciones.filter(r=>r.nombre===c.nombre).forEach(r=>Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);}));
+    return s+MONTHS.reduce((ms,m)=>{const key=`${curYear}-${m}`;return ms+(allP[key]||0);},0);
+  },0);
   const totalCaja=allVentas.reduce((s,l)=>s+Number(l.caja||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
   const todayM=todayMonth();
   const cajaPendiente=S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const allP={...c.pagos};rs.forEach(r=>{Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);});});return s+MONTHS.reduce((ms,m,mi)=>{const key=`${curYear}-${m}`;return mi>=todayM?ms+(allP[key]||allP[m]||0):ms;},0);},0);
