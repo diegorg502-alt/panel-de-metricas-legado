@@ -430,44 +430,29 @@ function setSyncStatus(state,label){
 }
 
 function migratePagos(){
-  // Migrate old pagos format (ENE,FEB..) to year-prefixed (2026-ENE, 2026-FEB..)
-  S.cuotas.forEach(c=>{
-    if(!c.pagos) return;
-    const needsMigration=Object.keys(c.pagos).some(k=>MONTHS.includes(k));
-    if(!needsMigration) return;
-    const year=new Date(c.fechaInicio).getFullYear();
-    const startM=new Date(c.fechaInicio).getMonth();
+  // Migrate old pagos format (ENE,FEB..) to year-prefixed (YYYY-MON)
+  // Uses fechaInicio to determine the correct year for each month
+  function migrateObj(obj, fechaInicio){
+    if(!obj) return obj;
+    const needsMigration=Object.keys(obj).some(k=>MONTHS.includes(k));
+    if(!needsMigration) return obj;
+    const startYear=new Date(fechaInicio).getFullYear();
+    const startM=new Date(fechaInicio).getMonth();
     const newPagos={};
+    // Copy already-migrated keys
+    Object.entries(obj).forEach(([k,v])=>{if(!MONTHS.includes(k))newPagos[k]=Number(v);});
+    // Migrate old keys
     MONTHS.forEach((m,mi)=>{
-      if(c.pagos[m]){
-        // Determine correct year for this month
-        const monthOffset=mi-startM;
-        const payYear=monthOffset>=0?year+(mi<startM?1:0):year+1;
-        // Simple: use fechaInicio year + check if month is before start month
-        const correctYear=mi>=startM?year:year+1;
-        newPagos[`${correctYear}-${m}`]=(newPagos[`${correctYear}-${m}`]||0)+Number(c.pagos[m]);
-      }
+      if(!obj[m]) return;
+      // Month mi relative to startM: if mi >= startM, same year; else next year
+      const yr = mi >= startM ? startYear : startYear + 1;
+      const key = `${yr}-${m}`;
+      newPagos[key] = (newPagos[key]||0) + Number(obj[m]);
     });
-    // Keep any already-migrated keys
-    Object.entries(c.pagos).forEach(([k,v])=>{if(!MONTHS.includes(k))newPagos[k]=v;});
-    c.pagos=newPagos;
-  });
-  S.renovaciones.forEach(r=>{
-    if(!r.pagos) return;
-    const needsMigration=Object.keys(r.pagos).some(k=>MONTHS.includes(k));
-    if(!needsMigration) return;
-    const year=new Date(r.fechaInicio).getFullYear();
-    const startM=new Date(r.fechaInicio).getMonth();
-    const newPagos={};
-    MONTHS.forEach((m,mi)=>{
-      if(r.pagos[m]){
-        const correctYear=mi>=startM?year:year+1;
-        newPagos[`${correctYear}-${m}`]=(newPagos[`${correctYear}-${m}`]||0)+Number(r.pagos[m]);
-      }
-    });
-    Object.entries(r.pagos).forEach(([k,v])=>{if(!MONTHS.includes(k))newPagos[k]=v;});
-    r.pagos=newPagos;
-  });
+    return newPagos;
+  }
+  S.cuotas.forEach(c=>{ c.pagos = migrateObj(c.pagos, c.fechaInicio); });
+  S.renovaciones.forEach(r=>{ r.pagos = migrateObj(r.pagos, r.fechaInicio); });
   save();
 }
 
@@ -560,9 +545,8 @@ function goTo(page,month){
 
 // ── DASHBOARD ─────────────────────────────────────────────
 function renderDashboard(){
-  const allL=Object.values(S.llamadas).filter((_,idx)=>{const key=Object.keys(S.llamadas)[idx];return key.startsWith(String(curYear));}).flat();
+  const allL=Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))).map(([,v])=>v).flat();
   const ventas=allL.filter(l=>l.estado==='Venta');const reservas=allL.filter(l=>l.estado==='Reserva');
-  // Year-filtered facturación and caja
   const totalFact=ventas.reduce((s,l)=>s+Number(l.facturacion||0),0);
   const totalCaja=ventas.reduce((s,l)=>s+Number(l.caja||0),0);
   const activos=S.cuotas.filter(isActive).length;
@@ -1133,15 +1117,17 @@ function upObj(mk,canal,key,val){ensureObj(mk,canal);S.objetivos[mk][canal][key]
 let cuotaSearch='';
 function renderCuotas(){
   const allVentas=Object.values(S.llamadas).flat().filter(l=>l.estado==='Venta');
-  // Facturación comprometida: sum all pagos for curYear across all clients
+  // Year-filtered: sum pagos of curYear only
   const totalFact=S.cuotas.reduce((s,c)=>{
+    const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);
     const allP={...c.pagos};
-    S.renovaciones.filter(r=>r.nombre===c.nombre).forEach(r=>Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);}));
-    return s+MONTHS.reduce((ms,m)=>{const key=`${curYear}-${m}`;return ms+(allP[key]||0);},0);
+    rs.forEach(r=>Object.entries(r.pagos||{}).forEach(([k,v])=>{allP[k]=(allP[k]||0)+Number(v);}));
+    return s+MONTHS.reduce((ms,m)=>{return ms+(allP[`${curYear}-${m}`]||0);},0);
   },0);
-  const totalCaja=allVentas.reduce((s,l)=>s+Number(l.caja||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
+  const allVentasYear=Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))).map(([,v])=>v).flat().filter(l=>l.estado==='Venta');
+  const totalCaja=allVentasYear.reduce((s,l)=>s+Number(l.caja||0),0);
   const todayM=todayMonth();
-  const cajaPendiente=S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const allP={...c.pagos};rs.forEach(r=>{Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);});});return s+MONTHS.reduce((ms,m,mi)=>{const key=`${curYear}-${m}`;return mi>=todayM?ms+(allP[key]||0):ms;},0);},0);
+  const cajaPendiente=S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const allP={...c.pagos};rs.forEach(r=>{Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);});});return s+MONTHS.reduce((ms,m,mi)=>{return mi>=todayM?ms+(allP[`${curYear}-${m}`]||0):ms;},0);},0);
   const filtered=S.cuotas.filter(c=>!cuotaSearch||c.nombre.toLowerCase().includes(cuotaSearch.toLowerCase()));
   document.getElementById('content').innerHTML=`
     ${!isEntrenador?`<div class="mg">
