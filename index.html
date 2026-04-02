@@ -1140,7 +1140,7 @@ function renderCuotas(){
             <td style="text-align:center">${c.nCuotas}</td>
             <td><input class="ce" type="number" inputmode="numeric" value="${c.ticket}" oninput="upCuotaNum(${ci},'ticket',this.value)" style="text-align:right;min-width:70px"></td>
             <td style="text-align:right">${fmt(cm)}</td>
-            ${MONTHS.map((m,mi)=>{const orig=Number(c.pagos?.[m]||0);const rv=rs.reduce((s,r)=>s+Number(r.pagos?.[m]||0),0);const total=orig+rv;return`<td style="text-align:center;${mi<todayM?'opacity:.5':mi===todayM?'background:#fff9e6':''}">${total>0?`<span class="cpaid">${fmt(total)}</span>`:`<span class="cpen">—</span>`}</td>`;}).join('')}
+            ${MONTHS.map((m,mi)=>{const key=`${curYear}-${m}`;const cp=getPagos(c);const orig=Number(cp[key]||0);const rv=rs.reduce((s,r)=>s+Number(getPagos(r)[key]||0),0);const total=orig+rv;const isPastR=curYear<new Date().getFullYear()||(curYear===new Date().getFullYear()&&mi<todayM);const isCurR=curYear===new Date().getFullYear()&&mi===todayM;return`<td style="text-align:center;${isPastR?'opacity:.5':isCurR?'background:#fff9e6':''}">${total>0?`<span class="cpaid">${fmt(total)}</span>`:`<span class="cpen">—</span>`}</td>`;}).join('')}
             <td style="font-size:12px;white-space:nowrap">${venc}</td><td><span class="badge ${inf.cls}">${inf.label}</span></td>
             <td style="text-align:center">${rs.length}</td><td style="font-weight:600">${fmt(ltv)}</td></tr>`;}).join('')}
         </tbody>
