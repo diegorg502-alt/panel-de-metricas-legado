@@ -726,8 +726,16 @@ function renderLlamadasRows(mk){
     <td><button class="btn btn-red btn-xs" onclick="delL('${mk}',${i})">✕</button></td>
   </tr>`).join('');
 }
-function upL(mk,i,f,v){S.llamadas[mk][i][f]=v;save();}
-function upLNum(mk,i,f,v){S.llamadas[mk][i][f]=parseNum(v);save();}
+function upL(mk,i,f,v){
+  S.llamadas[mk][i][f]=v;
+  if(f==='nombre'||f==='fecha'||f==='embudo') syncCuota(mk,i);
+  save();
+}
+function upLNum(mk,i,f,v){
+  S.llamadas[mk][i][f]=parseNum(v);
+  if(f==='facturacion'||f==='nCuotas') syncCuota(mk,i);
+  save();
+}
 function upLEntrenador(mk,i,val){
   S.llamadas[mk][i].entrenador=val;
   // Update cuota entrenador if client exists
@@ -736,11 +744,33 @@ function upLEntrenador(mk,i,val){
   if(cuota) cuota.entrenador=val;
   save();
 }
+function syncCuota(mk,i){
+  // Sync llamada data to cuota — called whenever estado=Venta or facturacion/nCuotas changes
+  const r=S.llamadas[mk][i];
+  if(r.estado!=='Venta') return;
+  const key=(r.nombre||'').toUpperCase().trim();
+  if(!key) return;
+  const fechaI=r.fecha||mKey(curMonth)+'-01';
+  const q=Number(r.nCuotas)||1;
+  const existing=S.cuotas.find(c=>c.nombre===key);
+  if(existing){
+    existing.ticket=r.facturacion||0;
+    existing.nCuotas=q;
+    existing.fechaInicio=fechaI;
+    existing.embudo=r.embudo||existing.embudo;
+    existing.entrenador=r.entrenador||existing.entrenador;
+  } else {
+    S.cuotas.push({nombre:key,fechaInicio:fechaI,ticket:r.facturacion||0,nCuotas:q,pagos:{},embudo:r.embudo||'YOUTUBE',entrenador:r.entrenador||''});
+  }
+}
+
 function upLEstado(mk,i,val){
   S.llamadas[mk][i].estado=val;
-  if(val==='Venta'){const r=S.llamadas[mk][i];const key=(r.nombre||'').toUpperCase().trim();
-    if(key&&!S.cuotas.find(c=>c.nombre===key)){const q=Number(r.nCuotas)||1;const pv=Math.round((r.facturacion||0)/q*100)/100;const fechaI=r.fecha||mKey(curMonth)+'-01';const startY2=new Date(fechaI).getFullYear();const startM2=new Date(fechaI).getMonth();const pagos={};for(let j=0;j<q;j++){const totalM2=startM2+j;const y2=startY2+Math.floor(totalM2/12);const m2=totalM2%12;const key2=`${y2}-${MONTHS[m2]}`;pagos[key2]=pv;}S.cuotas.push({nombre:key,fechaInicio:fechaI,ticket:r.facturacion||0,nCuotas:q,pagos,embudo:r.embudo||'YOUTUBE',entrenador:r.entrenador||'Bruno'});}}
-  save();const tr=document.getElementById(`lr-${i}`);if(tr)tr.style.background=val==='Venta'?'#f0fdf4':val==='Perdido'?'#fef2f2':val==='Reserva'?'#eff6ff':'';renderMes();
+  if(val==='Venta') syncCuota(mk,i);
+  save();
+  const tr=document.getElementById(`lr-${i}`);
+  if(tr)tr.style.background=val==='Venta'?'#f0fdf4':val==='Perdido'?'#fef2f2':val==='Reserva'?'#eff6ff':'';
+  renderMes();
 }
 function delL(mk,i){if(!confirm('¿Eliminar fila?'))return;S.llamadas[mk].splice(i,1);save();renderMes();}
 function addLlamadaRow(mi){
