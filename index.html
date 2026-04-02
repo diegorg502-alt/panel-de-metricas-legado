@@ -207,7 +207,7 @@ const MONTHS=['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV',
 const MFULL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const CANALES=['YOUTUBE','SOCIAL','VSL','REFERIDOS'];
 const ESTADOS=['Venta','Reserva','En seguimiento','Perdido'];
-const ENTRENADORES=['','Maria','Carlos'];
+const ENTRENADORES=['','Bruno','Carlos'];
 const CLOSERS=['Bruno'];
 const ENTRENADOR_EMAIL='entrenadores@agencialegado.com';
 
@@ -685,7 +685,7 @@ function renderLlamadasRows(mk){
     <td><select class="ce" onchange="upLEstado('${mk}',${i},this.value)" style="min-width:110px"><option value="">-</option>${ESTADOS.map(v=>`<option value="${v}"${r.estado===v?' selected':''}>${v}</option>`).join('')}</select></td>
     <td><select class="ce" onchange="upLEntrenador('${mk}',${i},this.value)">
       <option value="">Sin asignar</option>
-      ${['Maria','Carlos'].map(e=>`<option value="${e}"${r.entrenador===e?' selected':''}>${e}</option>`).join('')}
+      ${['Bruno','Carlos'].map(e=>`<option value="${e}"${r.entrenador===e?' selected':''}>${e}</option>`).join('')}
     </select></td>
     <td><input class="ce" type="number" inputmode="numeric" value="${r.facturacion||''}" oninput="upLNum('${mk}',${i},'facturacion',this.value)" placeholder="0" style="text-align:right"></td>
     <td><input class="ce" type="number" inputmode="numeric" value="${r.caja||''}" oninput="upLNum('${mk}',${i},'caja',this.value)" placeholder="0" style="text-align:right"></td>
