@@ -1082,14 +1082,14 @@ function renderCuotas(){
   const cajaPendiente=S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const allP={...c.pagos};rs.forEach(r=>{Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);});});return s+MONTHS.reduce((ms,m,mi)=>mi>=todayM?ms+(allP[m]||0):ms,0);},0);
   const filtered=S.cuotas.filter(c=>!cuotaSearch||c.nombre.toLowerCase().includes(cuotaSearch.toLowerCase()));
   document.getElementById('content').innerHTML=`
-    <div class="mg">
+    ${!isEntrenador?`<div class="mg">
       <div class="metric"><div class="ml">Facturación comprometida</div><div class="mv blue">${fmt(totalFact)}</div></div>
       <div class="metric"><div class="ml">Caja cobrada</div><div class="mv green">${fmt(totalCaja)}</div></div>
       <div class="metric"><div class="ml">Caja por cobrar</div><div class="mv amber">${fmt(cajaPendiente)}</div></div>
       <div class="metric"><div class="ml">Clientes activos</div><div class="mv">${S.cuotas.filter(isActive).length}</div></div>
       <div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${S.renovaciones.length}</div></div>
     </div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Caja por cobrar desde ${MFULL[todayM]} (día ${todayDayOfMonth()}) en adelante.</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Caja por cobrar desde ${MFULL[todayM]} (día ${todayDayOfMonth()}) en adelante.</div>`:''}
     <div class="card" style="padding:0;overflow:hidden">
       <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
         <div style="font-size:13px;font-weight:600">Detalle por cliente <span style="font-size:11px;color:var(--text3);font-weight:400">(${filtered.length} de ${S.cuotas.length})</span></div>
