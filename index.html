@@ -1161,7 +1161,7 @@ function renderCuotas(){
             <td style="text-align:center">${rs.length}</td><td style="font-weight:600">${fmt(ltv)}</td></tr>`;}).join('')}
         </tbody>
         <tfoot><tr><td colspan="6">Total en caja por mes</td>
-          ${MONTHS.map((m,mi)=>{const key=`${curYear}-${m}`;const t=S.cuotas.reduce((s,c)=>{const orig=Number(c.pagos?.[key]||c.pagos?.[m]||0);const rv=S.renovaciones.filter(r=>r.nombre===c.nombre).reduce((x,r)=>x+Number(r.pagos?.[key]||r.pagos?.[m]||0),0);return s+orig+rv;},0);return`<td style="text-align:center;${mi<todayM?'opacity:.5':mi===todayM?'background:#fff9e6':''}">${t>0?fmt(t):''}</td>`;}).join('')}<td colspan="4"></td></tr></tfoot>
+          ${MONTHS.map((m,mi)=>{const key=`${curYear}-${m}`;const isPast=curYear<new Date().getFullYear()||(curYear===new Date().getFullYear()&&mi<todayM);const isCur=curYear===new Date().getFullYear()&&mi===todayM;const filtClients=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear);const t=filtClients.reduce((s,c)=>{const orig=Number(c.pagos?.[key]||c.pagos?.[m]||0);const rv=S.renovaciones.filter(r=>r.nombre===c.nombre).reduce((x,r)=>x+Number(r.pagos?.[key]||r.pagos?.[m]||0),0);return s+orig+rv;},0);return`<td style="text-align:center;${isPast?'opacity:.5':isCur?'background:#fff9e6':''}">${t>0?fmt(t):''}</td>`;}).join('')}<td colspan="4"></td></tr></tfoot>
       </table></div>
     </div>`;
 }
@@ -1184,7 +1184,9 @@ function renderCuotasFiltered(){
       <td><input class="ce" type="number" inputmode="numeric" value="${c.ticket}" oninput="upCuotaNum(${origIdx},'ticket',this.value)" style="text-align:right;min-width:70px"></td>
       <td style="text-align:right">${fmt(cm)}</td>
       ${MONTHS.map((m,mi)=>{const key=`${curYear}-${m}`;const orig=Number(c.pagos?.[key]||c.pagos?.[m]||0);const rv=rs.reduce((s,r)=>s+Number(r.pagos?.[key]||r.pagos?.[m]||0),0);const total=orig+rv;
-        return`<td style="text-align:center;${mi<todayM?'opacity:.5':mi===todayM?'background:#fff9e6':''}">${total>0?`<span class="cpaid">${fmt(total)}</span>`:`<span class="cpen">—</span>`}</td>`;}).join('')}
+        const isPast=curYear<new Date().getFullYear()||(curYear===new Date().getFullYear()&&mi<todayM);
+        const isCur=curYear===new Date().getFullYear()&&mi===todayM;
+        return`<td style="text-align:center;${isPast?'opacity:.5':isCur?'background:#fff9e6':''}">${total>0?`<span class="cpaid">${fmt(total)}</span>`:`<span class="cpen">—</span>`}</td>`;}).join('')}
       <td style="font-size:12px;white-space:nowrap">${venc}</td><td><span class="badge ${inf.cls}">${inf.label}</span></td>
       <td style="text-align:center">${rs.length}</td><td style="font-weight:600">${fmt(ltv)}</td></tr>`;
   }).join('');
