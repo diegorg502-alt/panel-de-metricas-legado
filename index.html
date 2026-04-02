@@ -150,6 +150,16 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
   <div class="shell">
     <aside>
       <div class="sb-brand">CRM · Bruno Gómez</div>
+    <div style="padding:6px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:11px;color:var(--text3)">Año activo</span>
+      <select id="year-sel" onchange="changeYear(this.value)" style="border:1px solid var(--border2);border-radius:6px;padding:3px 6px;font-size:12px;font-weight:600;background:var(--bg);color:var(--text);cursor:pointer">
+        <option value="2024">2024</option>
+        <option value="2025">2025</option>
+        <option value="2026" selected>2026</option>
+        <option value="2027">2027</option>
+        <option value="2028">2028</option>
+      </select>
+    </div>
       <nav class="sb-nav">
         <div class="nav-g">Principal</div>
         <div class="nav-i active" id="ni-dashboard" onclick="goTo('dashboard')">
@@ -214,6 +224,7 @@ const ENTRENADOR_EMAIL='entrenadores@brunogarcia.com';
 let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{}};
 let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null;
 let isEntrenador=false;
+let curYear=new Date().getFullYear();
 
 // ── AUTH ──────────────────────────────────────────────────
 async function init(){
@@ -259,6 +270,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementB
 async function showApp(){
   document.getElementById('shell').style.display='block';
   isEntrenador = currentUser?.email===ENTRENADOR_EMAIL;
+  curYear=new Date().getFullYear();
+  const ys=document.getElementById('year-sel');if(ys)ys.value=curYear;
   document.getElementById('sb-user').textContent=isEntrenador?'Entrenador':(currentUser?.email||'');
   setSyncStatus('saving','Cargando...');
   await loadData();
@@ -416,19 +429,19 @@ function setSyncStatus(state,label){
 }
 
 function seed(){
-  const mk='2026-03';
+  const mk=`${new Date().getFullYear()}-03`;
   if(!S.llamadas[mk]){
     S.llamadas[mk]=[];
-    [{n:'YENISLEIDY',f:'2026-03-01',t:1800,c:600,q:3,e:'YOUTUBE'},{n:'SAMAEL',f:'2026-03-01',t:1500,c:250,q:6,e:'YOUTUBE'},
-     {n:'DANIEL MORENO',f:'2026-03-04',t:1500,c:1500,q:1,e:'YOUTUBE'},{n:'RUBEN ESPINOSA',f:'2026-03-10',t:1500,c:1500,q:1,e:'YOUTUBE'},
-     {n:'CAMILA',f:'2026-03-10',t:1500,c:250,q:6,e:'YOUTUBE'},{n:'STALIN CARRION',f:'2026-03-12',t:1200,c:200,q:6,e:'YOUTUBE'},
-     {n:'CARMEN (MAICA)',f:'2026-03-13',t:1800,c:600,q:3,e:'SOCIAL'},{n:'FLAVIO',f:'2026-03-25',t:1500,c:250,q:6,e:'REFERIDOS'},
-     {n:'RUDI PONCE',f:'2026-03-25',t:1500,c:1500,q:1,e:'REFERIDOS'}].forEach(v=>{
+    [{n:'YENISLEIDY',f:`${new Date().getFullYear()}-03-01`,t:1800,c:600,q:3,e:'YOUTUBE'},{n:'SAMAEL',f:`${new Date().getFullYear()}-03-01`,t:1500,c:250,q:6,e:'YOUTUBE'},
+     {n:'DANIEL MORENO',f:`${new Date().getFullYear()}-03-04`,t:1500,c:1500,q:1,e:'YOUTUBE'},{n:'RUBEN ESPINOSA',f:`${new Date().getFullYear()}-03-10`,t:1500,c:1500,q:1,e:'YOUTUBE'},
+     {n:'CAMILA',f:`${new Date().getFullYear()}-03-10`,t:1500,c:250,q:6,e:'YOUTUBE'},{n:'STALIN CARRION',f:`${new Date().getFullYear()}-03-12`,t:1200,c:200,q:6,e:'YOUTUBE'},
+     {n:'CARMEN (MAICA)',f:`${new Date().getFullYear()}-03-13`,t:1800,c:600,q:3,e:'SOCIAL'},{n:'FLAVIO',f:`${new Date().getFullYear()}-03-25`,t:1500,c:250,q:6,e:'REFERIDOS'},
+     {n:'RUDI PONCE',f:`${new Date().getFullYear()}-03-25`,t:1500,c:1500,q:1,e:'REFERIDOS'}].forEach(v=>{
       S.llamadas[mk].push({nombre:v.n,fecha:v.f,telefono:'',embudo:v.e,closer:'Bruno',asistencia:'SI',incidencia:'',estado:'Venta',facturacion:v.t,caja:v.c,nCuotas:v.q,comentarios:'',entrenador:''});
       const k=v.n.toUpperCase();
-      if(!S.cuotas.find(c=>c.nombre===k)){const pv=Math.round(v.t/v.q*100)/100;const pagos={};for(let i=0;i<v.q&&(2+i)<12;i++)pagos[MONTHS[2+i]]=pv;S.cuotas.push({nombre:k,fechaInicio:v.f,ticket:v.t,nCuotas:v.q,pagos,embudo:v.e});}
+      if(!S.cuotas.find(c=>c.nombre===k)){const pv=Math.round(v.t/v.q*100)/100;const pagos={};const startY=new Date(v.f).getFullYear();const startM=new Date(v.f).getMonth();for(let i=0;i<v.q;i++){const totalM=startM+i;const y=startY+Math.floor(totalM/12);const m=totalM%12;const key=`${y}-${MONTHS[m]}`;pagos[key]=pv;}S.cuotas.push({nombre:k,fechaInicio:v.f,ticket:v.t,nCuotas:v.q,pagos,embudo:v.e});}
     });
-    [{n:'CHRISTIAN AZUAGA',f:'2026-03-16',e:'SOCIAL'},{n:'NOELIA LAZO',f:'2026-03-18',e:'SOCIAL'},{n:'ANA GONZALO',f:'2026-03-20',e:'YOUTUBE'},{n:'JUAN PABLO (JOTA)',f:'2026-03-18',e:'SOCIAL'},{n:'TATIANA',f:'2026-03-23',e:'YOUTUBE'}].forEach(v=>{
+    [{n:'CHRISTIAN AZUAGA',f:`${new Date().getFullYear()}-03-16`,e:'SOCIAL'},{n:'NOELIA LAZO',f:`${new Date().getFullYear()}-03-18`,e:'SOCIAL'},{n:'ANA GONZALO',f:`${new Date().getFullYear()}-03-20`,e:'YOUTUBE'},{n:'JUAN PABLO (JOTA)',f:`${new Date().getFullYear()}-03-18`,e:'SOCIAL'},{n:'TATIANA',f:`${new Date().getFullYear()}-03-23`,e:'YOUTUBE'}].forEach(v=>{
       S.llamadas[mk].push({nombre:v.n,fecha:v.f,telefono:'',embudo:v.e,closer:'Bruno',asistencia:'SI',incidencia:'',estado:'Perdido',facturacion:0,caja:0,nCuotas:0,comentarios:'',entrenador:''});
     });
     save();
@@ -444,7 +457,7 @@ function daysDiff(d){return Math.round((new Date(d)-new Date())/86400000)}
 function alertInfo(v){const d=daysDiff(v);if(d<0)return{label:'Vencido',cls:'b-red',ai:'red'};if(d<30)return{label:'Renovar ya',cls:'b-amber',ai:'amber'};if(d<60)return{label:'Próximo',cls:'b-blue',ai:''};return{label:'Activo',cls:'b-green',ai:''};}
 function getVenc(c){const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);if(rs.length){const last=rs.sort((a,b)=>new Date(b.fechaInicio)-new Date(a.fechaInicio))[0];return edate(last.fechaInicio,6);}return edate(c.fechaInicio,6);}
 function isActive(c){const v=getVenc(c),t=new Date();return new Date(c.fechaInicio)<=t&&new Date(v)>=t;}
-function mKey(i){return`2026-${String(i+1).padStart(2,'0')}`}
+function mKey(i){return`${curYear}-${String(i+1).padStart(2,'0')}`}
 function esc(s){return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
 function todayMonth(){return new Date().getMonth();}
 function todayDayOfMonth(){return new Date().getDate();}
@@ -494,7 +507,7 @@ function goTo(page,month){
   if(page==='kpis_d')document.getElementById(`ni-kd-${MONTHS[curMonth]}`)?.classList.add('active');
   const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación'};
   updateAlertaBadge();
-  document.getElementById('topbar-title').textContent=titles[page]||(page==='mes'?`Llamadas — ${MFULL[curMonth]} 2026`:`KPIs diarios — ${MFULL[curMonth]} 2026`);
+  document.getElementById('topbar-title').textContent=titles[page]||(page==='mes'?`Llamadas — ${MFULL[curMonth]} ${curYear}`:`KPIs diarios — ${MFULL[curMonth]} ${curYear}`);
   const ex=document.getElementById('topbar-extra');ex.innerHTML='';
   if(page==='mes'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLlamadaRow(curMonth);ex.appendChild(b);}
   if(page==='cuotas'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Añadir cliente';b.onclick=openAddCuota;ex.appendChild(b);}
@@ -515,7 +528,7 @@ function renderDashboard(){
   const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
   const statsAll=CANALES.map(c=>canalStats(c,null));
   document.getElementById('content').innerHTML=`
-    <div class="sec-title">Resumen global 2026</div>
+    <div class="sec-title">Resumen global ${curYear}</div>
     <div class="mg">
       <div class="metric"><div class="ml">Facturación total</div><div class="mv blue">${fmt(totalFact)}</div></div>
       <div class="metric"><div class="ml">Caja cobrada</div><div class="mv green">${fmt(totalCaja)}</div></div>
@@ -648,7 +661,7 @@ function renderMes(){
 
   document.getElementById('content').innerHTML=`
     <div class="card" style="margin-bottom:14px">
-      <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text2)">KPIs totales — ${MFULL[curMonth]} 2026</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text2)">KPIs totales — ${MFULL[curMonth]} ${curYear}</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px">
         ${[
           ['Inversión',fmt(inv),'blue'],['Leads/Seg.',leads,''],['CPL',cpl?fmt(cpl,2):'-','amber'],
@@ -707,13 +720,13 @@ function upLEntrenador(mk,i,val){
 function upLEstado(mk,i,val){
   S.llamadas[mk][i].estado=val;
   if(val==='Venta'){const r=S.llamadas[mk][i];const key=(r.nombre||'').toUpperCase().trim();
-    if(key&&!S.cuotas.find(c=>c.nombre===key)){const q=Number(r.nCuotas)||1;const pv=Math.round((r.facturacion||0)/q*100)/100;const mStart=new Date(r.fecha||mKey(curMonth)+'-01').getMonth();const pagos={};for(let j=0;j<q&&(mStart+j)<12;j++)pagos[MONTHS[mStart+j]]=pv;S.cuotas.push({nombre:key,fechaInicio:r.fecha||mKey(curMonth)+'-01',ticket:r.facturacion||0,nCuotas:q,pagos,embudo:r.embudo||'YOUTUBE',entrenador:r.entrenador||'Bruno'});}}
+    if(key&&!S.cuotas.find(c=>c.nombre===key)){const q=Number(r.nCuotas)||1;const pv=Math.round((r.facturacion||0)/q*100)/100;const fechaI=r.fecha||mKey(curMonth)+'-01';const startY2=new Date(fechaI).getFullYear();const startM2=new Date(fechaI).getMonth();const pagos={};for(let j=0;j<q;j++){const totalM2=startM2+j;const y2=startY2+Math.floor(totalM2/12);const m2=totalM2%12;const key2=`${y2}-${MONTHS[m2]}`;pagos[key2]=pv;}S.cuotas.push({nombre:key,fechaInicio:fechaI,ticket:r.facturacion||0,nCuotas:q,pagos,embudo:r.embudo||'YOUTUBE',entrenador:r.entrenador||'Bruno'});}}
   save();const tr=document.getElementById(`lr-${i}`);if(tr)tr.style.background=val==='Venta'?'#f0fdf4':val==='Perdido'?'#fef2f2':val==='Reserva'?'#eff6ff':'';renderMes();
 }
 function delL(mk,i){if(!confirm('¿Eliminar fila?'))return;S.llamadas[mk].splice(i,1);save();renderMes();}
 function addLlamadaRow(mi){
   const mk=mKey(mi);if(!S.llamadas[mk])S.llamadas[mk]=[];
-  S.llamadas[mk].push({nombre:'',fecha:'',telefono:'',embudo:'',closer:'',asistencia:'',incidencia:'',estado:'',facturacion:0,caja:0,nCuotas:1,comentarios:'',entrenador:''});
+  S.llamadas[mk].push({nombre:'',fecha:'',telefono:'',embudo:'',closer:'',asistencia:'',incidencia:'',estado:'',facturacion:0,caja:0,nCuotas:1,comentarios:'',entrenador:'',year:curYear});
   save();renderMes();
   setTimeout(()=>{const lb=document.getElementById('lb');if(lb){const last=lb.querySelector('tr:last-child');if(last){last.scrollIntoView({behavior:'smooth',block:'nearest'});const inp=last.querySelector('input');if(inp)inp.focus();}}},80);
 }
@@ -730,7 +743,7 @@ function renderKpisD(){
   const totalCpl=totalLeads&&totalInv?totalInv/totalLeads:null;
   const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
   document.getElementById('content').innerHTML=`
-    ${canalTotals.length?`<div class="card" style="margin-bottom:14px"><div class="card-title">Resumen por canal — ${MFULL[curMonth]}</div>
+    ${canalTotals.length?`<div class="card" style="margin-bottom:14px"><div class="card-title">Resumen por canal — ${MFULL[curMonth]} ${curYear}</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
         ${canalTotals.map(c=>`<div style="background:var(--bg2);border-radius:9px;padding:12px"><div style="margin-bottom:8px"><span class="badge ${cbc[c.canal]}">${c.canal}</span></div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
@@ -746,7 +759,7 @@ function renderKpisD(){
     </div>
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
       <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:13px;font-weight:600">Registro diario — ${MFULL[curMonth]} 2026</div>
+        <div style="font-size:13px;font-weight:600">Registro diario — ${MFULL[curMonth]} ${curYear}</div>
         <button class="btn btn-p btn-xs" onclick="addKpiRow('${mk}')">+ Añadir día</button>
       </div>
       <div class="tw"><table>
@@ -756,7 +769,7 @@ function renderKpisD(){
       </table></div>
     </div>
     <div class="card">
-      <div class="card-title">Ads Ganadores — ${MFULL[curMonth]}<button class="btn btn-xs" onclick="addAd('${mk}')">+ Añadir</button></div>
+      <div class="card-title">Ads Ganadores — ${MFULL[curMonth]} ${curYear}<button class="btn btn-xs" onclick="addAd('${mk}')">+ Añadir</button></div>
       <div id="ads-list">
         ${(S.ads[mk]||[]).length===0?'<div class="empty" style="padding:16px">Sin ads este mes.</div>':''}
         ${(S.ads[mk]||[]).map((ad,i)=>`<div class="ad-card">
@@ -865,7 +878,7 @@ function renderObjetivos(){
     html+=`<div class="card" style="padding:0;overflow:hidden;margin-bottom:16px">
       <div style="padding:14px 18px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)">
         <span class="badge ${cbc[canal]}">${canal}</span>
-        <span style="font-size:12px;font-weight:600">Objetivos vs Real — ${canal}</span>
+        <span style="font-size:12px;font-weight:600">Objetivos vs Real ${curYear} — ${canal}</span>
       </div>
       <div class="tw"><table>
         <thead><tr>
@@ -1079,7 +1092,7 @@ function renderCuotas(){
   const totalFact=S.cuotas.reduce((s,c)=>s+Number(c.ticket||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
   const totalCaja=allVentas.reduce((s,l)=>s+Number(l.caja||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
   const todayM=todayMonth();
-  const cajaPendiente=S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const allP={...c.pagos};rs.forEach(r=>{Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);});});return s+MONTHS.reduce((ms,m,mi)=>mi>=todayM?ms+(allP[m]||0):ms,0);},0);
+  const cajaPendiente=S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const allP={...c.pagos};rs.forEach(r=>{Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);});});return s+MONTHS.reduce((ms,m,mi)=>{const key=`${curYear}-${m}`;return mi>=todayM?ms+(allP[key]||allP[m]||0):ms;},0);},0);
   const filtered=S.cuotas.filter(c=>!cuotaSearch||c.nombre.toLowerCase().includes(cuotaSearch.toLowerCase()));
   document.getElementById('content').innerHTML=`
     ${!isEntrenador?`<div class="mg">
@@ -1113,7 +1126,7 @@ function renderCuotas(){
             <td style="text-align:center">${rs.length}</td><td style="font-weight:600">${fmt(ltv)}</td></tr>`;}).join('')}
         </tbody>
         <tfoot><tr><td colspan="6">Total en caja por mes</td>
-          ${MONTHS.map((m,mi)=>{const t=S.cuotas.reduce((s,c)=>{const orig=Number(c.pagos?.[m]||0);const rv=S.renovaciones.filter(r=>r.nombre===c.nombre).reduce((x,r)=>x+Number(r.pagos?.[m]||0),0);return s+orig+rv;},0);return`<td style="text-align:center;${mi<todayM?'opacity:.5':mi===todayM?'background:#fff9e6':''}">${t>0?fmt(t):''}</td>`;}).join('')}<td colspan="4"></td></tr></tfoot>
+          ${MONTHS.map((m,mi)=>{const key=`${curYear}-${m}`;const t=S.cuotas.reduce((s,c)=>{const orig=Number(c.pagos?.[key]||c.pagos?.[m]||0);const rv=S.renovaciones.filter(r=>r.nombre===c.nombre).reduce((x,r)=>x+Number(r.pagos?.[key]||r.pagos?.[m]||0),0);return s+orig+rv;},0);return`<td style="text-align:center;${mi<todayM?'opacity:.5':mi===todayM?'background:#fff9e6':''}">${t>0?fmt(t):''}</td>`;}).join('')}<td colspan="4"></td></tr></tfoot>
       </table></div>
     </div>`;
 }
@@ -1135,7 +1148,7 @@ function renderCuotasFiltered(){
       <td style="text-align:center">${c.nCuotas}</td>
       <td><input class="ce" type="number" inputmode="numeric" value="${c.ticket}" oninput="upCuotaNum(${origIdx},'ticket',this.value)" style="text-align:right;min-width:70px"></td>
       <td style="text-align:right">${fmt(cm)}</td>
-      ${MONTHS.map((m,mi)=>{const orig=Number(c.pagos?.[m]||0);const rv=rs.reduce((s,r)=>s+Number(r.pagos?.[m]||0),0);const total=orig+rv;
+      ${MONTHS.map((m,mi)=>{const key=`${curYear}-${m}`;const orig=Number(c.pagos?.[key]||c.pagos?.[m]||0);const rv=rs.reduce((s,r)=>s+Number(r.pagos?.[key]||r.pagos?.[m]||0),0);const total=orig+rv;
         return`<td style="text-align:center;${mi<todayM?'opacity:.5':mi===todayM?'background:#fff9e6':''}">${total>0?`<span class="cpaid">${fmt(total)}</span>`:`<span class="cpen">—</span>`}</td>`;}).join('')}
       <td style="font-size:12px;white-space:nowrap">${venc}</td><td><span class="badge ${inf.cls}">${inf.label}</span></td>
       <td style="text-align:center">${rs.length}</td><td style="font-weight:600">${fmt(ltv)}</td></tr>`;
@@ -1171,7 +1184,7 @@ function openAddCuota(){openModal(`<div class="mtitle">Añadir cliente a cuotas<
   <div class="fr2"><div class="fg"><label class="fl">Ticket (€)</label><input class="fi" id="ct" type="number" placeholder="0"></div>
   <div class="fg"><label class="fl">Nº cuotas</label><select class="fi" id="cq">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}">${n===1?'1 (pago único)':n}</option>`).join('')}</select></div></div>
   <div class="mfooter"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="saveCuota()">Guardar</button></div>`);}
-function saveCuota(){const n=document.getElementById('cn').value.trim().toUpperCase();const f=document.getElementById('cf').value;const t=parseFloat(document.getElementById('ct').value)||0;const q=parseInt(document.getElementById('cq').value)||1;if(!n){alert('Introduce un nombre');return;}const ms=new Date(f).getMonth();const pv=Math.round(t/q*100)/100;const pagos={};for(let i=0;i<q&&(ms+i)<12;i++)pagos[MONTHS[ms+i]]=pv;S.cuotas.push({nombre:n,fechaInicio:f,ticket:t,nCuotas:q,pagos});save();closeModal();renderCuotas();}
+function saveCuota(){const n=document.getElementById('cn').value.trim().toUpperCase();const f=document.getElementById('cf').value;const t=parseFloat(document.getElementById('ct').value)||0;const q=parseInt(document.getElementById('cq').value)||1;if(!n){alert('Introduce un nombre');return;}const startYS=new Date(f).getFullYear();const startMS=new Date(f).getMonth();const pv=Math.round(t/q*100)/100;const pagos={};for(let i=0;i<q;i++){const totalMS=startMS+i;const yS=startYS+Math.floor(totalMS/12);const mS=totalMS%12;const keyS=`${yS}-${MONTHS[mS]}`;pagos[keyS]=pv;}S.cuotas.push({nombre:n,fechaInicio:f,ticket:t,nCuotas:q,pagos});save();closeModal();renderCuotas();}
 
 // ── RENOVACIONES ──────────────────────────────────────────
 let renovSearch='';
@@ -1204,7 +1217,7 @@ function openAddRenov(){const opts=S.cuotas.map(c=>`<option value="${esc(c.nombr
   <div class="fr2"><div class="fg"><label class="fl">Ticket (€)</label><input class="fi" id="rt" type="number" placeholder="0"></div>
   <div class="fg"><label class="fl">Nº cuotas</label><select class="fi" id="rq">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}">${n===1?'1 (pago único)':n}</option>`).join('')}</select></div></div>
   <div class="mfooter"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="saveRenov()">Guardar</button></div>`);}
-function saveRenov(){const nombre=document.getElementById('rn').value;const fecha=document.getElementById('rf').value;const ticket=parseFloat(document.getElementById('rt').value)||0;const cuotas=parseInt(document.getElementById('rq').value)||1;const nRenov=S.renovaciones.filter(r=>r.nombre===nombre).length+1;const mStart=new Date(fecha).getMonth();const pv=Math.round(ticket/cuotas*100)/100;const pagos={};for(let i=0;i<cuotas&&(mStart+i)<12;i++)pagos[MONTHS[mStart+i]]=pv;S.renovaciones.push({nombre,nRenov,ticket,nCuotas:cuotas,fechaInicio:fecha,pagos});save();closeModal();renderRenovaciones();}
+function saveRenov(){const nombre=document.getElementById('rn').value;const fecha=document.getElementById('rf').value;const ticket=parseFloat(document.getElementById('rt').value)||0;const cuotas=parseInt(document.getElementById('rq').value)||1;const nRenov=S.renovaciones.filter(r=>r.nombre===nombre).length+1;const startYR=new Date(fecha).getFullYear();const startMR=new Date(fecha).getMonth();const pv=Math.round(ticket/cuotas*100)/100;const pagos={};for(let i=0;i<cuotas;i++){const totalMR=startMR+i;const yR=startYR+Math.floor(totalMR/12);const mR=totalMR%12;const keyR=`${yR}-${MONTHS[mR]}`;pagos[keyR]=pv;}S.renovaciones.push({nombre,nRenov,ticket,nCuotas:cuotas,fechaInicio:fecha,pagos});save();closeModal();renderRenovaciones();}
 
 // ── ALERTAS ───────────────────────────────────────────────
 function proximosAVencer(){
@@ -1269,6 +1282,15 @@ function renderAlertas(){
 function openModal(html){document.getElementById('mbox').innerHTML=html;document.getElementById('moverlay').classList.add('open');}
 function closeModal(){document.getElementById('moverlay').classList.remove('open');}
 function handleMO(e){if(e.target===document.getElementById('moverlay'))closeModal();}
+
+function changeYear(y){
+  curYear=parseInt(y);
+  const sel=document.getElementById('year-sel');
+  if(sel) sel.value=curYear;
+  // Re-render current page with new year
+  const toRender={dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,mes:()=>goTo('mes',curMonth),kpis_d:()=>goTo('kpis_d',curMonth)};
+  if(toRender[curPage]) toRender[curPage]();
+}
 
 init();
 </script>
