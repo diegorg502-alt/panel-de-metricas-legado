@@ -208,6 +208,7 @@ const MFULL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','
 const CANALES=['YOUTUBE','SOCIAL','VSL','REFERIDOS'];
 const ESTADOS=['Venta','Reserva','En seguimiento','Perdido'];
 const ENTRENADORES=['','Maria','Carlos'];
+const CLOSERS=['Bruno'];
 const ENTRENADOR_EMAIL='entrenadores@agencialegado.com';
 
 let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{}};
@@ -663,9 +664,9 @@ function renderMes(){
       <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--text2)">KPIs por canal</div>
       ${acordeonesHTML}
     </div>
-    <div class="card" style="padding:0;overflow:hidden">
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:32px">
       <div class="tw"><table id="lt">
-        <thead><tr><th style="min-width:150px">Nombre</th><th style="min-width:108px">Fecha</th><th style="min-width:108px">Teléfono</th><th>Embudo</th><th>Closer</th><th>Asistencia</th><th>Incidencia</th><th>Estado</th><th>Entrenador</th><th style="min-width:90px">Facturación</th><th style="min-width:90px">Caja</th><th>Cuotas</th><th style="min-width:180px">Comentarios</th><th></th></tr></thead>
+        <thead><tr><th style="min-width:160px">Nombre</th><th style="min-width:120px">Fecha</th><th style="min-width:120px">Teléfono</th><th style="min-width:110px">Embudo</th><th style="min-width:90px">Closer</th><th style="min-width:100px">Asistencia</th><th style="min-width:90px">Incidencia</th><th style="min-width:120px">Estado</th><th style="min-width:120px">Entrenador</th><th style="min-width:110px">Facturación</th><th style="min-width:90px">Caja</th><th style="min-width:90px">Cuotas</th><th style="min-width:180px">Comentarios</th><th></th></tr></thead>
         <tbody id="lb"></tbody>
       </table></div>
     </div>`;
@@ -677,11 +678,11 @@ function renderLlamadasRows(mk){
     <td><input class="ce" value="${esc(r.nombre)}" oninput="upL('${mk}',${i},'nombre',this.value)" placeholder="Nombre completo"></td>
     <td><input class="ce" type="date" value="${r.fecha||''}" oninput="upL('${mk}',${i},'fecha',this.value)"></td>
     <td><input class="ce" value="${esc(r.telefono)}" oninput="upL('${mk}',${i},'telefono',this.value)" placeholder="+34..."></td>
-    <td><select class="ce" onchange="upL('${mk}',${i},'embudo',this.value)">${CANALES.map(c=>`<option${r.embudo===c?' selected':''}>${c}</option>`).join('')}</select></td>
-    <td><input class="ce" value="${esc(r.closer||'Bruno')}" oninput="upL('${mk}',${i},'closer',this.value)" style="min-width:60px"></td>
-    <td><select class="ce" onchange="upL('${mk}',${i},'asistencia',this.value)">${['SI','NO','PENDIENTE'].map(v=>`<option${r.asistencia===v?' selected':''}>${v}</option>`).join('')}</select></td>
+    <td><select class="ce" onchange="upL('${mk}',${i},'embudo',this.value)" style="min-width:100px"><option value="">-</option>${CANALES.map(c=>`<option value="${c}"${r.embudo===c?' selected':''}>${c}</option>`).join('')}</select></td>
+    <td><select class="ce" onchange="upL('${mk}',${i},'closer',this.value)" style="min-width:80px"><option value="">-</option>${CLOSERS.map(c=>`<option value="${c}"${r.closer===c?' selected':''}>${c}</option>`).join('')}</select></td>
+    <td><select class="ce" onchange="upL('${mk}',${i},'asistencia',this.value)" style="min-width:95px"><option value="">-</option>${['SI','NO','PENDIENTE'].map(v=>`<option value="${v}"${r.asistencia===v?' selected':''}>${v}</option>`).join('')}</select></td>
     <td><input class="ce" value="${esc(r.incidencia)}" oninput="upL('${mk}',${i},'incidencia',this.value)" placeholder="-" style="min-width:70px"></td>
-    <td><select class="ce" onchange="upLEstado('${mk}',${i},this.value)">${ESTADOS.map(v=>`<option${r.estado===v?' selected':''}>${v}</option>`).join('')}</select></td>
+    <td><select class="ce" onchange="upLEstado('${mk}',${i},this.value)" style="min-width:110px"><option value="">-</option>${ESTADOS.map(v=>`<option value="${v}"${r.estado===v?' selected':''}>${v}</option>`).join('')}</select></td>
     <td><select class="ce" onchange="upLEntrenador('${mk}',${i},this.value)">
       <option value="">Sin asignar</option>
       ${['Maria','Carlos'].map(e=>`<option value="${e}"${r.entrenador===e?' selected':''}>${e}</option>`).join('')}
@@ -712,7 +713,7 @@ function upLEstado(mk,i,val){
 function delL(mk,i){if(!confirm('¿Eliminar fila?'))return;S.llamadas[mk].splice(i,1);save();renderMes();}
 function addLlamadaRow(mi){
   const mk=mKey(mi);if(!S.llamadas[mk])S.llamadas[mk]=[];
-  S.llamadas[mk].push({nombre:'',fecha:`2026-${String(mi+1).padStart(2,'0')}-01`,telefono:'',embudo:'YOUTUBE',closer:'Bruno',asistencia:'SI',incidencia:'',estado:'En seguimiento',facturacion:0,caja:0,nCuotas:1,comentarios:'',entrenador:''});
+  S.llamadas[mk].push({nombre:'',fecha:'',telefono:'',embudo:'',closer:'',asistencia:'',incidencia:'',estado:'',facturacion:0,caja:0,nCuotas:1,comentarios:'',entrenador:''});
   save();renderMes();
   setTimeout(()=>{const lb=document.getElementById('lb');if(lb){const last=lb.querySelector('tr:last-child');if(last){last.scrollIntoView({behavior:'smooth',block:'nearest'});const inp=last.querySelector('input');if(inp)inp.focus();}}},80);
 }
