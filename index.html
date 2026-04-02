@@ -297,6 +297,7 @@ async function loadData(){
     setSyncStatus('err','Backup local');
   }
   if(!S.ads)S.ads={};
+  migratePagos();
   seed();
 }
 
@@ -428,6 +429,48 @@ function setSyncStatus(state,label){
   lbl.textContent=label;
 }
 
+function migratePagos(){
+  // Migrate old pagos format (ENE,FEB..) to year-prefixed (2026-ENE, 2026-FEB..)
+  S.cuotas.forEach(c=>{
+    if(!c.pagos) return;
+    const needsMigration=Object.keys(c.pagos).some(k=>MONTHS.includes(k));
+    if(!needsMigration) return;
+    const year=new Date(c.fechaInicio).getFullYear();
+    const startM=new Date(c.fechaInicio).getMonth();
+    const newPagos={};
+    MONTHS.forEach((m,mi)=>{
+      if(c.pagos[m]){
+        // Determine correct year for this month
+        const monthOffset=mi-startM;
+        const payYear=monthOffset>=0?year+(mi<startM?1:0):year+1;
+        // Simple: use fechaInicio year + check if month is before start month
+        const correctYear=mi>=startM?year:year+1;
+        newPagos[`${correctYear}-${m}`]=(newPagos[`${correctYear}-${m}`]||0)+Number(c.pagos[m]);
+      }
+    });
+    // Keep any already-migrated keys
+    Object.entries(c.pagos).forEach(([k,v])=>{if(!MONTHS.includes(k))newPagos[k]=v;});
+    c.pagos=newPagos;
+  });
+  S.renovaciones.forEach(r=>{
+    if(!r.pagos) return;
+    const needsMigration=Object.keys(r.pagos).some(k=>MONTHS.includes(k));
+    if(!needsMigration) return;
+    const year=new Date(r.fechaInicio).getFullYear();
+    const startM=new Date(r.fechaInicio).getMonth();
+    const newPagos={};
+    MONTHS.forEach((m,mi)=>{
+      if(r.pagos[m]){
+        const correctYear=mi>=startM?year:year+1;
+        newPagos[`${correctYear}-${m}`]=(newPagos[`${correctYear}-${m}`]||0)+Number(r.pagos[m]);
+      }
+    });
+    Object.entries(r.pagos).forEach(([k,v])=>{if(!MONTHS.includes(k))newPagos[k]=v;});
+    r.pagos=newPagos;
+  });
+  save();
+}
+
 function seed(){
   const mk=`${new Date().getFullYear()}-03`;
   if(!S.llamadas[mk]){
@@ -519,8 +562,9 @@ function goTo(page,month){
 function renderDashboard(){
   const allL=Object.values(S.llamadas).filter((_,idx)=>{const key=Object.keys(S.llamadas)[idx];return key.startsWith(String(curYear));}).flat();
   const ventas=allL.filter(l=>l.estado==='Venta');const reservas=allL.filter(l=>l.estado==='Reserva');
-  const totalFact=S.cuotas.reduce((s,c)=>s+Number(c.ticket||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
-  const totalCaja=ventas.reduce((s,l)=>s+Number(l.caja||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
+  // Year-filtered facturación and caja
+  const totalFact=ventas.reduce((s,l)=>s+Number(l.facturacion||0),0);
+  const totalCaja=ventas.reduce((s,l)=>s+Number(l.caja||0),0);
   const activos=S.cuotas.filter(isActive).length;
   const proximos=S.cuotas.filter(c=>{const d=daysDiff(getVenc(c));return d>=0&&d<30;}).length;
   const ltv_med=S.cuotas.length?Math.round(S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);return s+Number(c.ticket||0)+rs.reduce((x,r)=>x+Number(r.ticket||0),0);},0)/S.cuotas.length):0;
@@ -1097,7 +1141,7 @@ function renderCuotas(){
   },0);
   const totalCaja=allVentas.reduce((s,l)=>s+Number(l.caja||0),0)+S.renovaciones.reduce((s,r)=>s+Number(r.ticket||0),0);
   const todayM=todayMonth();
-  const cajaPendiente=S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const allP={...c.pagos};rs.forEach(r=>{Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);});});return s+MONTHS.reduce((ms,m,mi)=>{const key=`${curYear}-${m}`;return mi>=todayM?ms+(allP[key]||allP[m]||0):ms;},0);},0);
+  const cajaPendiente=S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const allP={...c.pagos};rs.forEach(r=>{Object.entries(r.pagos||{}).forEach(([m,v])=>{allP[m]=(allP[m]||0)+Number(v||0);});});return s+MONTHS.reduce((ms,m,mi)=>{const key=`${curYear}-${m}`;return mi>=todayM?ms+(allP[key]||0):ms;},0);},0);
   const filtered=S.cuotas.filter(c=>!cuotaSearch||c.nombre.toLowerCase().includes(cuotaSearch.toLowerCase()));
   document.getElementById('content').innerHTML=`
     ${!isEntrenador?`<div class="mg">
@@ -1131,7 +1175,7 @@ function renderCuotas(){
             <td style="text-align:center">${rs.length}</td><td style="font-weight:600">${fmt(ltv)}</td></tr>`;}).join('')}
         </tbody>
         <tfoot><tr><td colspan="6">Total en caja por mes</td>
-          ${MONTHS.map((m,mi)=>{const key=`${curYear}-${m}`;const t=S.cuotas.reduce((s,c)=>{const orig=Number(c.pagos?.[key]||c.pagos?.[m]||0);const rv=S.renovaciones.filter(r=>r.nombre===c.nombre).reduce((x,r)=>x+Number(r.pagos?.[key]||r.pagos?.[m]||0),0);return s+orig+rv;},0);return`<td style="text-align:center;${mi<todayM?'opacity:.5':mi===todayM?'background:#fff9e6':''}">${t>0?fmt(t):''}</td>`;}).join('')}<td colspan="4"></td></tr></tfoot>
+          ${MONTHS.map((m,mi)=>{const key=`${curYear}-${m}`;const t=S.cuotas.reduce((s,c)=>{const orig=Number(c.pagos?.[key]||0);const rv=S.renovaciones.filter(r=>r.nombre===c.nombre).reduce((x,r)=>x+Number(r.pagos?.[key]||0),0);return s+orig+rv;},0);return`<td style="text-align:center;${mi<todayM?'opacity:.5':mi===todayM?'background:#fff9e6':''}">${t>0?fmt(t):''}</td>`;}).join('')}<td colspan="4"></td></tr></tfoot>
       </table></div>
     </div>`;
 }
@@ -1153,7 +1197,7 @@ function renderCuotasFiltered(){
       <td style="text-align:center">${c.nCuotas}</td>
       <td><input class="ce" type="number" inputmode="numeric" value="${c.ticket}" oninput="upCuotaNum(${origIdx},'ticket',this.value)" style="text-align:right;min-width:70px"></td>
       <td style="text-align:right">${fmt(cm)}</td>
-      ${MONTHS.map((m,mi)=>{const key=`${curYear}-${m}`;const orig=Number(c.pagos?.[key]||c.pagos?.[m]||0);const rv=rs.reduce((s,r)=>s+Number(r.pagos?.[key]||r.pagos?.[m]||0),0);const total=orig+rv;
+      ${MONTHS.map((m,mi)=>{const key=`${curYear}-${m}`;const orig=Number(c.pagos?.[key]||0);const rv=rs.reduce((s,r)=>s+Number(r.pagos?.[key]||0),0);const total=orig+rv;
         return`<td style="text-align:center;${mi<todayM?'opacity:.5':mi===todayM?'background:#fff9e6':''}">${total>0?`<span class="cpaid">${fmt(total)}</span>`:`<span class="cpen">—</span>`}</td>`;}).join('')}
       <td style="font-size:12px;white-space:nowrap">${venc}</td><td><span class="badge ${inf.cls}">${inf.label}</span></td>
       <td style="text-align:center">${rs.length}</td><td style="font-weight:600">${fmt(ltv)}</td></tr>`;
