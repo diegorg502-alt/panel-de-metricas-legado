@@ -772,7 +772,21 @@ function upLEstado(mk,i,val){
   if(tr)tr.style.background=val==='Venta'?'#f0fdf4':val==='Perdido'?'#fef2f2':val==='Reserva'?'#eff6ff':'';
   renderMes();
 }
-function delL(mk,i){if(!confirm('¿Eliminar fila?'))return;S.llamadas[mk].splice(i,1);save();renderMes();}
+function delL(mk,i){
+  const r=S.llamadas[mk][i];
+  const nombre=(r.nombre||'').toUpperCase().trim();
+  const enCuotas=nombre&&S.cuotas.find(c=>c.nombre===nombre);
+  const msg=enCuotas
+    ?`¿Eliminar a ${r.nombre||'esta persona'}?\n\nTambién se eliminará de Cuotas y Renovaciones.`
+    :'¿Eliminar esta fila?';
+  if(!confirm(msg))return;
+  S.llamadas[mk].splice(i,1);
+  if(enCuotas){
+    S.cuotas=S.cuotas.filter(c=>c.nombre!==nombre);
+    S.renovaciones=S.renovaciones.filter(r=>r.nombre!==nombre);
+  }
+  save();renderMes();
+}
 function addLlamadaRow(mi){
   const mk=mKey(mi);if(!S.llamadas[mk])S.llamadas[mk]=[];
   S.llamadas[mk].push({nombre:'',fecha:'',telefono:'',embudo:'',closer:'',asistencia:'',incidencia:'',estado:'',facturacion:0,caja:0,nCuotas:1,comentarios:'',entrenador:'',year:curYear});
