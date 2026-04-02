@@ -208,18 +208,25 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
 <script>
 const SB_URL='https://obeopzavwnquapjdjwrx.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9iZW9wemF2d25xdWFwamRqd3J4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MDc0NzgsImV4cCI6MjA5MDQ4MzQ3OH0.mQqBvJbZokc-ZVHQn1LsLf6QBxRdEjoqT-3aoB5-VGQ';
-const RECORD_ID='bruno_2026';
+// RECORD_ID loaded dynamically from crm_clients
 
 const {createClient}=supabase;
 const sb=createClient(SB_URL,SB_KEY);
 
 const MONTHS=['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 const MFULL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const CANALES=['YOUTUBE','SOCIAL','VSL','REFERIDOS'];
 const ESTADOS=['Venta','Reserva','En seguimiento','Perdido'];
-const ENTRENADORES=['','Bruno','Carlos'];
-const CLOSERS=['Bruno'];
-const ENTRENADOR_EMAIL='entrenadores@brunogarcia.com';
+const SEMANAS_OPTIONS=[{label:'12 semanas',value:12,dias:84},{label:'24 semanas',value:24,dias:168},{label:'48 semanas',value:48,dias:336}];
+
+// Dynamic client config — loaded from crm_clients after login
+let CANALES=['YOUTUBE','SOCIAL','VSL','REFERIDOS'];
+let CLOSERS=['Bruno'];
+let SETTERS=[];
+let ENTRENADORES=['','Bruno','Carlos'];
+let ENTRENADOR_EMAIL='';
+let RECORD_ID='';
+let CLIENT_NOMBRE='';
+let SEMANAS_MODO=false; // true = use weeks for vencimiento
 
 let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[]};
 let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null;
@@ -269,11 +276,13 @@ document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementB
 // ── SUPABASE DATA ─────────────────────────────────────────
 async function showApp(){
   document.getElementById('shell').style.display='block';
-  isEntrenador = currentUser?.email===ENTRENADOR_EMAIL;
   curYear=new Date().getFullYear();
   const ys=document.getElementById('year-sel');if(ys)ys.value=curYear;
+  setSyncStatus('saving','Cargando configuración...');
+  await loadClientConfig(currentUser?.email||'');
+  isEntrenador = currentUser?.email===ENTRENADOR_EMAIL;
   document.getElementById('sb-user').textContent=isEntrenador?'Entrenador':(currentUser?.email||'');
-  setSyncStatus('saving','Cargando...');
+  setSyncStatus('saving','Cargando datos...');
   await loadData();
   buildSidebar();
   if(isEntrenador) goTo('cuotas');
@@ -312,6 +321,30 @@ async function sbSave(){
     setSyncStatus('ok','Guardado ✓');
   }catch(e){
     setSyncStatus('err','Error — guardado local');
+  }
+}
+
+async function loadClientConfig(email){
+  try{
+    const{data,error}=await sb.from('crm_clients').select('*').eq('email',email).single();
+    if(error||!data) throw new Error('Client not found');
+    // Apply config
+    RECORD_ID=data.record_id;
+    CLIENT_NOMBRE=data.nombre;
+    CANALES=data.canales||['YOUTUBE','SOCIAL','VSL','REFERIDOS'];
+    CLOSERS=data.closers||['Bruno'];
+    SETTERS=data.setters||[];
+    ENTRENADORES=[''].concat(data.entrenadores||[]);
+    ENTRENADOR_EMAIL=data.entrenador_email||'';
+    SEMANAS_MODO=data.semanas_modo||false;
+    // Update UI
+    document.querySelector('.sb-brand').textContent='CRM · '+CLIENT_NOMBRE;
+    document.querySelector('.sb-foot div:last-child').textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
+    document.title='Panel de Métricas — Agencia Legado';
+    return true;
+  }catch(e){
+    console.error('loadClientConfig error:',e);
+    return false;
   }
 }
 
@@ -431,25 +464,7 @@ function setSyncStatus(state,label){
 
 function migratePagos(){/* pagos now computed on the fly via getPagos() */}
 
-function seed(){
-  const mk=`${new Date().getFullYear()}-03`;
-  if(!S.llamadas[mk]){
-    S.llamadas[mk]=[];
-    [{n:'YENISLEIDY',f:`${new Date().getFullYear()}-03-01`,t:1800,c:600,q:3,e:'YOUTUBE'},{n:'SAMAEL',f:`${new Date().getFullYear()}-03-01`,t:1500,c:250,q:6,e:'YOUTUBE'},
-     {n:'DANIEL MORENO',f:`${new Date().getFullYear()}-03-04`,t:1500,c:1500,q:1,e:'YOUTUBE'},{n:'RUBEN ESPINOSA',f:`${new Date().getFullYear()}-03-10`,t:1500,c:1500,q:1,e:'YOUTUBE'},
-     {n:'CAMILA',f:`${new Date().getFullYear()}-03-10`,t:1500,c:250,q:6,e:'YOUTUBE'},{n:'STALIN CARRION',f:`${new Date().getFullYear()}-03-12`,t:1200,c:200,q:6,e:'YOUTUBE'},
-     {n:'CARMEN (MAICA)',f:`${new Date().getFullYear()}-03-13`,t:1800,c:600,q:3,e:'SOCIAL'},{n:'FLAVIO',f:`${new Date().getFullYear()}-03-25`,t:1500,c:250,q:6,e:'REFERIDOS'},
-     {n:'RUDI PONCE',f:`${new Date().getFullYear()}-03-25`,t:1500,c:1500,q:1,e:'REFERIDOS'}].forEach(v=>{
-      S.llamadas[mk].push({nombre:v.n,fecha:v.f,telefono:'',embudo:v.e,closer:'Bruno',asistencia:'SI',incidencia:'',estado:'Venta',facturacion:v.t,caja:v.c,nCuotas:v.q,comentarios:'',entrenador:''});
-      const k=v.n.toUpperCase();
-      if(!S.cuotas.find(c=>c.nombre===k)){const pv=Math.round(v.t/v.q*100)/100;const pagos={};const startY=new Date(v.f).getFullYear();const startM=new Date(v.f).getMonth();for(let i=0;i<v.q;i++){const totalM=startM+i;const y=startY+Math.floor(totalM/12);const m=totalM%12;const key=`${y}-${MONTHS[m]}`;pagos[key]=pv;}S.cuotas.push({nombre:k,fechaInicio:v.f,ticket:v.t,nCuotas:v.q,pagos,embudo:v.e});}
-    });
-    [{n:'CHRISTIAN AZUAGA',f:`${new Date().getFullYear()}-03-16`,e:'SOCIAL'},{n:'NOELIA LAZO',f:`${new Date().getFullYear()}-03-18`,e:'SOCIAL'},{n:'ANA GONZALO',f:`${new Date().getFullYear()}-03-20`,e:'YOUTUBE'},{n:'JUAN PABLO (JOTA)',f:`${new Date().getFullYear()}-03-18`,e:'SOCIAL'},{n:'TATIANA',f:`${new Date().getFullYear()}-03-23`,e:'YOUTUBE'}].forEach(v=>{
-      S.llamadas[mk].push({nombre:v.n,fecha:v.f,telefono:'',embudo:v.e,closer:'Bruno',asistencia:'SI',incidencia:'',estado:'Perdido',facturacion:0,caja:0,nCuotas:0,comentarios:'',entrenador:''});
-    });
-    save();
-  }
-}
+function seed(){}
 
 // ── HELPERS ───────────────────────────────────────────────
 function fmt(n,dec=0){return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:dec}).format(n||0)}
@@ -698,7 +713,7 @@ function renderMes(){
     </div>
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:32px">
       <div class="tw"><table id="lt">
-        <thead><tr><th style="min-width:160px">Nombre</th><th style="min-width:120px">Fecha</th><th style="min-width:120px">Teléfono</th><th style="min-width:110px">Embudo</th><th style="min-width:90px">Closer</th><th style="min-width:100px">Asistencia</th><th style="min-width:90px">Incidencia</th><th style="min-width:120px">Estado</th><th style="min-width:120px">Entrenador</th><th style="min-width:110px">Facturación</th><th style="min-width:90px">Caja</th><th style="min-width:90px">Cuotas</th><th style="min-width:180px">Comentarios</th><th></th></tr></thead>
+        <thead><tr><th style="min-width:160px">Nombre</th><th style="min-width:120px">Fecha</th><th style="min-width:120px">Teléfono</th><th style="min-width:110px">Embudo</th><th style="min-width:90px">Closer</th>${SETTERS.length?'<th style="min-width:100px">Setter</th>':''}${SEMANAS_MODO?'<th style="min-width:140px">Semanas</th>':''}<th style="min-width:100px">Asistencia</th><th style="min-width:90px">Incidencia</th><th style="min-width:120px">Estado</th><th style="min-width:120px">Entrenador</th><th style="min-width:110px">Facturación</th><th style="min-width:90px">Caja</th><th style="min-width:90px">Cuotas</th><th style="min-width:180px">Comentarios</th><th></th></tr></thead>
         <tbody id="lb"></tbody>
       </table></div>
     </div>`;
@@ -711,14 +726,13 @@ function renderLlamadasRows(mk){
     <td><input class="ce" type="date" value="${r.fecha||''}" oninput="upL('${mk}',${i},'fecha',this.value)"></td>
     <td><input class="ce" value="${esc(r.telefono)}" oninput="upL('${mk}',${i},'telefono',this.value)" placeholder="+34..."></td>
     <td><select class="ce" onchange="upL('${mk}',${i},'embudo',this.value)" style="min-width:100px"><option value="">-</option>${CANALES.map(c=>`<option value="${c}"${r.embudo===c?' selected':''}>${c}</option>`).join('')}</select></td>
-    <td><select class="ce" onchange="upL('${mk}',${i},'closer',this.value)" style="min-width:80px"><option value="">-</option>${CLOSERS.map(c=>`<option value="${c}"${r.closer===c?' selected':''}>${c}</option>`).join('')}</select></td>
+    <td><select class="ce" onchange="upL('${mk}',${i},'closer',this.value)" style="min-width:80px"><option value="">-</option>${CLOSERS.map(c=>`<option value="${c}"${r.closer===c?' selected':''}}>${c}</option>`).join('')}</select></td>
+    ${SETTERS.length?`<td><input class="ce" value="${esc(r.setter||'')}" oninput="upL('${mk}',${i},'setter',this.value)" placeholder="Setter" style="min-width:90px"></td>`:''}
+    ${SEMANAS_MODO?`<td><select class="ce" onchange="upLSemanas('${mk}',${i},this.value)" style="min-width:130px"><option value="">-</option>${SEMANAS_OPTIONS.map(s=>`<option value="${s.value}"${Number(r.semanas)===s.value?' selected':''}}>${s.label}</option>`).join('')}</select></td>`:''}
     <td><select class="ce" onchange="upL('${mk}',${i},'asistencia',this.value)" style="min-width:95px"><option value="">-</option>${['SI','NO','PENDIENTE'].map(v=>`<option value="${v}"${r.asistencia===v?' selected':''}>${v}</option>`).join('')}</select></td>
     <td><input class="ce" value="${esc(r.incidencia)}" oninput="upL('${mk}',${i},'incidencia',this.value)" placeholder="-" style="min-width:70px"></td>
     <td><select class="ce" onchange="upLEstado('${mk}',${i},this.value)" style="min-width:110px"><option value="">-</option>${ESTADOS.map(v=>`<option value="${v}"${r.estado===v?' selected':''}>${v}</option>`).join('')}</select></td>
-    <td><select class="ce" onchange="upLEntrenador('${mk}',${i},this.value)">
-      <option value="">Sin asignar</option>
-      ${['Bruno','Carlos'].map(e=>`<option value="${e}"${r.entrenador===e?' selected':''}>${e}</option>`).join('')}
-    </select></td>
+    <td><select class="ce" onchange="upLEntrenador('${mk}',${i},this.value)">${ENTRENADORES.map(e=>`<option value="${e}"${r.entrenador===e?' selected':''}>${e||'Sin asignar'}</option>`).join('')}</select></td>
     <td><input class="ce" type="number" inputmode="numeric" value="${r.facturacion||''}" oninput="upLNum('${mk}',${i},'facturacion',this.value)" placeholder="0" style="text-align:right"></td>
     <td><input class="ce" type="number" inputmode="numeric" value="${r.caja||''}" oninput="upLNum('${mk}',${i},'caja',this.value)" placeholder="0" style="text-align:right"></td>
     <td><select class="ce" onchange="upLNum('${mk}',${i},'nCuotas',this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${Number(r.nCuotas)===n?' selected':''}>${n===1?'1 (único)':n}</option>`).join('')}</select></td>
@@ -735,6 +749,10 @@ function upLNum(mk,i,f,v){
   S.llamadas[mk][i][f]=parseNum(v);
   if(f==='facturacion'||f==='nCuotas') syncCuota(mk,i);
   save();
+}
+function upLSemanas(mk,i,val){
+  S.llamadas[mk][i].semanas=parseInt(val)||0;
+  syncCuota(mk,i);save();
 }
 function upLEntrenador(mk,i,val){
   S.llamadas[mk][i].entrenador=val;
