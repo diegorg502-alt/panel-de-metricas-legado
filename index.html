@@ -228,7 +228,7 @@ let RECORD_ID='';
 let CLIENT_NOMBRE='';
 let SEMANAS_MODO=false; // true = use weeks for vencimiento
 
-let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[]};
+let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{}};
 let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null;
 let isEntrenador=false;
 let curYear=new Date().getFullYear();
@@ -1412,6 +1412,84 @@ function desmarcarContactado(nombre){
   save();
   renderAlertas();
   updateAlertaBadge();
+}
+
+// ── FICHA CLIENTE ──────────────────────────────────────────
+let fichaKey=null; // 'mk:i' — current open ficha
+
+function openFicha(mk,i){
+  const r=S.llamadas[mk][i];
+  if(!r) return;
+  fichaKey=`${mk}:${i}`;
+  const nombre=r.nombre||'Sin nombre';
+  document.getElementById('ficha-title').textContent=nombre||'Ficha del cliente';
+  // Load existing ficha data
+  if(!S.clientes) S.clientes={};
+  const key=(r.nombre||'').toUpperCase().trim();
+  const c=S.clientes[key]||{};
+  document.getElementById('ficha-body').innerHTML=`
+    <div style="margin-bottom:18px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Datos de contacto</div>
+      <div style="display:grid;gap:10px">
+        <div>
+          <div class="ml" style="font-size:11px;margin-bottom:3px">Nombre completo</div>
+          <input id="fc-nombre" class="ce" value="${esc(c.nombre||r.nombre||'')}" style="width:100%;box-sizing:border-box" placeholder="Nombre">
+        </div>
+        <div>
+          <div class="ml" style="font-size:11px;margin-bottom:3px">Apellidos</div>
+          <input id="fc-apellidos" class="ce" value="${esc(c.apellidos||'')}" style="width:100%;box-sizing:border-box" placeholder="Apellidos">
+        </div>
+        <div>
+          <div class="ml" style="font-size:11px;margin-bottom:3px">Email</div>
+          <input id="fc-email" class="ce" type="email" value="${esc(c.email||'')}" style="width:100%;box-sizing:border-box" placeholder="email@ejemplo.com">
+        </div>
+        <div>
+          <div class="ml" style="font-size:11px;margin-bottom:3px">Teléfono</div>
+          <input id="fc-telefono" class="ce" value="${esc(c.telefono||r.telefono||'')}" style="width:100%;box-sizing:border-box" placeholder="+34 600 000 000">
+        </div>
+      </div>
+    </div>
+    <div style="margin-bottom:18px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Info de la llamada</div>
+      <div style="display:grid;gap:6px;font-size:13px">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Canal</span><span style="font-weight:600">${r.embudo||'-'}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Fecha</span><span style="font-weight:600">${r.fecha||'-'}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Estado</span><span style="font-weight:600">${r.estado||'-'}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Closer</span><span style="font-weight:600">${r.closer||'-'}</span></div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Notas adicionales</div>
+      <textarea id="fc-notas" class="ce" style="width:100%;box-sizing:border-box;min-height:100px;resize:vertical;font-size:13px;line-height:1.5" placeholder="Notas, respuestas del formulario, observaciones...">${esc(c.notas||r.comentarios||'')}</textarea>
+    </div>
+  `;
+  document.getElementById('ficha-modal').style.display='block';
+}
+
+function closeFicha(e){
+  if(e.target===document.getElementById('ficha-modal'))
+    document.getElementById('ficha-modal').style.display='none';
+}
+
+function saveFicha(){
+  if(!fichaKey) return;
+  const [mk,i]=fichaKey.split(':');
+  const r=S.llamadas[mk][parseInt(i)];
+  if(!r) return;
+  const key=(r.nombre||'').toUpperCase().trim()||'SIN_NOMBRE';
+  if(!S.clientes) S.clientes={};
+  S.clientes[key]={
+    nombre:document.getElementById('fc-nombre').value.trim(),
+    apellidos:document.getElementById('fc-apellidos').value.trim(),
+    email:document.getElementById('fc-email').value.trim(),
+    telefono:document.getElementById('fc-telefono').value.trim(),
+    notas:document.getElementById('fc-notas').value.trim(),
+  };
+  // Also update telefono in llamada row
+  r.telefono=S.clientes[key].telefono;
+  save();
+  document.getElementById('ficha-modal').style.display='none';
+  renderMes();
 }
 
 function changeYear(y){
