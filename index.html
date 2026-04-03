@@ -722,7 +722,7 @@ function renderMes(){
 function renderLlamadasRows(mk){
   const rows=S.llamadas[mk]||[];const tbody=document.getElementById('lb');if(!tbody)return;
   tbody.innerHTML=rows.map((r,i)=>`<tr id="lr-${i}" style="${r.estado==='Venta'?'background:#f0fdf4':r.estado==='Perdido'?'background:#fef2f2':r.estado==='Reserva'?'background:#eff6ff':''}">
-    <td><input class="ce" value="${esc(r.nombre)}" oninput="upL('${mk}',${i},'nombre',this.value)" placeholder="Nombre completo"></td>
+    <td style="white-space:nowrap"><input class="ce" value="${esc(r.nombre)}" oninput="upL('${mk}',${i},'nombre',this.value)" placeholder="Nombre completo" style="min-width:100px"><button onclick="openFicha('${mk}',${i})" title="Ver ficha" style="background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--blue);font-size:13px">👤</button></td>
     <td><input class="ce" type="date" value="${r.fecha||''}" oninput="upL('${mk}',${i},'fecha',this.value)"></td>
     <td><input class="ce" value="${esc(r.telefono)}" oninput="upL('${mk}',${i},'telefono',this.value)" placeholder="+34..."></td>
     <td><select class="ce" onchange="upL('${mk}',${i},'embudo',this.value)" style="min-width:100px"><option value="">-</option>${CANALES.map(c=>`<option value="${c}"${r.embudo===c?' selected':''}>${c}</option>`).join('')}</select></td>
@@ -1503,5 +1503,19 @@ function changeYear(y){
 
 init();
 </script>
+
+<div id="ficha-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.4);backdrop-filter:blur(2px)" onclick="closeFicha(event)">
+  <div style="position:absolute;right:0;top:0;bottom:0;width:420px;background:var(--bg);box-shadow:-4px 0 24px rgba(0,0,0,0.15);display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:16px;font-weight:700" id="ficha-title">Ficha del cliente</div>
+      <button onclick="document.getElementById('ficha-modal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);padding:4px 8px">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:20px 24px" id="ficha-body"></div>
+    <div style="padding:16px 24px;border-top:1px solid var(--border)">
+      <button onclick="saveFicha()" class="btn btn-p" style="width:100%">Guardar ficha</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
