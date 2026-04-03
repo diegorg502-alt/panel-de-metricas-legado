@@ -501,7 +501,7 @@ function canalStats(canal,mk){
   const cl=lAll.filter(l=>l.embudo===canal);const cv=cl.filter(l=>l.estado==='Venta');
   const realizadas=cl.filter(l=>l.asistencia==='SI').length;
   const inv=kAll.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);
-  const leads=kAll.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0),0);
+  const leads=kAll.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
   const fact=cv.reduce((s,l)=>s+Number(l.facturacion||0),0);
   const caja=cv.reduce((s,l)=>s+Number(l.caja||0),0);
   const llamadasAgend=cl.length;
@@ -605,7 +605,7 @@ function kpisCanal(mk, canal){
   const realizadas=cl.filter(r=>r.asistencia==='SI').length;
   const kd=S.kpis_diarios[mk]||[];
   const inv=kd.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);
-  const leads=kd.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0),0);
+  const leads=kd.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
   const fact=cv.reduce((s,r)=>s+Number(r.facturacion||0),0);
   const caja=cv.reduce((s,r)=>s+Number(r.caja||0),0);
   const llamadas=cl.length;
@@ -649,7 +649,7 @@ function renderMes(){
   const realizadas=rows.filter(r=>r.asistencia==='SI').length;
   const kd=S.kpis_diarios[mk]||[];
   const inv=kd.reduce((s,k)=>s+Number(k.inversion||0),0);
-  const leads=kd.reduce((s,k)=>s+Number(k.leads||0),0);
+  const leads=kd.reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
   const fact=ventas.reduce((s,r)=>s+Number(r.facturacion||0),0);
   const caja=ventas.reduce((s,r)=>s+Number(r.caja||0),0);
   const llamadasTotal=rows.length;
@@ -875,10 +875,25 @@ function renderKpisD(){
 }
 function renderKpiDRows(mk){
   const rows=S.kpis_diarios[mk]||[];const tbody=document.getElementById('kpid-body');if(!tbody)return;
-  tbody.innerHTML=rows.map((r,i)=>{const cpl=r.leads&&r.inversion?(r.inversion/r.leads).toFixed(2):'-';
+  tbody.innerHTML=rows.map((r,i)=>{
+    const leadsVal=r.leads||r.seguidores||0;
+    const cpl=leadsVal&&r.inversion?(r.inversion/leadsVal).toFixed(2):'-';
+    const isMeta=r.source==='meta';
+    const diaStr=isMeta?(r.fecha?r.fecha.split('-')[2]:r.dia||''):(r.dia||'');
+    if(isMeta){
+      // Meta-imported row: read-only display with Meta badge
+      return`<tr style="background:rgba(24,119,242,0.04)">
+        <td style="text-align:center;font-weight:600;color:var(--text2)">${diaStr}</td>
+        <td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e7f3ff;color:#1877f2">${r.canal}</span></td>
+        <td style="text-align:right;font-weight:600">${fmt(r.inversion||0,2)}</td>
+        <td style="text-align:right;font-weight:600">${leadsVal}</td>
+        <td style="font-size:12px;font-weight:600;color:var(--amber);text-align:right">${cpl!=='-'?cpl+'€':'-'}</td>
+        <td><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:#e7f3ff;color:#1877f2;font-weight:700">META</span></td>
+      </tr>`;
+    }
     return`<tr><td><input class="ce" value="${r.dia||''}" oninput="upKDText('${mk}',${i},'dia',this.value)" placeholder="Día" style="text-align:center;max-width:50px"></td>
       <td><select class="ce" onchange="upKD('${mk}',${i},'canal',this.value)">${CANALES.map(c=>`<option${r.canal===c?' selected':''}>${c}</option>`).join('')}</select></td>
-      <td><input class="ce" type="text" inputmode="decimal" value="${r.inversion||''}" oninput="upKDNum('${mk}',${i},'inversion',this.value)" placeholder="0" inputmode="decimal" style="text-align:right"></td>
+      <td><input class="ce" type="text" inputmode="decimal" value="${r.inversion||''}" oninput="upKDNum('${mk}',${i},'inversion',this.value)" placeholder="0" style="text-align:right"></td>
       <td><input class="ce" type="number" inputmode="numeric" value="${r.leads||''}" oninput="upKDNum('${mk}',${i},'leads',this.value)" placeholder="0" style="text-align:right"></td>
       <td id="cpl-${i}" style="font-size:12px;font-weight:600;color:var(--amber);text-align:right">${cpl!=='-'?cpl+'€':'-'}</td>
       <td><button class="btn btn-red btn-xs" onclick="delKD('${mk}',${i})">✕</button></td>
