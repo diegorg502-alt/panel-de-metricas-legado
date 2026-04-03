@@ -557,18 +557,18 @@ function toggleG(id){document.getElementById(`nhdr-${id}`).classList.toggle('ope
 function goTo(page,month){
   if(month!==undefined)curMonth=month;curPage=page;
   document.querySelectorAll('.nav-i').forEach(el=>el.classList.remove('active'));
-  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas'};
+  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia'};
   if(ids[page])document.getElementById(ids[page])?.classList.add('active');
   if(page==='mes')document.getElementById(`ni-mes-${MONTHS[curMonth]}`)?.classList.add('active');
   if(page==='kpis_d')document.getElementById(`ni-kd-${MONTHS[curMonth]}`)?.classList.add('active');
-  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación'};
+  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación',ia:'Conversa con la IA'};
   updateAlertaBadge();
   document.getElementById('topbar-title').textContent=titles[page]||(page==='mes'?`Llamadas — ${MFULL[curMonth]} ${curYear}`:`KPIs diarios — ${MFULL[curMonth]} ${curYear}`);
   const ex=document.getElementById('topbar-extra');ex.innerHTML='';
   if(page==='mes'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLlamadaRow(curMonth);ex.appendChild(b);}
   if(page==='cuotas'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Añadir cliente';b.onclick=openAddCuota;ex.appendChild(b);}
   if(page==='renovaciones'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva renovación';b.onclick=openAddRenov;ex.appendChild(b);}
-  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,mes:renderMes,kpis_d:renderKpisD}[page]||renderDashboard)();
+  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,ia:renderIA,mes:renderMes,kpis_d:renderKpisD}[page]||renderDashboard)();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────
@@ -1480,9 +1480,13 @@ function openFicha(mk,i){
         <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Closer</span><span style="font-weight:600">${r.closer||'-'}</span></div>
       </div>
     </div>
-    <div>
+    <div style="margin-bottom:18px">
       <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Notas adicionales</div>
-      <textarea id="fc-notas" class="ce" style="width:100%;box-sizing:border-box;min-height:100px;resize:vertical;font-size:13px;line-height:1.5" placeholder="Notas, respuestas del formulario, observaciones...">${esc(c.notas||r.comentarios||'')}</textarea>
+      <textarea id="fc-notas" class="ce" style="width:100%;box-sizing:border-box;min-height:80px;resize:vertical;font-size:13px;line-height:1.5" placeholder="Notas, respuestas del formulario, observaciones...">${esc(c.notas||r.comentarios||'')}</textarea>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);margin-bottom:6px">📝 Transcripción de la llamada</div>
+      <textarea id="fc-transcripcion" class="ce" style="width:100%;box-sizing:border-box;min-height:180px;resize:vertical;font-size:12px;line-height:1.6;font-family:monospace" placeholder="Pega aquí la transcripción de la llamada...">${esc(c.transcripcion||'')}</textarea>
     </div>
   `;
   document.getElementById('ficha-modal').style.display='block';
@@ -1506,12 +1510,141 @@ function saveFicha(){
     email:document.getElementById('fc-email').value.trim(),
     telefono:document.getElementById('fc-telefono').value.trim(),
     notas:document.getElementById('fc-notas').value.trim(),
+    transcripcion:document.getElementById('fc-transcripcion').value.trim(),
   };
   // Also update telefono in llamada row
   r.telefono=S.clientes[key].telefono;
   save();
   document.getElementById('ficha-modal').style.display='none';
   renderMes();
+}
+
+
+// ── IA CHAT ───────────────────────────────────────────────
+let iaChatHistory = [];
+
+function getTranscripciones() {
+  if(!S.clientes) return [];
+  return Object.entries(S.clientes)
+    .filter(([,c]) => c.transcripcion && c.transcripcion.trim().length > 0)
+    .map(([nombre, c]) => ({ nombre, transcripcion: c.transcripcion }));
+}
+
+function renderIA() {
+  const transcripciones = getTranscripciones();
+  document.getElementById('content').innerHTML = `
+    <div style="max-width:780px;margin:0 auto">
+      <div class="card" style="margin-bottom:14px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">📊 Contexto disponible</div>
+        <div style="font-size:12px;color:var(--text2)">
+          ${transcripciones.length === 0
+            ? '⚠️ No hay transcripciones aún. Abre la ficha de un lead (icono 👤) y pega la transcripción de la llamada.'
+            : `✅ ${transcripciones.length} transcripción${transcripciones.length > 1 ? 'es' : ''} disponible${transcripciones.length > 1 ? 's' : ''}: <strong>${transcripciones.map(t => t.nombre).join(', ')}</strong>`
+          }
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px;min-height:400px;display:flex;flex-direction:column">
+        <div id="ia-messages" style="flex:1;overflow-y:auto;max-height:500px;display:flex;flex-direction:column;gap:14px;margin-bottom:16px;padding-right:4px">
+          ${iaChatHistory.length === 0
+            ? `<div style="text-align:center;color:var(--text3);font-size:13px;padding:40px 0">
+                Hola 👋 Puedes preguntarme sobre tus leads.<br>
+                <span style="font-size:12px">Ejemplos: "¿Cuáles son las objeciones más comunes?" • "¿Qué deseos mencionan más?" • "Resume el lead de [nombre]"</span>
+              </div>`
+            : iaChatHistory.map(m => `
+              <div style="display:flex;gap:10px;${m.role === 'user' ? 'flex-direction:row-reverse' : ''}">
+                <div style="width:28px;height:28px;border-radius:50%;background:${m.role === 'user' ? 'var(--blue)' : 'var(--text)'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">
+                  ${m.role === 'user' ? '👤' : '🤖'}
+                </div>
+                <div style="background:${m.role === 'user' ? 'var(--blue-l)' : 'var(--bg2)'};border-radius:10px;padding:10px 14px;max-width:85%;font-size:13px;line-height:1.6;white-space:pre-wrap">${esc(m.content)}</div>
+              </div>`).join('')
+          }
+          ${iaChatHistory.length > 0 ? '<div id="ia-bottom"></div>' : ''}
+        </div>
+        <div style="display:flex;gap:8px;border-top:1px solid var(--border);padding-top:14px">
+          <textarea id="ia-input" placeholder="Pregunta sobre tus leads..." style="flex:1;border:1px solid var(--border2);border-radius:8px;padding:10px 12px;font-family:var(--font);font-size:13px;resize:none;height:44px;line-height:1.5;overflow:hidden" onkeydown="iaKeyDown(event)" oninput="this.style.height='44px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+          <button onclick="iaSend()" id="ia-btn" class="btn btn-p" style="align-self:flex-end;height:44px;padding:0 16px">Enviar</button>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px">
+          <button onclick="iaClear()" class="btn btn-xs" style="font-size:11px;color:var(--text3)">🗑 Limpiar conversación</button>
+        </div>
+      </div>
+    </div>
+  `;
+  if (iaChatHistory.length > 0) {
+    setTimeout(() => {
+      const bottom = document.getElementById('ia-bottom');
+      if (bottom) bottom.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
+  }
+}
+
+function iaKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); iaSend(); }
+}
+
+function iaClear() {
+  iaChatHistory = [];
+  renderIA();
+}
+
+async function iaSend() {
+  const input = document.getElementById('ia-input');
+  const btn = document.getElementById('ia-btn');
+  const msg = input?.value?.trim();
+  if (!msg) return;
+
+  const transcripciones = getTranscripciones();
+  if (transcripciones.length === 0) {
+    alert('No hay transcripciones disponibles. Abre la ficha de un lead y pega la transcripción primero.');
+    return;
+  }
+
+  // Añadir mensaje del usuario
+  iaChatHistory.push({ role: 'user', content: msg });
+  input.value = '';
+  input.style.height = '44px';
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  renderIA();
+
+  // Construir contexto con todas las transcripciones
+  const contexto = transcripciones.map(t =>
+    `=== LEAD: ${t.nombre} ===\n${t.transcripcion}`
+  ).join('\n\n');
+
+  const systemPrompt = `Eres un asistente experto en ventas y análisis de llamadas comerciales.
+Tienes acceso a las transcripciones de las llamadas con los leads del equipo de ventas.
+Tu objetivo es ayudar al equipo a identificar patrones, objeciones, deseos y oportunidades de mejora.
+
+TRANSCRIPCIONES DISPONIBLES:
+${contexto}
+
+Responde siempre en español. Sé directo, específico y útil. Cita ejemplos concretos de las transcripciones cuando sea relevante.`;
+
+  try {
+    const messages = [
+      ...iaChatHistory.slice(0, -1).map(m => ({ role: m.role, content: m.content })),
+      { role: 'user', content: msg }
+    ];
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages
+      })
+    });
+
+    const data = await res.json();
+    const reply = data.content?.[0]?.text || 'No se pudo obtener respuesta.';
+    iaChatHistory.push({ role: 'assistant', content: reply });
+  } catch(e) {
+    iaChatHistory.push({ role: 'assistant', content: 'Error al conectar con la IA. Inténtalo de nuevo.' });
+  }
+
+  renderIA();
 }
 
 function changeYear(y){
