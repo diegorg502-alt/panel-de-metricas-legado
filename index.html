@@ -341,7 +341,7 @@ async function loadClientConfig(email){
     SEMANAS_MODO=data.semanas_modo||false;
     // Update UI
     document.querySelector('.sb-brand').textContent='CRM · '+CLIENT_NOMBRE;
-    document.querySelector('.sb-foot div:last-child').textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
+   const sbfoot=document.querySelector('.sb-foot div:last-child');if(sbfoot)sbfoot.textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
     document.title='Panel de Métricas — Agencia Legado';
     return true;
   }catch(e){
