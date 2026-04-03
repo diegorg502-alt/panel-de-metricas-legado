@@ -291,10 +291,12 @@ async function showApp(){
 
 async function loadData(){
   try{
-    const{data,error}=await sb.from('crm_data').select('data').eq('id',RECORD_ID).single();
+    const{data,error}=await sb.from('crm_data').select('data,updated_at').eq('id',RECORD_ID).single();
     if(error&&error.code!=='PGRST116') throw error;
     if(data?.data&&Object.keys(data.data).length>0){
+      // Supabase siempre tiene prioridad — actualiza también el localStorage
       S={...S,...data.data};
+      localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
     } else {
       const bk=localStorage.getItem('crm_bruno_bk');
       if(bk) S={...S,...JSON.parse(bk)};
