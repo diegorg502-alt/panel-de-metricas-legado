@@ -1629,15 +1629,13 @@ Responde siempre en español. Sé directo, específico y útil. Cita ejemplos co
       { role: 'user', content: msg }
     ];
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://obeopzavwnquapjdjwrx.supabase.co/functions/v1/ai-chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages
-      })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9iZW9wemF2d25xdWFwamRqd3J4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MDc0NzgsImV4cCI6MjA5MDQ4MzQ3OH0.mQqBvJbZokc-ZVHQn1LsLf6QBxRdEjoqT-3aoB5-VGQ'
+      },
+      body: JSON.stringify({ system: systemPrompt, messages })
     });
 
     const data = await res.json();
