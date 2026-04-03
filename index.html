@@ -193,6 +193,7 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
         <div class="sb-sync"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Conectando...</span></div>
         <div class="sb-user" id="sb-user"></div>
         <button class="btn-logout" style="margin-bottom:6px;background:var(--bg2)" onclick="openBackupsModal()">🔒 Backups</button>
+        <button class="btn-logout" style="margin-bottom:6px;background:#eff6ff;color:#1a6bdb;border-color:#bfdbfe" onclick="reloadFromSupabase()">🔄 Recargar datos</button>
         <button class="btn-logout" onclick="doLogout()">Cerrar sesión</button>
       </div>
     </aside>
@@ -287,6 +288,25 @@ async function showApp(){
   buildSidebar();
   if(isEntrenador) goTo('cuotas');
   else goTo('dashboard');
+  // Realtime — detecta cambios del webhook GHL automáticamente
+  sb.channel('crm_realtime').on('postgres_changes',{event:'UPDATE',schema:'public',table:'crm_data',filter:`id=eq.${RECORD_ID}`},async(payload)=>{
+    if(payload.new?.data&&!saveTimer){
+      S={...S,...payload.new.data};
+      localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
+      goTo(curPage,curMonth);
+      setSyncStatus('ok','Nuevos datos recibidos ✓');
+    }
+  }).subscribe();
+}
+
+async function reloadFromSupabase(){
+  setSyncStatus('saving','Recargando...');
+  localStorage.removeItem('crm_bruno_bk');
+  localStorage.removeItem('crm_last_backup');
+  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{}};
+  await loadData();
+  goTo(curPage,curMonth);
+  setSyncStatus('ok','Datos recargados ✓');
 }
 
 async function loadData(){
