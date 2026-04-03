@@ -340,8 +340,8 @@ async function loadClientConfig(email){
     ENTRENADOR_EMAIL=data.entrenador_email||'';
     SEMANAS_MODO=data.semanas_modo||false;
     // Update UI
-    document.querySelector('.sb-brand').textContent='CRM · '+CLIENT_NOMBRE;
-   const sbfoot=document.querySelector('.sb-foot div:last-child');if(sbfoot)sbfoot.textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
+    const sbbrand=document.querySelector('.sb-brand');if(sbbrand)sbbrand.textContent='CRM · '+CLIENT_NOMBRE;
+    const sbfoot=document.querySelector('.sb-foot div:last-child');if(sbfoot)sbfoot.textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
     document.title='Panel de Métricas — Agencia Legado';
     return true;
   }catch(e){
