@@ -818,9 +818,9 @@ function addLlamadaRow(mi){
 function renderKpisD(){
   const mk=mKey(curMonth);if(!S.kpis_diarios[mk])S.kpis_diarios[mk]=[];if(!S.ads[mk])S.ads[mk]=[];
   const rows=S.kpis_diarios[mk];
-  const canalTotals=CANALES.map(canal=>{const cr=rows.filter(r=>r.canal===canal);const inv=cr.reduce((s,r)=>s+Number(r.inversion||0),0);const leads=cr.reduce((s,r)=>s+Number(r.leads||0),0);return{canal,inv,leads,cpl:leads&&inv?inv/leads:null};}).filter(c=>c.inv>0||c.leads>0);
+  const canalTotals=CANALES.map(canal=>{const cr=rows.filter(r=>r.canal===canal);const inv=cr.reduce((s,r)=>s+Number(r.inversion||0),0);const leads=cr.reduce((s,r)=>s+Number(r.leads||0)+Number(r.seguidores||0),0);return{canal,inv,leads,cpl:leads&&inv?inv/leads:null};}).filter(c=>c.inv>0||c.leads>0);
   const totalInv=rows.reduce((s,r)=>s+Number(r.inversion||0),0);
-  const totalLeads=rows.reduce((s,r)=>s+Number(r.leads||0),0);
+  const totalLeads=rows.reduce((s,r)=>s+Number(r.leads||0)+Number(r.seguidores||0),0);
   const totalCpl=totalLeads&&totalInv?totalInv/totalLeads:null;
   const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
   document.getElementById('content').innerHTML=`
