@@ -722,7 +722,7 @@ function renderMes(){
 function renderLlamadasRows(mk){
   const rows=S.llamadas[mk]||[];const tbody=document.getElementById('lb');if(!tbody)return;
   tbody.innerHTML=rows.map((r,i)=>`<tr id="lr-${i}" style="${r.estado==='Venta'?'background:#f0fdf4':r.estado==='Perdido'?'background:#fef2f2':r.estado==='Reserva'?'background:#eff6ff':''}">
-    <td style="white-space:nowrap"><input class="ce" value="${esc(r.nombre)}" oninput="upL('${mk}',${i},'nombre',this.value)" placeholder="Nombre completo" style="min-width:100px"><button onclick="openFicha('${mk}',${i})" title="Ver ficha" style="background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--blue);font-size:13px">👤</button></td>
+    <td style="white-space:nowrap;display:flex;align-items:center;gap:2px"><input class="ce" value="${esc(r.nombre)}" oninput="upL('${mk}',${i},'nombre',this.value)" placeholder="Nombre completo" style="min-width:100px"><button onclick="openFicha('${mk}',${i})" title="Ver ficha" style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--blue);font-size:12px;line-height:1;flex-shrink:0">👤</button></td>
     <td><input class="ce" type="date" value="${r.fecha||''}" oninput="upL('${mk}',${i},'fecha',this.value)"></td>
     <td><input class="ce" value="${esc(r.telefono)}" oninput="upL('${mk}',${i},'telefono',this.value)" placeholder="+34..."></td>
     <td><select class="ce" onchange="upL('${mk}',${i},'embudo',this.value)" style="min-width:100px"><option value="">-</option>${CANALES.map(c=>`<option value="${c}"${r.embudo===c?' selected':''}>${c}</option>`).join('')}</select></td>
