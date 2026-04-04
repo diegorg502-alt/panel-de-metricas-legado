@@ -1533,6 +1533,20 @@ function getTranscripciones() {
     .map(([nombre, c]) => ({ nombre, transcripcion: c.transcripcion }));
 }
 
+function renderMarkdown(text) {
+  let t = text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  t = t.replace(/^#### (.+)$/gm,'<b style="font-size:11px;text-transform:uppercase;color:var(--text3)">$1</b>');
+  t = t.replace(/^### (.+)$/gm,'<b style="font-size:13px;color:var(--text2)">$1</b>');
+  t = t.replace(/^## (.+)$/gm,'<div style="font-size:14px;font-weight:700;margin:10px 0 4px">$1</div>');
+  t = t.replace(/^# (.+)$/gm,'<div style="font-size:15px;font-weight:700;margin:10px 0 4px">$1</div>');
+  t = t.replace(new RegExp('[*][*](.+?)[*][*]','g'),'<b>$1</b>');
+  t = t.replace(new RegExp('[*]([^*]+?)[*]','g'),'<i>$1</i>');
+  t = t.replace(/^&gt; (.+)$/gm,'<div style="border-left:3px solid var(--border2);padding-left:10px;color:var(--text2);font-style:italic;margin:4px 0">$1</div>');
+  t = t.replace(/^([0-9]+)[.] (.+)$/gm,'<div style="display:flex;gap:6px;margin:2px 0"><span style="color:var(--text3);min-width:18px;font-weight:600">$1.</span><span>$2</span></div>');
+  t = t.replace(/^[-] (.+)$/gm,'<div style="display:flex;gap:8px;margin:2px 0"><span style="color:var(--text3)">•</span><span>$1</span></div>');
+  t = t.split("\n\n").join("<br><br>").split("\n").join("<br>");
+  return t;
+}
 function renderIA() {
   const transcripciones = getTranscripciones();
   document.getElementById('content').innerHTML = `
@@ -1558,7 +1572,7 @@ function renderIA() {
                 <div style="width:28px;height:28px;border-radius:50%;background:${m.role === 'user' ? 'var(--blue)' : 'var(--text)'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">
                   ${m.role === 'user' ? '👤' : '🤖'}
                 </div>
-                <div style="background:${m.role === 'user' ? 'var(--blue-l)' : 'var(--bg2)'};border-radius:10px;padding:10px 14px;max-width:85%;font-size:13px;line-height:1.6;white-space:pre-wrap">${esc(m.content)}</div>
+                <div style="background:${m.role === 'user' ? 'var(--blue-l)' : 'var(--bg2)'};border-radius:10px;padding:10px 14px;max-width:85%;font-size:13px;line-height:1.6">${m.role === 'user' ? esc(m.content) : renderMarkdown(m.content)}</div>
               </div>`).join('')
           }
           ${iaChatHistory.length > 0 ? '<div id="ia-bottom"></div>' : ''}
