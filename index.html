@@ -585,7 +585,7 @@ function goTo(page,month){
   updateAlertaBadge();
   document.getElementById('topbar-title').textContent=titles[page]||(page==='mes'?`Llamadas — ${MFULL[curMonth]} ${curYear}`:`KPIs diarios — ${MFULL[curMonth]} ${curYear}`);
   const ex=document.getElementById('topbar-extra');ex.innerHTML='';
-  if(page==='mes'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLlamadaRow(curMonth);ex.appendChild(b);}
+  if(page==='mes'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLlamadaRow(curMonth);ex.appendChild(b);const bcsv=document.createElement('button');bcsv.className='btn';bcsv.textContent='⬇ Exportar CSV';bcsv.style.marginLeft='8px';bcsv.onclick=()=>exportCSV(curMonth);ex.appendChild(bcsv);}
   if(page==='cuotas'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Añadir cliente';b.onclick=openAddCuota;ex.appendChild(b);}
   if(page==='renovaciones'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva renovación';b.onclick=openAddRenov;ex.appendChild(b);}
   ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,ia:renderIA,mes:renderMes,kpis_d:renderKpisD}[page]||renderDashboard)();
@@ -1542,12 +1542,62 @@ function saveFicha(){
 
 // ── IA CHAT ───────────────────────────────────────────────
 let iaChatHistory = [];
+let iaContextMode = 'mes_actual'; // 'mes_actual' | 'mes_concreto' | 'año_completo'
+let iaContextMes = null; // índice 0-11 para mes concreto
 
 function getTranscripciones() {
   if(!S.clientes) return [];
   return Object.entries(S.clientes)
     .filter(([,c]) => c.transcripcion && c.transcripcion.trim().length > 0)
     .map(([nombre, c]) => ({ nombre, transcripcion: c.transcripcion }));
+}
+
+function buildIAContext() {
+  const MONTHS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+  const MONTHS_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  function resumeMes(mk) {
+    const llamadas = (S.llamadas[mk] || []);
+    const ventas = llamadas.filter(l => l.estado === 'Venta');
+    const totalFact = ventas.reduce((a,l) => a + (parseFloat(l.facturacion)||0), 0);
+    const totalCaja = ventas.reduce((a,l) => a + (parseFloat(l.caja)||0), 0);
+    const kpis = S.kpis[mk] || {};
+    return `MES: ${mk}
+- Llamadas: ${llamadas.length} | Ventas: ${ventas.length} | % Cierre: ${llamadas.length ? Math.round(ventas.length/llamadas.length*100) : 0}%
+- Facturación: ${totalFact.toFixed(2)}€ | Caja: ${totalCaja.toFixed(2)}€
+- KPIs registrados: ${Object.keys(kpis).length > 0 ? 'Sí' : 'No'}`;
+  }
+
+  if (iaContextMode === 'mes_actual') {
+    const mk = `${curYear}-${String(curMonth+1).padStart(2,'0')}`;
+    const llamadas = (S.llamadas[mk] || []);
+    const resumen = resumeMes(mk);
+    const detalle = llamadas.map(l =>
+      `${l.nombre||'—'} | ${l.fecha||'—'} | ${l.estado||'—'} | ${l.canal||'—'} | Fact: ${l.facturacion||0}€ | Caja: ${l.caja||0}€ | ${l.comentarios||''}`
+    ).join('\n');
+    return `Contexto: ${MONTHS_FULL[curMonth]} ${curYear}\n${resumen}\n\nDETALLE LLAMADAS:\n${detalle || 'Sin llamadas registradas'}`;
+  }
+
+  if (iaContextMode === 'mes_concreto') {
+    const mesIdx = iaContextMes !== null ? iaContextMes : curMonth;
+    const mk = `${curYear}-${String(mesIdx+1).padStart(2,'0')}`;
+    const llamadas = (S.llamadas[mk] || []);
+    const resumen = resumeMes(mk);
+    const detalle = llamadas.map(l =>
+      `${l.nombre||'—'} | ${l.fecha||'—'} | ${l.estado||'—'} | ${l.canal||'—'} | Fact: ${l.facturacion||0}€ | Caja: ${l.caja||0}€ | ${l.comentarios||''}`
+    ).join('\n');
+    return `Contexto: ${MONTHS_FULL[mesIdx]} ${curYear}\n${resumen}\n\nDETALLE LLAMADAS:\n${detalle || 'Sin llamadas registradas'}`;
+  }
+
+  if (iaContextMode === 'año_completo') {
+    const bloques = MONTHS.map((_,i) => {
+      const mk = `${curYear}-${String(i+1).padStart(2,'0')}`;
+      return resumeMes(mk);
+    });
+    return `Contexto: Año completo ${curYear}\n\n${bloques.join('\n\n')}`;
+  }
+
+  return '';
 }
 
 function renderMarkdown(text) {
@@ -1570,24 +1620,40 @@ function renderMarkdown(text) {
   return t;
 }
 function renderIA() {
-  const transcripciones = getTranscripciones();
+  const MONTHS_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const mesOptions = MONTHS_FULL.map((m,i) => `<option value="${i}" ${iaContextMes===i?'selected':''}>${m}</option>`).join('');
+
+  const contextCost = {
+    mes_actual: '~0,01€ / consulta',
+    mes_concreto: '~0,01€ / consulta',
+    año_completo: '~0,05€ / consulta'
+  };
+  const contextDesc = {
+    mes_actual: `Datos de ${MONTHS_FULL[curMonth]} ${curYear}`,
+    mes_concreto: 'Elige el mes a analizar',
+    año_completo: `Todos los meses de ${curYear}`
+  };
+
   document.getElementById('content').innerHTML = `
     <div style="max-width:780px;margin:0 auto">
       <div class="card" style="margin-bottom:14px">
-        <div style="font-size:13px;font-weight:600;margin-bottom:6px">📊 Contexto disponible</div>
-        <div style="font-size:12px;color:var(--text2)">
-          ${transcripciones.length === 0
-            ? '⚠️ No hay transcripciones aún. Abre la ficha de un lead (icono 👤) y pega la transcripción de la llamada.'
-            : `✅ ${transcripciones.length} transcripción${transcripciones.length > 1 ? 'es' : ''} disponible${transcripciones.length > 1 ? 's' : ''}: <strong>${transcripciones.map(t => t.nombre).join(', ')}</strong>`
-          }
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px">📊 Contexto a analizar</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <button onclick="setIAContext('mes_actual')" style="padding:7px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:2px solid ${iaContextMode==='mes_actual'?'var(--blue)':'var(--border2)'};background:${iaContextMode==='mes_actual'?'var(--blue-l)':'var(--bg)'};color:${iaContextMode==='mes_actual'?'var(--blue)':'var(--text2)'}">📅 Mes actual</button>
+          <button onclick="setIAContext('mes_concreto')" style="padding:7px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:2px solid ${iaContextMode==='mes_concreto'?'var(--blue)':'var(--border2)'};background:${iaContextMode==='mes_concreto'?'var(--blue-l)':'var(--bg)'};color:${iaContextMode==='mes_concreto'?'var(--blue)':'var(--text2)'}">🗓 Mes concreto</button>
+          <button onclick="setIAContext('año_completo')" style="padding:7px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:2px solid ${iaContextMode==='año_completo'?'var(--amber)':'var(--border2)'};background:${iaContextMode==='año_completo'?'var(--amber-l)':'var(--bg)'};color:${iaContextMode==='año_completo'?'var(--amber)':'var(--text2)'}">📆 Año completo</button>
+        </div>
+        ${iaContextMode==='mes_concreto' ? `<select onchange="iaContextMes=parseInt(this.value);renderIA()" style="padding:6px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;margin-bottom:8px">${mesOptions}</select>` : ''}
+        <div style="font-size:11px;color:var(--text3)">
+          ${contextDesc[iaContextMode]} &nbsp;·&nbsp; <span style="color:${iaContextMode==='año_completo'?'var(--amber)':'var(--green)'}">${contextCost[iaContextMode]}</span>
         </div>
       </div>
       <div class="card" style="margin-bottom:14px;min-height:400px;display:flex;flex-direction:column">
         <div id="ia-messages" style="flex:1;overflow-y:auto;max-height:500px;display:flex;flex-direction:column;gap:14px;margin-bottom:16px;padding-right:4px">
           ${iaChatHistory.length === 0
             ? `<div style="text-align:center;color:var(--text3);font-size:13px;padding:40px 0">
-                Hola 👋 Puedes preguntarme sobre tus leads.<br>
-                <span style="font-size:12px">Ejemplos: "¿Cuáles son las objeciones más comunes?" • "¿Qué deseos mencionan más?" • "Resume el lead de [nombre]"</span>
+                Hola 👋 Pregúntame lo que necesites sobre tus ventas.<br>
+                <span style="font-size:12px">Ejemplos: "¿Cuántas ventas hubo?" • "¿Cuál es el % de cierre?" • "¿Qué leads están perdidos?"</span>
               </div>`
             : iaChatHistory.map(m => `
               <div style="display:flex;gap:10px;${m.role === 'user' ? 'flex-direction:row-reverse' : ''}">
@@ -1600,7 +1666,7 @@ function renderIA() {
           ${iaChatHistory.length > 0 ? '<div id="ia-bottom"></div>' : ''}
         </div>
         <div style="display:flex;gap:8px;border-top:1px solid var(--border);padding-top:14px">
-          <textarea id="ia-input" placeholder="Pregunta sobre tus leads..." style="flex:1;border:1px solid var(--border2);border-radius:8px;padding:10px 12px;font-family:var(--font);font-size:13px;resize:none;height:44px;line-height:1.5;overflow:hidden" onkeydown="iaKeyDown(event)" oninput="this.style.height='44px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+          <textarea id="ia-input" placeholder="Pregunta sobre tus ventas..." style="flex:1;border:1px solid var(--border2);border-radius:8px;padding:10px 12px;font-family:var(--font);font-size:13px;resize:none;height:44px;line-height:1.5;overflow:hidden" onkeydown="iaKeyDown(event)" oninput="this.style.height='44px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
           <button onclick="iaSend()" id="ia-btn" class="btn btn-p" style="align-self:flex-end;height:44px;padding:0 16px">Enviar</button>
         </div>
         <div style="display:flex;justify-content:flex-end;margin-top:8px">
@@ -1615,6 +1681,13 @@ function renderIA() {
       if (bottom) bottom.scrollIntoView({ behavior: 'smooth' });
     }, 50);
   }
+}
+
+function setIAContext(mode) {
+  iaContextMode = mode;
+  if (mode === 'mes_concreto' && iaContextMes === null) iaContextMes = curMonth;
+  iaChatHistory = [];
+  renderIA();
 }
 
 function iaKeyDown(e) {
@@ -1632,32 +1705,15 @@ async function iaSend() {
   const msg = input?.value?.trim();
   if (!msg) return;
 
-  const transcripciones = getTranscripciones();
-  if (transcripciones.length === 0) {
-    alert('No hay transcripciones disponibles. Abre la ficha de un lead y pega la transcripción primero.');
-    return;
-  }
-
-  // Añadir mensaje del usuario
   iaChatHistory.push({ role: 'user', content: msg });
   input.value = '';
   input.style.height = '44px';
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
   renderIA();
 
-  // Construir contexto con todas las transcripciones
-  const contexto = transcripciones.map(t =>
-    `=== LEAD: ${t.nombre} ===\n${t.transcripcion}`
-  ).join('\n\n');
+  const contexto = buildIAContext();
+  const systemPrompt = `Eres un asistente experto en ventas y análisis comercial. Responde siempre en español, de forma directa y útil. Cita datos concretos cuando sea relevante.\n\nDATOS DISPONIBLES:\n${contexto}`;
 
-  const systemPrompt = `Eres un asistente experto en ventas y análisis de llamadas comerciales.
-Tienes acceso a las transcripciones de las llamadas con los leads del equipo de ventas.
-Tu objetivo es ayudar al equipo a identificar patrones, objeciones, deseos y oportunidades de mejora.
-
-TRANSCRIPCIONES DISPONIBLES:
-${contexto}
-
-Responde siempre en español. Sé directo, específico y útil. Cita ejemplos concretos de las transcripciones cuando sea relevante.`;
 
   try {
     const messages = [
@@ -1681,6 +1737,7 @@ Responde siempre en español. Sé directo, específico y útil. Cita ejemplos co
     iaChatHistory.push({ role: 'assistant', content: 'Error al conectar con la IA. Inténtalo de nuevo.' });
   }
 
+  if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; }
   renderIA();
 }
 
@@ -1691,6 +1748,37 @@ function changeYear(y){
   // Re-render current page with new year
   const toRender={dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,mes:()=>goTo('mes',curMonth),kpis_d:()=>goTo('kpis_d',curMonth)};
   if(toRender[curPage]) toRender[curPage]();
+}
+
+// ── EXPORT CSV ────────────────────────────────────────────
+function exportCSV(mesIdx) {
+  const mk = mKey(mesIdx);
+  const rows = S.llamadas[mk] || [];
+  if (rows.length === 0) { alert('No hay llamadas registradas en este mes.'); return; }
+
+  const headers = ['Nombre','Fecha','Teléfono','Embudo/Canal','Closer','Asistencia','Incidencia','Estado','Facturación','Caja','Nº Cuotas','Comentarios'];
+  const campos = ['nombre','fecha','telefono','canal','closer','asistencia','incidencia','estado','facturacion','caja','cuotas','comentarios'];
+
+  const escape = v => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  };
+
+  const lines = [
+    headers.join(','),
+    ...rows.map(r => campos.map(c => escape(r[c])).join(','))
+  ];
+
+  const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const mesNombre = MFULL[mesIdx] || mk;
+  a.href = url;
+  a.download = `Llamadas_Bruno_${mesNombre}_${curYear}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── TOKEN META COUNTDOWN ──────────────────────────────────
