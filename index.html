@@ -204,6 +204,11 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
       </nav>
       <div class="sb-foot">
         <div class="sb-sync"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Conectando...</span></div>
+        <div class="token-box" id="ia-usage-box" style="margin-bottom:6px">
+          <div class="token-label">🤖 IA este mes</div>
+          <div class="token-bar-wrap" style="margin-top:5px"><div class="token-bar" id="ia-usage-bar" style="width:0%;background:var(--green)"></div></div>
+          <div style="font-size:10px;color:var(--text3);margin-top:3px" id="ia-usage-sub">Cargando...</div>
+        </div>
         <div class="token-box" id="token-countdown-box">
           <div class="token-label">🔑 Token Meta</div>
           <div class="token-days" id="token-days-num">—</div>
@@ -306,6 +311,7 @@ async function showApp(){
   setSyncStatus('saving','Cargando datos...');
   await loadData();
   buildSidebar();
+  updateIAUsageBar();
   if(isEntrenador) goTo('cuotas');
   else goTo('dashboard');
   // Realtime — detecta cambios del webhook GHL automáticamente
@@ -1705,6 +1711,11 @@ async function iaSend() {
   const msg = input?.value?.trim();
   if (!msg) return;
 
+  if (!checkIALimit()) {
+    alert('Has alcanzado el límite mensual de uso de IA. Se reiniciará el próximo mes.');
+    return;
+  }
+
   iaChatHistory.push({ role: 'user', content: msg });
   input.value = '';
   input.style.height = '44px';
@@ -1713,7 +1724,6 @@ async function iaSend() {
 
   const contexto = buildIAContext();
   const systemPrompt = `Eres un asistente experto en ventas y análisis comercial. Responde siempre en español, de forma directa y útil. Cita datos concretos cuando sea relevante.\n\nDATOS DISPONIBLES:\n${contexto}`;
-
 
   try {
     const messages = [
@@ -1733,6 +1743,11 @@ async function iaSend() {
     const data = await res.json();
     const reply = data.content?.[0]?.text || 'No se pudo obtener respuesta.';
     iaChatHistory.push({ role: 'assistant', content: reply });
+
+    const inputTokens = data.usage?.input_tokens || 0;
+    const outputTokens = data.usage?.output_tokens || 0;
+    addIAUsage(inputTokens, outputTokens);
+
   } catch(e) {
     iaChatHistory.push({ role: 'assistant', content: 'Error al conectar con la IA. Inténtalo de nuevo.' });
   }
@@ -1740,7 +1755,6 @@ async function iaSend() {
   if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; }
   renderIA();
 }
-
 function changeYear(y){
   curYear=parseInt(y);
   const sel=document.getElementById('year-sel');
@@ -1748,6 +1762,60 @@ function changeYear(y){
   // Re-render current page with new year
   const toRender={dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,mes:()=>goTo('mes',curMonth),kpis_d:()=>goTo('kpis_d',curMonth)};
   if(toRender[curPage]) toRender[curPage]();
+}
+
+// ── IA COST TRACKER ───────────────────────────────────────
+const IA_LIMIT_EUR = 7.14; // 50€ / 7 clientes
+const HAIKU_INPUT_EUR_PER_TOKEN = 1 / 1_000_000;   // $1/MTok ≈ €1/MTok
+const HAIKU_OUTPUT_EUR_PER_TOKEN = 5 / 1_000_000;  // $5/MTok
+
+function getIAUsageKey() {
+  const now = new Date();
+  return `ia_usage_${RECORD_ID}_${now.getFullYear()}_${now.getMonth()+1}`;
+}
+
+function getIAUsage() {
+  const key = getIAUsageKey();
+  const stored = localStorage.getItem(key);
+  return stored ? parseFloat(stored) : 0;
+}
+
+function addIAUsage(inputTokens, outputTokens) {
+  const cost = (inputTokens * HAIKU_INPUT_EUR_PER_TOKEN) + (outputTokens * HAIKU_OUTPUT_EUR_PER_TOKEN);
+  const current = getIAUsage();
+  const newTotal = current + cost;
+  localStorage.setItem(getIAUsageKey(), newTotal.toFixed(6));
+  updateIAUsageBar();
+  return newTotal;
+}
+
+function updateIAUsageBar() {
+  const usage = getIAUsage();
+  const pct = Math.min(100, (usage / IA_LIMIT_EUR) * 100);
+
+  const barEl = document.getElementById('ia-usage-bar');
+  const subEl = document.getElementById('ia-usage-sub');
+  if (!barEl) return;
+
+  barEl.style.width = pct + '%';
+
+  if (pct >= 100) {
+    barEl.style.background = 'var(--red)';
+    subEl.textContent = '⛔ Límite mensual alcanzado';
+    subEl.style.color = 'var(--red)';
+  } else if (pct >= 80) {
+    barEl.style.background = 'var(--amber)';
+    subEl.textContent = '⚠️ Uso casi al límite';
+    subEl.style.color = 'var(--amber)';
+  } else {
+    barEl.style.background = 'var(--green)';
+    subEl.textContent = `Uso: ${Math.round(pct)}%`;
+    subEl.style.color = 'var(--text3)';
+  }
+}
+
+function checkIALimit() {
+  return getIAUsage() < IA_LIMIT_EUR;
 }
 
 // ── EXPORT CSV ────────────────────────────────────────────
