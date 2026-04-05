@@ -1018,7 +1018,7 @@ function renderKpisD(){
       <div class="tw"><table>
         <thead><tr><th style="width:60px">Día</th><th style="width:120px">Canal</th><th style="width:140px;text-align:right">Inversión (€)</th><th style="width:120px;text-align:right">Leads / Seg.</th><th style="width:100px;text-align:right">CPL</th><th style="width:60px"></th></tr></thead>
         <tbody id="kpid-body"></tbody>
-        <tfoot><tr><td colspan="2">Total</td><td id="kpid-total-inv">${fmt(totalInv,2)}</td><td id="kpid-total-leads">${totalLeads}</td><td id="kpid-total-cpl">${totalCpl?fmt(totalCpl,2)+'€':'-'}</td><td></td></tr></tfoot>
+        <tfoot><tr><td colspan="2">Total</td><td id="kpid-total-inv">${fmt(totalInv,2)}</td><td id="kpid-total-leads">${totalLeads}</td><td id="kpid-total-cpl">${totalCpl?fmt(totalCpl,2):'-'}</td><td></td></tr></tfoot>
       </table></div>
     </div>
     <div class="card">
