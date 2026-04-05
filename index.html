@@ -54,6 +54,16 @@ aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .btn-logout{width:100%;padding:7px;border:1px solid var(--border2);background:var(--bg);border-radius:7px;font-family:var(--font);font-size:12px;color:var(--text2);cursor:pointer}
 .btn-logout:hover{background:var(--bg3)}
+.token-box{background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:11px}
+.token-label{color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.token-days{font-size:22px;font-weight:700;color:var(--text);line-height:1}
+.token-days.warn{color:var(--amber)}
+.token-days.danger{color:var(--red)}
+.token-sub{color:var(--text3);font-size:10px;margin-top:2px}
+.token-bar-wrap{background:var(--bg3);border-radius:4px;height:4px;margin-top:6px;overflow:hidden}
+.token-bar{height:4px;border-radius:4px;background:var(--green);transition:width .5s,background .5s}
+.btn-token-renew{width:100%;padding:7px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:7px;font-family:var(--font);font-size:12px;color:var(--blue);cursor:pointer;font-weight:500;margin-bottom:6px}
+.btn-token-renew:hover{background:#dbeafe}
 .topbar{height:50px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:10px;flex-shrink:0;background:var(--bg)}
 .topbar-title{font-size:14px;font-weight:600;flex:1}
 .content{flex:1;overflow-y:auto;padding:22px;background:var(--bg2)}
@@ -194,6 +204,13 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
       </nav>
       <div class="sb-foot">
         <div class="sb-sync"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Conectando...</span></div>
+        <div class="token-box" id="token-countdown-box">
+          <div class="token-label">🔑 Token Meta</div>
+          <div class="token-days" id="token-days-num">—</div>
+          <div class="token-sub" id="token-days-sub">días restantes</div>
+          <div class="token-bar-wrap"><div class="token-bar" id="token-bar" style="width:100%"></div></div>
+        </div>
+        <button class="btn-token-renew" id="btn-token-renew" onclick="openTokenRenewModal()" style="display:none">🔄 Renovar token</button>
         <div class="sb-user" id="sb-user"></div>
         <button class="btn-logout" style="margin-bottom:6px;background:var(--bg2)" onclick="openBackupsModal()">🔒 Backups</button>
         <button class="btn-logout" style="margin-bottom:6px;background:#eff6ff;color:#1a6bdb;border-color:#bfdbfe" onclick="reloadFromSupabase()">🔄 Recargar datos</button>
@@ -1675,6 +1692,106 @@ function changeYear(y){
   const toRender={dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,mes:()=>goTo('mes',curMonth),kpis_d:()=>goTo('kpis_d',curMonth)};
   if(toRender[curPage]) toRender[curPage]();
 }
+
+// ── TOKEN META COUNTDOWN ──────────────────────────────────
+// Fecha en que se generó el token actual (actualizar al renovar)
+const TOKEN_START_KEY = 'meta_token_start';
+const TOKEN_DAYS_TOTAL = 59;
+
+function getTokenStart(){
+  const stored = localStorage.getItem(TOKEN_START_KEY);
+  if(stored) return new Date(stored);
+  // Si no hay fecha guardada, asumimos hoy como inicio
+  const today = new Date().toISOString().split('T')[0];
+  localStorage.setItem(TOKEN_START_KEY, today);
+  return new Date(today);
+}
+
+function updateTokenCountdown(){
+  const start = getTokenStart();
+  const now = new Date();
+  const diffMs = now - start;
+  const diffDays = Math.floor(diffMs / (1000*60*60*24));
+  const remaining = TOKEN_DAYS_TOTAL - diffDays;
+
+  const numEl = document.getElementById('token-days-num');
+  const subEl = document.getElementById('token-days-sub');
+  const barEl = document.getElementById('token-bar');
+  const btnRenew = document.getElementById('btn-token-renew');
+  if(!numEl) return;
+
+  const pct = Math.max(0, Math.min(100, (remaining / TOKEN_DAYS_TOTAL) * 100));
+
+  numEl.textContent = remaining > 0 ? remaining : '0';
+  subEl.textContent = remaining > 1 ? 'días restantes' : remaining === 1 ? 'último día' : '¡Expirado!';
+  barEl.style.width = pct + '%';
+
+  // Color según urgencia
+  numEl.className = 'token-days';
+  if(remaining <= 0){
+    numEl.classList.add('danger');
+    barEl.style.background = 'var(--red)';
+    btnRenew.style.display = 'block';
+    btnRenew.textContent = '🚨 Token expirado — Renovar';
+    btnRenew.style.background = '#fef2f2';
+    btnRenew.style.borderColor = '#fca5a5';
+    btnRenew.style.color = 'var(--red)';
+  } else if(remaining <= 7){
+    numEl.classList.add('danger');
+    barEl.style.background = 'var(--red)';
+    btnRenew.style.display = 'block';
+    btnRenew.textContent = '🔄 Renovar token ahora';
+  } else if(remaining <= 14){
+    numEl.classList.add('warn');
+    barEl.style.background = 'var(--amber)';
+    btnRenew.style.display = 'block';
+    btnRenew.textContent = '🔄 Renovar token pronto';
+  } else {
+    barEl.style.background = 'var(--green)';
+    btnRenew.style.display = 'none';
+  }
+}
+
+function openTokenRenewModal(){
+  const html = `
+    <div style="padding:4px 0 16px">
+      <div style="font-size:16px;font-weight:600;margin-bottom:8px">Renovar Token de Meta</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:16px">
+        Sigue estos pasos para renovar el token y que los datos de Meta Ads sigan sincronizándose:
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+        <div style="background:var(--bg2);border-radius:8px;padding:12px">
+          <b>Paso 1</b> — Ve a <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:var(--blue)">Explorador de API Graph</a>, selecciona la app <b>Agencia Legado</b>, añade permisos <code>ads_read</code> y <code>ads_management</code>, y haz clic en <b>Generate Access Token</b>.
+        </div>
+        <div style="background:var(--bg2);border-radius:8px;padding:12px">
+          <b>Paso 2</b> — Abre esta URL en el navegador con el token generado:<br>
+          <code style="font-size:10px;word-break:break-all;display:block;margin-top:6px;background:#f0f0ee;padding:6px;border-radius:4px">https://graph.facebook.com/oauth/access_token?grant_type=fb_exchange_token&client_id=727232146853471&client_secret=7ad85eba8934c247df62df820ba2dccd&fb_exchange_token=TU_TOKEN_CORTO</code>
+        </div>
+        <div style="background:var(--bg2);border-radius:8px;padding:12px">
+          <b>Paso 3</b> — Copia el <code>access_token</code> del resultado y pégalo en <b>Supabase → Edge Functions → Secrets → META_ACCESS_TOKEN</b>.
+        </div>
+        <div style="background:var(--bg2);border-radius:8px;padding:12px">
+          <b>Paso 4</b> — Haz clic en el botón de abajo para reiniciar el contador a 59 días.
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border)">
+      <button onclick="closeModal()" style="padding:8px 16px;border:1px solid var(--border2);background:var(--bg);border-radius:7px;cursor:pointer;font-size:13px">Cancelar</button>
+      <button onclick="resetTokenDate()" style="padding:8px 16px;background:var(--text);color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500">✅ Token renovado — Reiniciar contador</button>
+    </div>`;
+  openModal(html);
+}
+
+function resetTokenDate(){
+  const today = new Date().toISOString().split('T')[0];
+  localStorage.setItem(TOKEN_START_KEY, today);
+  closeModal();
+  updateTokenCountdown();
+}
+
+// Actualizar al cargar y cada hora
+updateTokenCountdown();
+setInterval(updateTokenCountdown, 1000*60*60);
 
 init();
 </script>
