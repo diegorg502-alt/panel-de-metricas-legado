@@ -204,16 +204,12 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
       </nav>
       <div class="sb-foot">
         <div class="sb-sync"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Conectando...</span></div>
-        <div class="token-box" id="ia-usage-box" style="margin-bottom:6px">
-          <div class="token-label">🤖 IA este mes</div>
-          <div class="token-bar-wrap" style="margin-top:5px"><div class="token-bar" id="ia-usage-bar" style="width:0%;background:var(--green)"></div></div>
-          <div style="font-size:10px;color:var(--text3);margin-top:3px" id="ia-usage-sub">Cargando...</div>
-        </div>
+
         <div class="token-box" id="token-countdown-box">
           <div class="token-label">🔑 Token Meta</div>
           <div class="token-days" id="token-days-num">—</div>
           <div class="token-sub" id="token-days-sub">días restantes</div>
-          <div class="token-bar-wrap"><div class="token-bar" id="token-bar" style="width:100%"></div></div>
+          <div class="token-bar-wrap"><div class="token-bar" id="token-bar" style="width:0%"></div></div>
         </div>
         <button class="btn-token-renew" id="btn-token-renew" onclick="openTokenRenewModal()" style="display:none">🔄 Renovar token</button>
         <div class="sb-user" id="sb-user"></div>
@@ -1650,11 +1646,16 @@ function renderIA() {
           <button onclick="setIAContext('año_completo')" style="padding:7px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:2px solid ${iaContextMode==='año_completo'?'var(--amber)':'var(--border2)'};background:${iaContextMode==='año_completo'?'var(--amber-l)':'var(--bg)'};color:${iaContextMode==='año_completo'?'var(--amber)':'var(--text2)'}">📆 Año completo</button>
         </div>
         ${iaContextMode==='mes_concreto' ? `<select onchange="iaContextMes=parseInt(this.value);renderIA()" style="padding:6px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;margin-bottom:8px">${mesOptions}</select>` : ''}
-        <div style="font-size:11px;color:var(--text3)">
-          ${contextDesc[iaContextMode]} &nbsp;·&nbsp; <span style="color:${iaContextMode==='año_completo'?'var(--amber)':'var(--green)'}">${contextCost[iaContextMode]}</span>
-        </div>
+        <div style="font-size:11px;color:var(--text3)">${contextDesc[iaContextMode]}</div>
       </div>
       <div class="card" style="margin-bottom:14px;min-height:400px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:16px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);white-space:nowrap">🤖 Uso IA este mes</div>
+          <div style="flex:1;background:var(--bg3);border-radius:4px;height:6px;overflow:hidden">
+            <div class="token-bar" id="ia-usage-bar" style="width:0%;background:var(--green);height:6px"></div>
+          </div>
+          <div style="font-size:11px;color:var(--text3);white-space:nowrap" id="ia-usage-sub">Uso: 0%</div>
+        </div>
         <div id="ia-messages" style="flex:1;overflow-y:auto;max-height:500px;display:flex;flex-direction:column;gap:14px;margin-bottom:16px;padding-right:4px">
           ${iaChatHistory.length === 0
             ? `<div style="text-align:center;color:var(--text3);font-size:13px;padding:40px 0">
