@@ -926,24 +926,7 @@ function renderMes(){
         <tbody id="lb"></tbody>
       </table></div>
     </div>
-    ${(()=>{
-      const bajas = getBajasMes(curYear, curMonth);
-      const media = getMediaBajasMensual();
-      if (!S.cuotas.length) return '';
-      return `<div class="card" style="margin-bottom:32px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
-        <div>
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:4px">Bajas este mes</div>
-          <div style="font-size:28px;font-weight:700;color:${bajas.length>0?'var(--red)':'var(--green)'}">${bajas.length}</div>
-          ${bajas.length>0?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${bajas.map(c=>c.nombre).join(', ')}</div>`:'<div style="font-size:11px;color:var(--green);margin-top:2px">Sin bajas este mes</div>'}
-        </div>
-        <div style="width:1px;height:48px;background:var(--border)"></div>
-        <div>
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:4px">Media bajas/mes</div>
-          <div style="font-size:28px;font-weight:700;color:var(--text)">${media}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">histórico</div>
-        </div>
-      </div>`;
-    })()}`;
+    `;
   renderLlamadasRows(mk);
 }
 function renderLlamadasRows(mk){
@@ -975,8 +958,9 @@ function upL(mk,i,f,v){
 }
 function upLNum(mk,i,f,v){
   S.llamadas[mk][i][f]=parseNum(v);
-  if(f==='facturacion'||f==='nCuotas') syncCuota(mk,i);
+  if(f==='facturacion'||f==='nCuotas'||f==='mesesServicio') syncCuota(mk,i);
   save();
+  if(f==='mesesServicio'&&curPage==='cuotas') renderCuotas();
 }
 function upLSemanas(mk,i,val){
   S.llamadas[mk][i].semanas=parseInt(val)||0;
@@ -1426,6 +1410,24 @@ function renderCuotas(){
       <div class="metric"><div class="ml">Caja por cobrar</div><div class="mv amber">${fmt(cajaPendiente)}</div></div>
       <div class="metric"><div class="ml">Clientes activos</div><div class="mv">${S.cuotas.filter(isActive).length}</div></div>
       <div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${S.renovaciones.length}</div></div>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px">
+      ${(()=>{
+        const now = new Date();
+        const bajasMes = getBajasMes(now.getFullYear(), now.getMonth());
+        const media = getMediaBajasMensual();
+        return `
+        <div class="card" style="flex:1;min-width:180px;padding:14px 18px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:6px">Bajas este mes</div>
+          <div style="font-size:28px;font-weight:700;color:${bajasMes.length>0?'var(--red)':'var(--green)'};line-height:1">${bajasMes.length}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">${bajasMes.length>0?bajasMes.map(c=>c.nombre).join(', '):'Sin bajas este mes'}</div>
+        </div>
+        <div class="card" style="flex:1;min-width:180px;padding:14px 18px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:6px">Media bajas/mes</div>
+          <div style="font-size:28px;font-weight:700;color:${media>2?'var(--amber)':'var(--text)'};line-height:1">${media}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">histórico desde inicio</div>
+        </div>`;
+      })()}
     </div>
     <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Caja por cobrar desde ${MFULL[todayM]} (día ${todayDayOfMonth()}) en adelante.</div>`:''}
     <div class="card" style="padding:0;overflow:hidden">
