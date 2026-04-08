@@ -804,7 +804,7 @@ function goTo(page,month){
   if(page==='mes'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLlamadaRow(curMonth);ex.appendChild(b);const bcsv=document.createElement('button');bcsv.className='btn';bcsv.textContent='⬇ Exportar CSV';bcsv.style.marginLeft='8px';bcsv.onclick=()=>exportCSV(curMonth);ex.appendChild(bcsv);}
   if(page==='cuotas'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Añadir cliente';b.onclick=openAddCuota;ex.appendChild(b);}
   if(page==='renovaciones'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva renovación';b.onclick=openAddRenov;ex.appendChild(b);}
-  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,ia:renderIA,mes:renderMes,kpis_d:renderKpisD}[page]||renderDashboard)();
+  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,ia:renderIA,mes:renderMes,kpis_d:renderKpisD,balance:renderBalance}[page]||renderDashboard)();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────
