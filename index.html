@@ -675,6 +675,31 @@ function getBajasMes(year, monthIdx) {
   });
 }
 
+function getRenovacionesMes(year, monthIdx) {
+  return S.renovaciones.filter(r => {
+    const f = new Date(r.fechaInicio);
+    return f.getFullYear() === year && f.getMonth() === monthIdx;
+  });
+}
+
+function getMediaRenovacionesMensual() {
+  if (!S.cuotas.length && !S.renovaciones.length) return 0;
+  const now = new Date();
+  const mesesConDatos = [];
+  const primerFecha = [...S.cuotas, ...S.renovaciones].reduce((min, c) => {
+    const f = new Date(c.fechaInicio);
+    return f < min ? f : min;
+  }, new Date());
+  let d = new Date(primerFecha.getFullYear(), primerFecha.getMonth(), 1);
+  while (d <= now) {
+    mesesConDatos.push(getRenovacionesMes(d.getFullYear(), d.getMonth()).length);
+    d.setMonth(d.getMonth() + 1);
+  }
+  if (!mesesConDatos.length) return 0;
+  const total = mesesConDatos.reduce((s, n) => s + n, 0);
+  return Math.round((total / mesesConDatos.length) * 10) / 10;
+}
+
 function getMediaBajasMensual() {
   const now = new Date();
   const mesesConDatos = [];
@@ -1437,27 +1462,38 @@ function renderCuotas(){
       <div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${S.renovaciones.length}</div></div>
     </div>
     ${(()=>{
-      const media = getMediaBajasMensual();
+      const mediaBajas = getMediaBajasMensual();
+      const mediaRenovs = getMediaRenovacionesMensual();
       const bajasAnio = MONTHS.map((_,mi) => getBajasMes(curYear, mi));
-      return `<div class="card" style="margin-bottom:14px;padding:14px 18px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-          <span style="font-size:13px;font-weight:600">📉 Bajas por mes — ${curYear}</span>
-          <span style="font-size:12px;color:var(--text3)">Media: <strong style="color:${media>2?'var(--amber)':'var(--text)'}">${media}/mes</strong></span>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:6px;text-align:center">
-          ${MONTHS.map((m,mi)=>{
-            const b=bajasAnio[mi];
-            const esMesActual=mi===new Date().getMonth()&&curYear===new Date().getFullYear();
-            const color=b.length>0?'var(--red)':esMesActual?'var(--blue)':'var(--text3)';
-            const bg=b.length>0?'var(--red-l)':esMesActual?'var(--blue-l)':'var(--bg2)';
-            return `<div style="border-radius:8px;padding:8px 4px;background:${bg}">
-              <div style="font-size:10px;font-weight:600;text-transform:uppercase;color:${color};margin-bottom:4px">${m}</div>
-              <div style="font-size:20px;font-weight:700;color:${color};line-height:1">${b.length}</div>
-              ${b.length>0?`<div style="font-size:9px;color:var(--text3);margin-top:3px;line-height:1.3">${b.map(c=>c.nombre.split(' ')[0]).join(', ')}</div>`:''}
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`;
+      const renovsAnio = MONTHS.map((_,mi) => getRenovacionesMes(curYear, mi));
+      const hoyM = new Date().getMonth();
+      const hoyY = new Date().getFullYear();
+
+      function fila(titulo, emoji, datosAnio, colorPos, colorPosL, colorNeg, colorNegL, mediaVal) {
+        return `<div class="card" style="margin-bottom:10px;padding:14px 18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <span style="font-size:13px;font-weight:600">${emoji} ${titulo} — ${curYear}</span>
+            <span style="font-size:12px;color:var(--text3)">Media: <strong style="color:var(--text)">${mediaVal}/mes</strong></span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:6px;text-align:center">
+            ${MONTHS.map((m,mi)=>{
+              const items=datosAnio[mi];
+              const n=items.length;
+              const esMesActual=mi===hoyM&&curYear===hoyY;
+              const color=n>0?colorPos:esMesActual?'var(--blue)':'var(--text3)';
+              const bg=n>0?colorPosL:esMesActual?'var(--blue-l)':'var(--bg2)';
+              return `<div style="border-radius:8px;padding:8px 4px;background:${bg}">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;color:${color};margin-bottom:4px">${m}</div>
+                <div style="font-size:20px;font-weight:700;color:${color};line-height:1">${n}</div>
+                ${n>0?`<div style="font-size:9px;color:var(--text3);margin-top:3px;line-height:1.3">${items.map(c=>c.nombre.split(' ')[0]).join(', ')}</div>`:''}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }
+
+      return fila('Bajas por mes','📉',bajasAnio,'var(--red)','var(--red-l)','var(--text3)','var(--bg2)',mediaBajas)
+           + fila('Renovaciones por mes','🔄',renovsAnio,'var(--green)','var(--green-l)','var(--text3)','var(--bg2)',mediaRenovs);
     })()}
     <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Caja por cobrar desde ${MFULL[todayM]} (día ${todayDayOfMonth()}) en adelante.</div>`:''}
     <div class="card" style="padding:0;overflow:hidden">
