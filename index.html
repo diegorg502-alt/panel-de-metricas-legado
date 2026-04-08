@@ -479,6 +479,7 @@ async function loadData(){
   }
   if(!S.ads)S.ads={};
   migratePagos();
+  migrateMesesServicio();
   seed();
 }
 
@@ -636,17 +637,39 @@ function setSyncStatus(state,label){
 
 function migratePagos(){/* pagos now computed on the fly via getPagos() */}
 
+// Sincroniza mesesServicio de llamadas → cuotas para clientes existentes
+function migrateMesesServicio(){
+  Object.entries(S.llamadas).forEach(([mk, rows]) => {
+    rows.forEach(r => {
+      if(r.estado !== 'Venta' || !r.mesesServicio) return;
+      const key = (r.nombre||'').toUpperCase().trim();
+      const cuota = S.cuotas.find(c => c.nombre === key);
+      if(cuota && !cuota.mesesServicio){
+        cuota.mesesServicio = Number(r.mesesServicio);
+      }
+    });
+  });
+}
+
 // Calcula bajas en un mes dado (año-MM formato Date)
 // Un cliente es baja si su vencimiento cae dentro de ese mes y no tiene renovación posterior
 function getBajasMes(year, monthIdx) {
   const mesStart = new Date(year, monthIdx, 1);
   const mesEnd = new Date(year, monthIdx + 1, 0, 23, 59, 59);
+  const hoy = new Date();
+  hoy.setHours(0,0,0,0);
   return S.cuotas.filter(c => {
     const venc = new Date(getVenc(c));
+    venc.setHours(0,0,0,0);
+    // Vencimiento debe estar en este mes
     if (venc < mesStart || venc > mesEnd) return false;
-    // Comprobar si hay renovación posterior al vencimiento
+    // Al menos 1 día desde el vencimiento
+    const unDiaDespues = new Date(venc);
+    unDiaDespues.setDate(unDiaDespues.getDate() + 1);
+    if (hoy < unDiaDespues) return false;
+    // Sin renovación posterior al vencimiento
     const tieneRenov = S.renovaciones.some(r =>
-      r.nombre === c.nombre && new Date(r.fechaInicio) > venc
+      r.nombre === c.nombre && new Date(r.fechaInicio) >= unDiaDespues
     );
     return !tieneRenov;
   });
@@ -697,7 +720,7 @@ function pct(a,b){return b?Math.round(a/b*100):0}
 function edate(d,m){const dt=new Date(d);dt.setMonth(dt.getMonth()+m);return dt.toISOString().split('T')[0]}
 function daysDiff(d){return Math.round((new Date(d)-new Date())/86400000)}
 function alertInfo(v){const d=daysDiff(v);if(d<0)return{label:'Vencido',cls:'b-red',ai:'red'};if(d<30)return{label:'Renovar ya',cls:'b-amber',ai:'amber'};if(d<60)return{label:'Próximo',cls:'b-blue',ai:''};return{label:'Activo',cls:'b-green',ai:''};}
-function getVenc(c){const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);if(rs.length){const last=rs.sort((a,b)=>new Date(b.fechaInicio)-new Date(a.fechaInicio))[0];const lastMeses=last.mesesServicio||Number(last.nCuotas)||6;return edate(last.fechaInicio,lastMeses);}const meses=Number(c.mesesServicio)||Number(c.nCuotas)||6;return edate(c.fechaInicio,meses);}
+function getVenc(c){const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);if(rs.length){const last=rs.sort((a,b)=>new Date(b.fechaInicio)-new Date(a.fechaInicio))[0];const lastMeses=Number(last.mesesServicio)||Number(last.nCuotas)||1;return edate(last.fechaInicio,lastMeses);}const meses=Number(c.mesesServicio)||1;return edate(c.fechaInicio,meses);}
 function isActive(c){const v=getVenc(c),t=new Date();return new Date(c.fechaInicio)<=t&&new Date(v)>=t;}
 function mKey(i){return`${curYear}-${String(i+1).padStart(2,'0')}`}
 function esc(s){return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
@@ -960,7 +983,8 @@ function upLNum(mk,i,f,v){
   S.llamadas[mk][i][f]=parseNum(v);
   if(f==='facturacion'||f==='nCuotas'||f==='mesesServicio') syncCuota(mk,i);
   save();
-  if(f==='mesesServicio'&&curPage==='cuotas') renderCuotas();
+  // Always re-render mes to reflect updated vencimiento badges
+  if(f==='mesesServicio') renderLlamadasRows(mk);
 }
 function upLSemanas(mk,i,val){
   S.llamadas[mk][i].semanas=parseInt(val)||0;
@@ -989,9 +1013,10 @@ function syncCuota(mk,i){
     existing.fechaInicio=fechaI;
     existing.embudo=r.embudo||existing.embudo;
     existing.entrenador=r.entrenador||existing.entrenador;
-    if(r.mesesServicio) existing.mesesServicio=Number(r.mesesServicio);
+    // Always update mesesServicio — this drives getVenc()
+    existing.mesesServicio=Number(r.mesesServicio)||Number(r.nCuotas)||1;
   } else {
-    S.cuotas.push({nombre:key,fechaInicio:fechaI,ticket:r.facturacion||0,nCuotas:q,mesesServicio:Number(r.mesesServicio)||1,pagos:{},embudo:r.embudo||'YOUTUBE',entrenador:r.entrenador||''});
+    S.cuotas.push({nombre:key,fechaInicio:fechaI,ticket:r.facturacion||0,nCuotas:q,mesesServicio:Number(r.mesesServicio)||Number(q)||1,pagos:{},embudo:r.embudo||'YOUTUBE',entrenador:r.entrenador||''});
   }
 }
 
@@ -1411,24 +1436,31 @@ function renderCuotas(){
       <div class="metric"><div class="ml">Clientes activos</div><div class="mv">${S.cuotas.filter(isActive).length}</div></div>
       <div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${S.renovaciones.length}</div></div>
     </div>
-    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px">
-      ${(()=>{
-        const now = new Date();
-        const bajasMes = getBajasMes(now.getFullYear(), now.getMonth());
-        const media = getMediaBajasMensual();
-        return `
-        <div class="card" style="flex:1;min-width:180px;padding:14px 18px">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:6px">Bajas este mes</div>
-          <div style="font-size:28px;font-weight:700;color:${bajasMes.length>0?'var(--red)':'var(--green)'};line-height:1">${bajasMes.length}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:4px">${bajasMes.length>0?bajasMes.map(c=>c.nombre).join(', '):'Sin bajas este mes'}</div>
+    ${(()=>{
+      const now = new Date();
+      const bajasMes = getBajasMes(now.getFullYear(), now.getMonth());
+      const media = getMediaBajasMensual();
+      const MESES_NOMBRES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      return `<div class="card" style="margin-bottom:14px;padding:14px 18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.baja-arr').style.transform=this.nextElementSibling.style.display==='none'?'rotate(0deg)':'rotate(180deg)'">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:13px;font-weight:600">📉 Bajas — ${MESES_NOMBRES[now.getMonth()]} ${now.getFullYear()}</span>
+            <span style="font-size:12px;font-weight:700;padding:2px 10px;border-radius:20px;background:${bajasMes.length>0?'var(--red-l)':'var(--green-l)'};color:${bajasMes.length>0?'var(--red)':'var(--green)'}">${bajasMes.length}</span>
+            <span style="font-size:11px;color:var(--text3)">Media: ${media}/mes</span>
+          </div>
+          <svg class="baja-arr" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="transition:transform .2s;color:var(--text3)"><path d="M6 9l6 6 6-6"/></svg>
         </div>
-        <div class="card" style="flex:1;min-width:180px;padding:14px 18px">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:6px">Media bajas/mes</div>
-          <div style="font-size:28px;font-weight:700;color:${media>2?'var(--amber)':'var(--text)'};line-height:1">${media}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:4px">histórico desde inicio</div>
-        </div>`;
-      })()}
-    </div>
+        <div style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          ${bajasMes.length===0
+            ? '<div style="font-size:13px;color:var(--green)">✅ Sin bajas este mes</div>'
+            : bajasMes.map(c=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+                <span style="font-size:13px;font-weight:500">${c.nombre}</span>
+                <span style="font-size:11px;color:var(--text3)">Venció: ${getVenc(c)}</span>
+              </div>`).join('')
+          }
+        </div>
+      </div>`;
+    })()}
     <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Caja por cobrar desde ${MFULL[todayM]} (día ${todayDayOfMonth()}) en adelante.</div>`:''}
     <div class="card" style="padding:0;overflow:hidden">
       <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
@@ -1540,13 +1572,37 @@ function renderRenovaciones(){
     </div>`;
 }
 function delRenov(i){if(!confirm('¿Eliminar?'))return;S.renovaciones.splice(i,1);save();renderRenovaciones();}
-function openAddRenov(){const opts=S.cuotas.map(c=>`<option value="${esc(c.nombre)}">${c.nombre}</option>`).join('');openModal(`<div class="mtitle">Nueva renovación</div>
+function openAddRenov(){
+  const opts=S.cuotas.map(c=>`<option value="${esc(c.nombre)}">${c.nombre}</option>`).join('');
+  openModal(`<div class="mtitle">Nueva renovación</div>
   <div class="fr2"><div class="fg"><label class="fl">Cliente</label><select class="fi" id="rn">${opts}</select></div>
   <div class="fg"><label class="fl">Fecha inicio</label><input class="fi" id="rf" type="date" value="${new Date().toISOString().split('T')[0]}"></div></div>
   <div class="fr2"><div class="fg"><label class="fl">Ticket (€)</label><input class="fi" id="rt" type="number" placeholder="0"></div>
   <div class="fg"><label class="fl">Nº cuotas</label><select class="fi" id="rq">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}">${n===1?'1 (pago único)':n}</option>`).join('')}</select></div></div>
-  <div class="mfooter"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="saveRenov()">Guardar</button></div>`);}
-function saveRenov(){const nombre=document.getElementById('rn').value;const fecha=document.getElementById('rf').value;const ticket=parseFloat(document.getElementById('rt').value)||0;const cuotas=parseInt(document.getElementById('rq').value)||1;const nRenov=S.renovaciones.filter(r=>r.nombre===nombre).length+1;const startYR=new Date(fecha).getFullYear();const startMR=new Date(fecha).getMonth();const pv=Math.round(ticket/cuotas*100)/100;const pagos={};for(let i=0;i<cuotas;i++){const totalMR=startMR+i;const yR=startYR+Math.floor(totalMR/12);const mR=totalMR%12;const keyR=`${yR}-${MONTHS[mR]}`;pagos[keyR]=pv;}S.renovaciones.push({nombre,nRenov,ticket,nCuotas:cuotas,fechaInicio:fecha,pagos});save();closeModal();renderRenovaciones();}
+  <div class="fg"><label class="fl">Meses de servicio</label><select class="fi" id="rm">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${n===6?' selected':''}>${n} mes${n>1?'es':''}</option>`).join('')}</select></div>
+  <div class="mfooter"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="saveRenov()">Guardar</button></div>`);
+}
+function saveRenov(){
+  const nombre=document.getElementById('rn').value;
+  const fecha=document.getElementById('rf').value;
+  const ticket=parseFloat(document.getElementById('rt').value)||0;
+  const cuotas=parseInt(document.getElementById('rq').value)||1;
+  const mesesServ=parseInt(document.getElementById('rm').value)||cuotas;
+  const nRenov=S.renovaciones.filter(r=>r.nombre===nombre).length+1;
+  const startYR=new Date(fecha).getFullYear();
+  const startMR=new Date(fecha).getMonth();
+  const pv=Math.round(ticket/cuotas*100)/100;
+  const pagos={};
+  for(let i=0;i<cuotas;i++){
+    const totalMR=startMR+i;const yR=startYR+Math.floor(totalMR/12);const mR=totalMR%12;
+    const keyR=`${yR}-${MONTHS[mR]}`;pagos[keyR]=pv;
+  }
+  S.renovaciones.push({nombre,nRenov,ticket,nCuotas:cuotas,mesesServicio:mesesServ,fechaInicio:fecha,pagos});
+  // Actualizar cuota principal para que getVenc() use los nuevos meses
+  const cuota=S.cuotas.find(c=>c.nombre===nombre);
+  if(cuota) cuota.mesesServicio=mesesServ;
+  save();closeModal();renderRenovaciones();
+}
 
 // ── ALERTAS ───────────────────────────────────────────────
 function proximosAVencer(){
