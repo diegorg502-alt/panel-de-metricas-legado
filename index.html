@@ -317,6 +317,8 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><rect x="1" y="3" width="14" height="2" rx="1"/><rect x="1" y="7" width="14" height="2" rx="1"/><rect x="1" y="11" width="14" height="2" rx="1"/></svg>Cuotas</div>
         <div class="nav-i" id="ni-renovaciones" onclick="goTo('renovaciones')">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M13.5 6A6 6 0 102.5 10m0 0v3m0-3h3"/></svg>Renovaciones</div>
+        <div class="nav-i" id="ni-balance" onclick="goTo('balance')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M2 12 L5 7 L8 9 L11 4 L14 6"/><line x1="2" y1="14" x2="14" y2="14"/></svg>Balance</div>
         <div class="nav-i" id="ni-alertas" onclick="goTo('alertas')" style="position:relative">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M8 1a5 5 0 015 5v3l1.5 2.5H1.5L3 9V6a5 5 0 015-5zM6.5 13.5a1.5 1.5 0 003 0"/></svg>Alertas
           <span id="alerta-badge" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px"></span>
@@ -378,7 +380,7 @@ let RECORD_ID='';
 let CLIENT_NOMBRE='';
 let SEMANAS_MODO=false; // true = use weeks for vencimiento
 
-let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{}};
+let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25}};
 let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null;
 let isEntrenador=false;
 let curYear=new Date().getFullYear();
@@ -418,7 +420,7 @@ async function doLogout(){
   document.getElementById('shell').style.display='none';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('li-pass').value='';
-  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{}};
+  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25}};
 }
 
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')doLogin();});
@@ -453,7 +455,7 @@ async function reloadFromSupabase(){
   setSyncStatus('saving','Recargando...');
   localStorage.removeItem('crm_bruno_bk');
   localStorage.removeItem('crm_last_backup');
-  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{}};
+  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25}};
   await loadData();
   goTo(curPage,curMonth);
   setSyncStatus('ok','Datos recargados ✓');
@@ -795,7 +797,7 @@ function goTo(page,month){
   if(ids[page])document.getElementById(ids[page])?.classList.add('active');
   if(page==='mes')document.getElementById(`ni-mes-${MONTHS[curMonth]}`)?.classList.add('active');
   if(page==='kpis_d')document.getElementById(`ni-kd-${MONTHS[curMonth]}`)?.classList.add('active');
-  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación',ia:'Conversa con la IA'};
+  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación',ia:'Conversa con la IA',balance:'Balance'};
   updateAlertaBadge();
   document.getElementById('topbar-title').textContent=titles[page]||(page==='mes'?`Llamadas — ${MFULL[curMonth]} ${curYear}`:`KPIs diarios — ${MFULL[curMonth]} ${curYear}`);
   const ex=document.getElementById('topbar-extra');ex.innerHTML='';
@@ -2038,7 +2040,7 @@ function changeYear(y){
   const sel=document.getElementById('year-sel');
   if(sel) sel.value=curYear;
   // Re-render current page with new year
-  const toRender={dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,mes:()=>goTo('mes',curMonth),kpis_d:()=>goTo('kpis_d',curMonth)};
+  const toRender={dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,mes:()=>goTo('mes',curMonth),kpis_d:()=>goTo('kpis_d',curMonth),balance:renderBalance};
   if(toRender[curPage]) toRender[curPage]();
 }
 
@@ -2125,6 +2127,208 @@ function exportCSV(mesIdx) {
   a.download = `Llamadas_Bruno_${mesNombre}_${curYear}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── BALANCE ───────────────────────────────────────────────
+function getIngresosMes(mk) {
+  // Altas del mes (ventas)
+  const ventas = (S.llamadas[mk]||[]).filter(l=>l.estado==='Venta');
+  const altas = ventas.reduce((s,l)=>s+Number(l.facturacion||0),0);
+  // Renovaciones del mes
+  const [year,mon] = mk.split('-');
+  const mesIdx = parseInt(mon)-1;
+  const renovs = getRenovacionesMes(parseInt(year), mesIdx);
+  const ingrRenovs = renovs.reduce((s,r)=>s+Number(r.ticket||0),0);
+  return {altas, renovaciones: ingrRenovs, total: altas+ingrRenovs};
+}
+
+function getGastosMes(mk) {
+  if(!S.balance) S.balance={gastos:[],impuestos_pct:25};
+  const gastos = S.balance.gastos||[];
+  // Gastos fijos activos para este mes
+  const fijos = gastos.filter(g=>g.activo&&g.tipo!=='comercial');
+  // Comerciales — siempre manuales, buscar override del mes
+  const comerciales = gastos.filter(g=>g.tipo==='comercial');
+  // Meta Ads inversión del mes
+  const kd = S.kpis_diarios[mk]||[];
+  const metaInv = kd.reduce((s,k)=>s+Number(k.inversion||0),0);
+
+  let totalSinIva=0, totalConIva=0;
+  fijos.forEach(g=>{
+    const imp = Number(g.importes?.[mk]??g.importe??0);
+    if(g.iva) totalConIva+=imp; else totalSinIva+=imp;
+  });
+  comerciales.forEach(g=>{
+    const imp = Number(g.importes?.[mk]??0);
+    totalSinIva+=imp;
+  });
+  totalSinIva += metaInv;
+
+  return {fijos, comerciales, metaInv, totalSinIva, totalConIva};
+}
+
+function renderBalance(){
+  if(!S.balance) S.balance={gastos:[],impuestos_pct:25};
+  const gastos = S.balance.gastos||[];
+  const impPct = Number(S.balance.impuestos_pct||25);
+
+  // Resumen anual por mes
+  const resumen = MONTHS.map((m,mi)=>{
+    const mk=`${curYear}-${String(mi+1).padStart(2,'0')}`;
+    const ing = getIngresosMes(mk);
+    const gas = getGastosMes(mk);
+    const bruto = ing.total - gas.totalSinIva;
+    const impuestos = bruto>0 ? Math.round(bruto*(impPct/100)*100)/100 : 0;
+    const neto = bruto - impuestos;
+    return {m, mk, mi, ...ing, ...gas, bruto, impuestos, neto};
+  });
+
+  const totYear = resumen.reduce((s,r)=>({
+    total:s.total+r.total, altas:s.altas+r.altas, renovaciones:s.renovaciones+r.renovaciones,
+    totalSinIva:s.totalSinIva+r.totalSinIva, bruto:s.bruto+r.bruto,
+    impuestos:s.impuestos+r.impuestos, neto:s.neto+r.neto
+  }), {total:0,altas:0,renovaciones:0,totalSinIva:0,bruto:0,impuestos:0,neto:0});
+
+  // Chart data
+  const chartMax = Math.max(...resumen.map(r=>r.total), 1);
+
+  document.getElementById('content').innerHTML=`
+    <div style="max-width:1200px">
+
+      <!-- MÉTRICAS ANUALES -->
+      <div class="mg" style="margin-bottom:20px">
+        <div class="metric"><div class="ml">Facturación ${curYear}</div><div class="mv blue">${fmt(totYear.total)}</div></div>
+        <div class="metric"><div class="ml">Gastos totales</div><div class="mv red">${fmt(totYear.totalSinIva)}</div></div>
+        <div class="metric"><div class="ml">Beneficio bruto</div><div class="mv ${totYear.bruto>=0?'green':'red'}">${fmt(totYear.bruto)}</div></div>
+        <div class="metric"><div class="ml">Impuestos (${impPct}%)</div><div class="mv amber">${fmt(totYear.impuestos)}</div></div>
+        <div class="metric"><div class="ml">Beneficio neto</div><div class="mv ${totYear.neto>=0?'green':'red'}">${fmt(totYear.neto)}</div></div>
+        <div class="metric"><div class="ml">% Beneficio</div><div class="mv">${totYear.total>0?Math.round(totYear.neto/totYear.total*100):0}%</div></div>
+      </div>
+
+      <!-- GRÁFICA FACTURACIÓN -->
+      <div class="card" style="margin-bottom:20px;padding:18px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:16px">Facturación mensual ${curYear}</div>
+        <div style="display:flex;align-items:flex-end;gap:6px;height:120px">
+          ${resumen.map(r=>{
+            const hPct = chartMax>0?Math.round(r.total/chartMax*100):0;
+            const esMesActual=r.mi===new Date().getMonth()&&curYear===new Date().getFullYear();
+            return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+              <div style="font-size:9px;color:var(--text3)">${r.total>0?fmt(r.total,0):''}</div>
+              <div style="width:100%;background:${esMesActual?'var(--blue)':'var(--blue-l)'};border-radius:4px 4px 0 0;height:${hPct}%;min-height:${r.total>0?4:0}px;transition:height .3s"></div>
+              <div style="font-size:10px;color:var(--text3);font-weight:600">${r.m}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- TABLA RESUMEN MENSUAL -->
+      <div class="card" style="margin-bottom:20px;padding:0;overflow:hidden">
+        <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:13px;font-weight:600">Resumen mensual</div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+            <span style="color:var(--text2)">Impuestos:</span>
+            <input type="number" value="${impPct}" min="0" max="100" oninput="S.balance.impuestos_pct=parseFloat(this.value)||0;save();renderBalance()" style="width:55px;padding:4px 8px;border:1px solid var(--border2);border-radius:6px;font-size:12px;text-align:center">
+            <span style="color:var(--text2)">%</span>
+          </div>
+        </div>
+        <div class="tw"><table style="min-width:900px">
+          <thead><tr>
+            <th>Mes</th><th style="text-align:right">Altas</th><th style="text-align:right">Renovaciones</th>
+            <th style="text-align:right">Total ingresos</th><th style="text-align:right">Gastos (s/IVA)</th>
+            <th style="text-align:right">Benef. bruto</th><th style="text-align:right">Impuestos</th>
+            <th style="text-align:right">Benef. neto</th><th style="text-align:right">% Benef.</th>
+          </tr></thead>
+          <tbody>
+            ${resumen.map(r=>{
+              const pct=r.total>0?Math.round(r.neto/r.total*100):0;
+              const esMes=r.mi===new Date().getMonth()&&curYear===new Date().getFullYear();
+              return`<tr style="${esMes?'background:var(--blue-l)':''}">
+                <td style="font-weight:600">${MFULL[r.mi]}</td>
+                <td style="text-align:right">${r.altas>0?fmt(r.altas):'-'}</td>
+                <td style="text-align:right">${r.renovaciones>0?fmt(r.renovaciones):'-'}</td>
+                <td style="text-align:right;font-weight:600;color:var(--blue)">${r.total>0?fmt(r.total):'-'}</td>
+                <td style="text-align:right;color:var(--red)">${r.totalSinIva>0?fmt(r.totalSinIva):'-'}</td>
+                <td style="text-align:right;font-weight:600;color:${r.bruto>=0?'var(--green)':'var(--red)'}">${r.total>0||r.totalSinIva>0?fmt(r.bruto):'-'}</td>
+                <td style="text-align:right;color:var(--amber)">${r.impuestos>0?fmt(r.impuestos):'-'}</td>
+                <td style="text-align:right;font-weight:700;color:${r.neto>=0?'var(--green)':'var(--red)'}">${r.total>0||r.totalSinIva>0?fmt(r.neto):'-'}</td>
+                <td style="text-align:right">${r.total>0?pct+'%':'-'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+          <tfoot><tr>
+            <td style="font-weight:600">TOTAL</td>
+            <td style="text-align:right;font-weight:600">${fmt(totYear.altas)}</td>
+            <td style="text-align:right;font-weight:600">${fmt(totYear.renovaciones)}</td>
+            <td style="text-align:right;font-weight:700;color:var(--blue)">${fmt(totYear.total)}</td>
+            <td style="text-align:right;font-weight:600;color:var(--red)">${fmt(totYear.totalSinIva)}</td>
+            <td style="text-align:right;font-weight:700;color:${totYear.bruto>=0?'var(--green)':'var(--red)'}">${fmt(totYear.bruto)}</td>
+            <td style="text-align:right;font-weight:600;color:var(--amber)">${fmt(totYear.impuestos)}</td>
+            <td style="text-align:right;font-weight:700;color:${totYear.neto>=0?'var(--green)':'var(--red)'}">${fmt(totYear.neto)}</td>
+            <td style="text-align:right;font-weight:600">${totYear.total>0?Math.round(totYear.neto/totYear.total*100):0}%</td>
+          </tr></tfoot>
+        </table></div>
+      </div>
+
+      <!-- GASTOS CONFIGURABLES -->
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:13px;font-weight:600">Gastos mensuales</div>
+          <button class="btn btn-p" style="font-size:12px" onclick="addGasto()">+ Añadir gasto</button>
+        </div>
+        <div class="tw"><table style="min-width:1000px">
+          <thead><tr>
+            <th style="min-width:180px">Concepto</th>
+            <th style="min-width:80px">Tipo</th>
+            <th style="min-width:60px">IVA</th>
+            <th style="min-width:70px">Activo</th>
+            ${MONTHS.map(m=>`<th style="text-align:right;min-width:90px">${m}</th>`).join('')}
+            <th></th>
+          </tr></thead>
+          <tbody>
+            <!-- Meta Ads (automático, solo lectura en nombre) -->
+            <tr style="background:var(--blue-l)">
+              <td style="font-size:12px;font-weight:600;color:var(--blue)">📱 Meta Ads (auto)</td>
+              <td><span style="font-size:11px;padding:2px 6px;border-radius:10px;background:var(--blue-l);color:var(--blue)">publicidad</span></td>
+              <td style="text-align:center"><span style="color:var(--text3);font-size:12px">No</span></td>
+              <td style="text-align:center"><span style="color:var(--green);font-size:12px">●</span></td>
+              ${MONTHS.map((_,mi)=>{
+                const mk=`${curYear}-${String(mi+1).padStart(2,'0')}`;
+                const kd=S.kpis_diarios[mk]||[];
+                const inv=kd.reduce((s,k)=>s+Number(k.inversion||0),0);
+                return`<td style="text-align:right;font-size:12px">${inv>0?fmt(inv,2):'-'}</td>`;
+              }).join('')}
+              <td></td>
+            </tr>
+            ${gastos.map((g,gi)=>`<tr>
+              <td><input class="ce" value="${esc(g.nombre||'')}" oninput="S.balance.gastos[${gi}].nombre=this.value;save()" style="min-width:160px"></td>
+              <td><select class="ce" onchange="S.balance.gastos[${gi}].tipo=this.value;save();renderBalance()" style="min-width:80px">
+                ${['fijo','comercial','otros'].map(t=>`<option value="${t}"${g.tipo===t?' selected':''}>${t}</option>`).join('')}
+              </select></td>
+              <td style="text-align:center"><input type="checkbox" ${g.iva?'checked':''} onchange="S.balance.gastos[${gi}].iva=this.checked;save();renderBalance()"></td>
+              <td style="text-align:center"><input type="checkbox" ${g.activo?'checked':''} onchange="S.balance.gastos[${gi}].activo=this.checked;save();renderBalance()"></td>
+              ${MONTHS.map((_,mi)=>{
+                const mk=`${curYear}-${String(mi+1).padStart(2,'0')}`;
+                const val=g.importes?.[mk]??((g.activo&&g.tipo!=='comercial')?g.importe:0)??0;
+                return`<td><input class="ce" type="number" value="${val||''}" oninput="if(!S.balance.gastos[${gi}].importes)S.balance.gastos[${gi}].importes={};S.balance.gastos[${gi}].importes['${mk}']=parseFloat(this.value)||0;save()" style="text-align:right;width:80px" placeholder="0"></td>`;
+              }).join('')}
+              <td><button class="btn btn-red btn-xs" onclick="S.balance.gastos.splice(${gi},1);save();renderBalance()">✕</button></td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  `;
+}
+
+function addGasto(){
+  if(!S.balance) S.balance={gastos:[],impuestos_pct:25};
+  S.balance.gastos.push({nombre:'',tipo:'fijo',iva:false,activo:true,importe:0,importes:{}});
+  save();renderBalance();
+  // Focus last row nombre input
+  setTimeout(()=>{
+    const inputs=document.querySelectorAll('#content tbody tr:last-child input[type="text"],#content tbody tr:last-child .ce:not([type])');
+    if(inputs.length) inputs[0].focus();
+  },100);
 }
 
 // ── TOKEN META COUNTDOWN ──────────────────────────────────
