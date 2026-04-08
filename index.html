@@ -299,6 +299,8 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Dashboard</div>
         <div class="nav-i" id="ni-objetivos" onclick="goTo('objetivos')">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7"/><circle cx="8" cy="8" r="3"/><line x1="8" y1="1" x2="8" y2="3"/></svg>Objetivos</div>
+        <div class="nav-i" id="ni-balance" onclick="goTo('balance')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M2 12 L5 7 L8 9 L11 4 L14 6"/><line x1="2" y1="14" x2="14" y2="14"/></svg>Balance</div>
         <div class="nav-g">Registros</div>
         <div class="nav-gh" id="nhdr-mes" onclick="toggleG('mes')">
           <div style="display:flex;align-items:center;gap:8px">
@@ -317,8 +319,6 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><rect x="1" y="3" width="14" height="2" rx="1"/><rect x="1" y="7" width="14" height="2" rx="1"/><rect x="1" y="11" width="14" height="2" rx="1"/></svg>Cuotas</div>
         <div class="nav-i" id="ni-renovaciones" onclick="goTo('renovaciones')">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M13.5 6A6 6 0 102.5 10m0 0v3m0-3h3"/></svg>Renovaciones</div>
-        <div class="nav-i" id="ni-balance" onclick="goTo('balance')">
-          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M2 12 L5 7 L8 9 L11 4 L14 6"/><line x1="2" y1="14" x2="14" y2="14"/></svg>Balance</div>
         <div class="nav-i" id="ni-alertas" onclick="goTo('alertas')" style="position:relative">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M8 1a5 5 0 015 5v3l1.5 2.5H1.5L3 9V6a5 5 0 015-5zM6.5 13.5a1.5 1.5 0 003 0"/></svg>Alertas
           <span id="alerta-badge" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px"></span>
@@ -793,7 +793,7 @@ function toggleG(id){document.getElementById(`nhdr-${id}`).classList.toggle('ope
 function goTo(page,month){
   if(month!==undefined)curMonth=month;curPage=page;
   document.querySelectorAll('.nav-i').forEach(el=>el.classList.remove('active'));
-  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia'};
+  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance'};
   if(ids[page])document.getElementById(ids[page])?.classList.add('active');
   if(page==='mes')document.getElementById(`ni-mes-${MONTHS[curMonth]}`)?.classList.add('active');
   if(page==='kpis_d')document.getElementById(`ni-kd-${MONTHS[curMonth]}`)?.classList.add('active');
