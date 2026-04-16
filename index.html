@@ -560,10 +560,10 @@ async function listBackups(){
   }catch(e){return[];}
 }
 
-async function restoreBackup(id){
+async function restoreBackup(id,table){
   if(!confirm('¿Restaurar este backup? Los datos actuales se guardarán como backup antes de restaurar.')) return;
   try{
-    const{data}=await sb.from('crm_backups').select('data').eq('id',id).single();
+    const{data}=await sb.from(table||'crm_backups').select('data').eq('id',id).single();
     if(!data) return alert('No se pudo cargar el backup');
     await saveBackup(); // save current state first
     S={...S,...data.data};
@@ -614,24 +614,49 @@ function importBackup(event){
 
 async function openBackupsModal(){
   openModal(`<div class="mtitle">Copias de seguridad</div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Se guarda una copia automática cada hora. Puedes restaurar cualquier punto anterior.</p>
-    <div id="bk-list" style="margin-bottom:16px"><div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">Cargando...</div></div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Backups automáticos cada hora + backup diario a las 3:00 AM. Puedes restaurar cualquier punto anterior.</p>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn btn-xs" id="bk-tab-hourly" onclick="showBkTab('hourly')" style="font-weight:700;background:var(--text);color:#fff">Cada hora</button>
+      <button class="btn btn-xs" id="bk-tab-daily" onclick="showBkTab('daily')">Diarios (seguros)</button>
+    </div>
+    <div id="bk-list" style="margin-bottom:16px;max-height:300px;overflow-y:auto"><div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">Cargando...</div></div>
     <div class="mfooter">
       <button class="btn" onclick="closeModal()">Cerrar</button>
       <button class="btn" onclick="triggerImport()">⬆ Importar JSON</button>
       <button class="btn btn-p" onclick="exportBackup()">⬇ Exportar JSON</button>
     </div>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importBackup(event)">`);
-  const bks=await listBackups();
-  const el=document.getElementById('bk-list');
-  if(!el) return;
-  if(!bks.length){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">Sin backups automáticos aún. Se crearán cada hora mientras uses la app.</div>';return;}
+  await showBkTab('hourly');
+}
+
+async function showBkTab(tab){
+  const el=document.getElementById('bk-list');if(!el)return;
+  el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">Cargando...</div>';
+  // Update tab styles
+  const hBtn=document.getElementById('bk-tab-hourly');
+  const dBtn=document.getElementById('bk-tab-daily');
+  if(hBtn)hBtn.style.cssText=tab==='hourly'?'font-weight:700;background:var(--text);color:#fff':'';
+  if(dBtn)dBtn.style.cssText=tab==='daily'?'font-weight:700;background:var(--text);color:#fff':'';
+
+  let bks=[];
+  if(tab==='hourly'){
+    bks=await listBackups();
+  } else {
+    try{
+      const{data}=await sb.from('crm_daily_backups').select('id,created_at').eq('client_id',RECORD_ID).order('created_at',{ascending:false}).limit(30);
+      bks=data||[];
+    }catch(e){bks=[];}
+  }
+
+  if(!bks.length){el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">${tab==='hourly'?'Sin backups por hora aún. Se crean automáticamente mientras usas la app.':'Sin backups diarios aún. Se crean automáticamente cada noche a las 3:00 AM.'}</div>`;return;}
+  const table=tab==='daily'?'crm_daily_backups':'crm_backups';
   el.innerHTML=bks.map(b=>{
     const d=new Date(b.created_at);
     const label=d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    const badge=tab==='daily'?'<span style="font-size:9px;padding:2px 6px;border-radius:10px;background:#f0fdf4;color:#057a55;font-weight:700;margin-left:6px">SEGURO</span>':'';
     return`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:8px;background:var(--bg2);margin-bottom:6px;font-size:12px">
-      <span style="color:var(--text2)">${label}</span>
-      <button class="btn btn-xs" onclick="restoreBackup(${b.id})">Restaurar</button>
+      <span style="color:var(--text2)">${label}${badge}</span>
+      <button class="btn btn-xs" onclick="restoreBackup(${b.id},'${table}')">Restaurar</button>
     </div>`;
   }).join('');
 }
