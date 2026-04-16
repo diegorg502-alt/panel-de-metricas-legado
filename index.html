@@ -327,6 +327,13 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
         <div class="nav-i" id="ni-ia" onclick="goTo('ia')">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M5 8h6M8 5v6"/></svg>Conversa con la IA
         </div>
+        <div id="lanz-nav-section" style="display:none">
+          <div class="nav-g">Lanzamientos</div>
+          <div class="nav-i" id="ni-lanzamientos" onclick="goTo('lanzamientos')">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M2 13 L8 3 L14 13 Z"/></svg>Todos los lanzamientos
+          </div>
+          <div id="lanz-sub-items"></div>
+        </div>
       </nav>
       <div class="sb-foot">
         <div class="sb-sync"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Conectando...</span></div>
@@ -380,8 +387,10 @@ let ENTRENADOR_EMAIL='';
 let RECORD_ID='';
 let CLIENT_NOMBRE='';
 let SEMANAS_MODO=false; // true = use weeks for vencimiento
+let HAS_LANZAMIENTOS=false; // true = show lanzamientos section
+let curLanzamiento=''; // current selected launch id
 
-let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25}};
+let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[]};
 let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null;
 let isEntrenador=false;
 let curYear=new Date().getFullYear();
@@ -421,7 +430,7 @@ async function doLogout(){
   document.getElementById('shell').style.display='none';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('li-pass').value='';
-  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25}};
+  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[]};
 }
 
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')doLogin();});
@@ -456,7 +465,7 @@ async function reloadFromSupabase(){
   setSyncStatus('saving','Recargando...');
   localStorage.removeItem('crm_bruno_bk');
   localStorage.removeItem('crm_last_backup');
-  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25}};
+  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[]};
   await loadData();
   goTo(curPage,curMonth);
   setSyncStatus('ok','Datos recargados ✓');
@@ -513,6 +522,9 @@ async function loadClientConfig(email){
     ENTRENADORES=[''].concat(data.entrenadores||[]);
     ENTRENADOR_EMAIL=data.entrenador_email||'';
     SEMANAS_MODO=data.semanas_modo||false;
+    HAS_LANZAMIENTOS=data.has_lanzamientos||false;
+    // Auto-enable lanzamientos if client has LANZAMIENTO or WORKSHOP channels
+    if(!HAS_LANZAMIENTOS&&CANALES.some(c=>c.toUpperCase().includes('LANZAMIENTO')||c.toUpperCase().includes('WORKSHOP')))HAS_LANZAMIENTOS=true;
     // Update UI
     const sbbrand=document.querySelector('#sb-brand-text');if(sbbrand)sbbrand.textContent='CRM · '+CLIENT_NOMBRE;
     const sbfoot=document.querySelector('.sb-foot div:last-child');if(sbfoot)sbfoot.textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
@@ -778,6 +790,18 @@ function buildSidebar(){
     const d=document.createElement('div');d.className='nav-i';d.id=`ni-mes-${m}`;d.textContent=m;d.onclick=()=>goTo('mes',i);sm.appendChild(d);
     const k=document.createElement('div');k.className='nav-i';k.id=`ni-kd-${m}`;k.textContent=m;k.onclick=()=>goTo('kpis_d',i);sk.appendChild(k);
   });
+  // Build lanzamientos nav
+  const lanzNav=document.getElementById('lanz-nav-section');
+  const lanzSub=document.getElementById('lanz-sub-items');
+  if(HAS_LANZAMIENTOS&&lanzNav){
+    lanzNav.style.display='block';
+    lanzSub.innerHTML='';
+    (S.lanzamientos||[]).forEach(l=>{
+      const d=document.createElement('div');d.className='nav-i';d.id=`ni-lanz-${l.id}`;
+      d.textContent=l.nombre;d.onclick=()=>goTo('lanzamiento_detail',null,l.id);
+      lanzSub.appendChild(d);
+    });
+  } else if(lanzNav){ lanzNav.style.display='none'; }
   // Hide sections for entrenador
   if(isEntrenador){
     ['nhdr-mes','nhdr-kd','ni-dashboard','ni-objetivos'].forEach(id=>{
@@ -791,26 +815,32 @@ function buildSidebar(){
   }
 }
 function toggleG(id){document.getElementById(`nhdr-${id}`).classList.toggle('open');document.getElementById(`nsub-${id}`).classList.toggle('open');}
-function goTo(page,month){
-  if(month!==undefined)curMonth=month;curPage=page;
+function goTo(page,month,lanzId){
+  if(month!==undefined)curMonth=month;if(lanzId!==undefined)curLanzamiento=lanzId;curPage=page;
   document.querySelectorAll('.nav-i').forEach(el=>el.classList.remove('active'));
-  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance'};
+  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance',lanzamientos:'ni-lanzamientos'};
   if(ids[page])document.getElementById(ids[page])?.classList.add('active');
   if(page==='mes')document.getElementById(`ni-mes-${MONTHS[curMonth]}`)?.classList.add('active');
   if(page==='kpis_d')document.getElementById(`ni-kd-${MONTHS[curMonth]}`)?.classList.add('active');
-  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación',ia:'Conversa con la IA',balance:'Balance'};
+  if(page==='lanzamiento_detail')document.getElementById(`ni-lanz-${curLanzamiento}`)?.classList.add('active');
+  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación',ia:'Conversa con la IA',balance:'Balance',lanzamientos:'Lanzamientos'};
   updateAlertaBadge();
-  document.getElementById('topbar-title').textContent=titles[page]||(page==='mes'?`Llamadas — ${MFULL[curMonth]} ${curYear}`:`KPIs diarios — ${MFULL[curMonth]} ${curYear}`);
+  let pageTitle=titles[page]||(page==='mes'?`Llamadas — ${MFULL[curMonth]} ${curYear}`:page==='kpis_d'?`KPIs diarios — ${MFULL[curMonth]} ${curYear}`:'');
+  if(page==='lanzamiento_detail'){const lz=(S.lanzamientos||[]).find(l=>l.id===curLanzamiento);pageTitle=lz?lz.nombre:'Lanzamiento';}
+  document.getElementById('topbar-title').textContent=pageTitle;
   const ex=document.getElementById('topbar-extra');ex.innerHTML='';
   if(page==='mes'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLlamadaRow(curMonth);ex.appendChild(b);const bcsv=document.createElement('button');bcsv.className='btn';bcsv.textContent='⬇ Exportar CSV';bcsv.style.marginLeft='8px';bcsv.onclick=()=>exportCSV(curMonth);ex.appendChild(bcsv);}
   if(page==='cuotas'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Añadir cliente';b.onclick=openAddCuota;ex.appendChild(b);}
   if(page==='renovaciones'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva renovación';b.onclick=openAddRenov;ex.appendChild(b);}
-  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,ia:renderIA,mes:renderMes,kpis_d:renderKpisD,balance:renderBalance}[page]||renderDashboard)();
+  if(page==='lanzamientos'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nuevo lanzamiento';b.onclick=openAddLanzamiento;ex.appendChild(b);}
+  if(page==='lanzamiento_detail'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLanzRow(curLanzamiento);ex.appendChild(b);const bd=document.createElement('button');bd.className='btn btn-red';bd.textContent='Eliminar lanzamiento';bd.style.marginLeft='8px';bd.onclick=()=>deleteLanzamiento(curLanzamiento);ex.appendChild(bd);}
+  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,ia:renderIA,mes:renderMes,kpis_d:renderKpisD,balance:renderBalance,lanzamientos:renderLanzamientos,lanzamiento_detail:renderLanzamientoDetail}[page]||renderDashboard)();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────
 function renderDashboard(){
-  const allL=Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))).map(([,v])=>v).flat();
+  const lanzKeys=(S.lanzamientos||[]).map(l=>`lanz_${l.id}`);
+  const allL=Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))||lanzKeys.includes(k)).map(([,v])=>v).flat();
   const ventas=allL.filter(l=>l.estado==='Venta');const reservas=allL.filter(l=>l.estado==='Reserva');
   const totalFact=ventas.reduce((s,l)=>s+Number(l.facturacion||0),0);
   const totalCaja=ventas.reduce((s,l)=>s+Number(l.caja||0),0);
@@ -1145,7 +1175,7 @@ function renderKpiDRows(mk){
     const leadsVal=r.leads||r.seguidores||0;
     const cpl=leadsVal&&r.inversion?(r.inversion/leadsVal).toFixed(2):'-';
     const isMeta=r.source==='meta';
-    const diaStr=isMeta?(r.fecha?r.fecha.split('-')[2]:r.dia||''):(r.dia||'');
+    const diaStr=isMeta?(r.fecha?r.fecha.split('-')[2]:r.dia?(r.dia.includes('-')?r.dia.split('-')[2]:r.dia):''):(r.dia||'');
     if(isMeta){
       // Meta-imported row: read-only display with Meta badge
       return`<tr style="background:rgba(24,119,242,0.04)">
@@ -2128,6 +2158,189 @@ function exportCSV(mesIdx) {
   a.download = `Llamadas_Bruno_${mesNombre}_${curYear}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── LANZAMIENTOS ─────────────────────────────────────────
+function renderLanzamientos(){
+  if(!S.lanzamientos)S.lanzamientos=[];
+  const c=document.getElementById('content');
+  if(!S.lanzamientos.length){
+    c.innerHTML='<div class="empty">No hay lanzamientos creados aún.<br><br><button class="btn btn-p" onclick="openAddLanzamiento()">+ Crear primer lanzamiento</button></div>';
+    return;
+  }
+  let html='<div class="sec-title">Todos los lanzamientos</div>';
+  S.lanzamientos.forEach(l=>{
+    const mk=`lanz_${l.id}`;
+    const rows=S.llamadas[mk]||[];
+    const ventas=rows.filter(r=>r.estado==='Venta');
+    const fact=ventas.reduce((s,r)=>s+Number(r.facturacion||0),0);
+    const caja=ventas.reduce((s,r)=>s+Number(r.caja||0),0);
+    const realizadas=rows.filter(r=>r.asistencia==='SI').length;
+    const kd=S.kpis_diarios[mk]||[];
+    const inv=kd.reduce((s,k)=>s+Number(k.inversion||0),0);
+    const leads=kd.reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
+    html+=`<div class="card" style="cursor:pointer" onclick="goTo('lanzamiento_detail',null,'${l.id}')">
+      <div class="card-title"><span>${l.nombre}</span><span class="badge b-blue">${l.fecha||'Sin fecha'}</span></div>
+      <div class="mg">
+        <div class="metric"><div class="ml">Inversión</div><div class="mv blue">${fmt(inv)}</div></div>
+        <div class="metric"><div class="ml">Leads</div><div class="mv">${leads}</div></div>
+        <div class="metric"><div class="ml">Llamadas</div><div class="mv">${rows.length}</div></div>
+        <div class="metric"><div class="ml">Realizadas</div><div class="mv">${realizadas}</div></div>
+        <div class="metric"><div class="ml">Ventas</div><div class="mv green">${ventas.length}</div></div>
+        <div class="metric"><div class="ml">Facturación</div><div class="mv blue">${fmt(fact)}</div></div>
+        <div class="metric"><div class="ml">Caja</div><div class="mv green">${fmt(caja)}</div></div>
+        <div class="metric"><div class="ml">ROAS</div><div class="mv amber">${inv?((fact/inv).toFixed(2)+'x'):'-'}</div></div>
+      </div>
+    </div>`;
+  });
+  c.innerHTML=html;
+}
+
+function renderLanzamientoDetail(){
+  const lz=(S.lanzamientos||[]).find(l=>l.id===curLanzamiento);
+  if(!lz){document.getElementById('content').innerHTML='<div class="empty">Lanzamiento no encontrado</div>';return;}
+  const mk=`lanz_${lz.id}`;
+  if(!S.llamadas[mk])S.llamadas[mk]=[];
+  if(!S.kpis_diarios[mk])S.kpis_diarios[mk]=[];
+  const rows=S.llamadas[mk];
+  const kd=S.kpis_diarios[mk];
+  // KPIs globales
+  const ventas=rows.filter(r=>r.estado==='Venta');
+  const fact=ventas.reduce((s,r)=>s+Number(r.facturacion||0),0);
+  const caja=ventas.reduce((s,r)=>s+Number(r.caja||0),0);
+  const realizadas=rows.filter(r=>r.asistencia==='SI').length;
+  const llamadasTotal=rows.length;
+  const inv=kd.reduce((s,k)=>s+Number(k.inversion||0),0);
+  const leads=kd.reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
+  const cpl=leads&&inv?inv/leads:null;
+  const pctAgend=leads?llamadasTotal/leads:null;
+  const pctAsist=llamadasTotal?realizadas/llamadasTotal:null;
+  const pctCierre=realizadas?ventas.length/realizadas:null;
+  const roas=inv?fact/inv:null;
+  const roi=inv?caja/inv:null;
+  const cpa=ventas.length&&inv?inv/ventas.length:null;
+  const costeLlamada=llamadasTotal&&inv?inv/llamadasTotal:null;
+
+  document.getElementById('content').innerHTML=`
+    <div class="card">
+      <div class="card-title"><span>Métricas del lanzamiento</span><span class="badge b-blue">${lz.fecha||''}</span></div>
+      <div class="mg" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
+        ${[
+          ['Inversión',fmt(inv),'blue'],['Leads/Seg.',leads,''],['CPL',cpl?fmt(cpl,2):'-','amber'],
+          ['Llamadas',llamadasTotal,''],['% Agendamiento',pctAgend!=null?(pctAgend*100).toFixed(1)+'%':'-',''],
+          ['€/Llamada',costeLlamada?fmt(costeLlamada,2):'-','amber'],['% Asistencia',pctAsist!=null?(pctAsist*100).toFixed(1)+'%':'-',''],
+          ['Realizadas',realizadas,''],['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue'],
+          ['Ventas',ventas.length,'green'],['Facturación',fmt(fact),'blue'],['Caja',fmt(caja),'green'],
+          ['ROAS',roas?roas.toFixed(2)+'x':'-','amber'],['ROI',roi?roi.toFixed(2)+'x':'-','purple'],['CPA',cpa?fmt(cpa,2):'-','']
+        ].map(([l,v,c])=>`<div class="kpi-m"><div class="ml">${l}</div><div class="mv ${c}" style="font-size:16px">${v}</div></div>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">KPIs diarios del lanzamiento</div>
+      <div class="tw"><table>
+        <thead><tr><th>Día</th><th>Canal</th><th style="text-align:right">Inversión (€)</th><th style="text-align:right">Leads</th><th style="text-align:right">CPL</th><th></th></tr></thead>
+        <tbody id="lanz-kd-body"></tbody>
+        <tfoot><tr><td colspan="2" style="font-weight:600">Total</td><td style="text-align:right">${fmt(inv,2)}</td><td style="text-align:right">${leads}</td><td style="text-align:right">${cpl?fmt(cpl,2):'-'}</td><td></td></tr></tfoot>
+      </table></div>
+      <button class="btn" style="margin-top:10px" onclick="addLanzKpiRow('${mk}')">+ Añadir fila KPI</button>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:32px">
+      <div style="padding:14px 20px 0"><div class="card-title" style="margin-bottom:0">Llamadas del lanzamiento</div></div>
+      <div class="tw"><table id="lt">
+        <thead><tr><th style="min-width:160px">Nombre</th><th style="min-width:120px">Fecha</th><th style="min-width:120px">Teléfono</th><th style="min-width:110px">Embudo</th><th style="min-width:90px">Closer</th>${SETTERS.length?'<th style="min-width:100px">Setter</th>':''}<th style="min-width:100px">Asistencia</th><th style="min-width:90px">Incidencia</th><th style="min-width:120px">Estado</th><th style="min-width:110px">Facturación</th><th style="min-width:90px">Caja</th><th style="min-width:90px">Cuotas</th><th style="min-width:120px">Meses servicio</th><th style="min-width:180px">Comentarios</th><th></th></tr></thead>
+        <tbody id="lb"></tbody>
+      </table></div>
+    </div>`;
+  renderLanzKpiRows(mk);
+  renderLanzLlamadaRows(mk);
+}
+
+function renderLanzKpiRows(mk){
+  const rows=S.kpis_diarios[mk]||[];
+  const tbody=document.getElementById('lanz-kd-body');if(!tbody)return;
+  tbody.innerHTML=rows.map((r,i)=>{
+    const cpl=r.leads&&r.inversion?(r.inversion/r.leads).toFixed(2):'-';
+    return`<tr>
+      <td><input class="ce" type="date" value="${r.dia||''}" oninput="upLanzKD('${mk}',${i},'dia',this.value)"></td>
+      <td><select class="ce" onchange="upLanzKD('${mk}',${i},'canal',this.value)">${CANALES.map(c=>`<option value="${c}"${r.canal===c?' selected':''}>${c}</option>`).join('')}</select></td>
+      <td><input class="ce" type="number" inputmode="decimal" value="${r.inversion||''}" oninput="upLanzKDNum('${mk}',${i},'inversion',this.value)" placeholder="0" style="text-align:right"></td>
+      <td><input class="ce" type="number" inputmode="numeric" value="${r.leads||''}" oninput="upLanzKDNum('${mk}',${i},'leads',this.value)" placeholder="0" style="text-align:right"></td>
+      <td style="text-align:right;color:var(--amber);font-weight:600">${cpl}</td>
+      <td><button class="btn btn-red btn-xs" onclick="delLanzKD('${mk}',${i})">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderLanzLlamadaRows(mk){
+  const rows=S.llamadas[mk]||[];
+  const tbody=document.getElementById('lb');if(!tbody)return;
+  tbody.innerHTML=rows.map((r,i)=>`<tr style="${r.estado==='Venta'?'background:#f0fdf4':r.estado==='Perdido'?'background:#fef2f2':r.estado==='Reserva'?'background:#eff6ff':''}">
+    <td><input class="ce" value="${esc(r.nombre)}" oninput="upLanz('${mk}',${i},'nombre',this.value)" placeholder="Nombre" style="min-width:100px"></td>
+    <td><input class="ce" type="date" value="${r.fecha||''}" oninput="upLanz('${mk}',${i},'fecha',this.value)"></td>
+    <td><input class="ce" value="${esc(r.telefono)}" oninput="upLanz('${mk}',${i},'telefono',this.value)" placeholder="+34..."></td>
+    <td><select class="ce" onchange="upLanz('${mk}',${i},'embudo',this.value)" style="min-width:100px"><option value="">-</option>${CANALES.map(c=>`<option value="${c}"${r.embudo===c?' selected':''}>${c}</option>`).join('')}</select></td>
+    <td><select class="ce" onchange="upLanz('${mk}',${i},'closer',this.value)" style="min-width:80px"><option value="">-</option>${CLOSERS.map(c=>`<option value="${c}"${r.closer===c?' selected':''}>${c}</option>`).join('')}</select></td>
+    ${SETTERS.length?`<td><input class="ce" value="${esc(r.setter||'')}" oninput="upLanz('${mk}',${i},'setter',this.value)" placeholder="Setter" style="min-width:90px"></td>`:''}
+    <td><select class="ce" onchange="upLanz('${mk}',${i},'asistencia',this.value)" style="min-width:95px"><option value="">-</option>${['SI','NO','PENDIENTE'].map(v=>`<option value="${v}"${r.asistencia===v?' selected':''}>${v}</option>`).join('')}</select></td>
+    <td><input class="ce" value="${esc(r.incidencia)}" oninput="upLanz('${mk}',${i},'incidencia',this.value)" placeholder="-" style="min-width:70px"></td>
+    <td><select class="ce" onchange="upLanz('${mk}',${i},'estado',this.value)" style="min-width:110px"><option value="">-</option>${ESTADOS.map(v=>`<option value="${v}"${r.estado===v?' selected':''}>${v}</option>`).join('')}</select></td>
+    <td><input class="ce" type="number" inputmode="numeric" value="${r.facturacion||''}" oninput="upLanzNum('${mk}',${i},'facturacion',this.value)" placeholder="0" style="text-align:right"></td>
+    <td><input class="ce" type="number" inputmode="numeric" value="${r.caja||''}" oninput="upLanzNum('${mk}',${i},'caja',this.value)" placeholder="0" style="text-align:right"></td>
+    <td><select class="ce" onchange="upLanzNum('${mk}',${i},'nCuotas',this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${Number(r.nCuotas)===n?' selected':''}>${n===1?'1 (único)':n}</option>`).join('')}</select></td>
+    <td><select class="ce" onchange="upLanzNum('${mk}',${i},'mesesServicio',this.value)" style="min-width:110px">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${Number(r.mesesServicio)===n?' selected':''}>${n} mes${n>1?'es':''}</option>`).join('')}</select></td>
+    <td><input class="ce" value="${esc(r.comentarios)}" oninput="upLanz('${mk}',${i},'comentarios',this.value)" placeholder="Notas..." style="min-width:260px"></td>
+    <td><button class="btn btn-red btn-xs" onclick="delLanzRow('${mk}',${i})">✕</button></td>
+  </tr>`).join('');
+}
+
+// Lanzamiento data handlers
+function upLanz(mk,i,f,v){S.llamadas[mk][i][f]=v;save();}
+function upLanzNum(mk,i,f,v){S.llamadas[mk][i][f]=parseNum(v);save();if(f==='facturacion')renderLanzamientoDetail();}
+function upLanzKD(mk,i,f,v){S.kpis_diarios[mk][i][f]=v;save();}
+function upLanzKDNum(mk,i,f,v){S.kpis_diarios[mk][i][f]=parseNum(v);save();renderLanzKpiRows(mk);}
+function delLanzRow(mk,i){S.llamadas[mk].splice(i,1);save();renderLanzamientoDetail();}
+function delLanzKD(mk,i){S.kpis_diarios[mk].splice(i,1);save();renderLanzamientoDetail();}
+function addLanzRow(lanzId){
+  const mk=`lanz_${lanzId}`;
+  if(!S.llamadas[mk])S.llamadas[mk]=[];
+  S.llamadas[mk].push({nombre:'',fecha:'',telefono:'',embudo:'',closer:'',asistencia:'',incidencia:'',estado:'',facturacion:0,caja:0,nCuotas:1,mesesServicio:1,comentarios:'',year:curYear});
+  save();renderLanzamientoDetail();
+}
+function addLanzKpiRow(mk){
+  if(!S.kpis_diarios[mk])S.kpis_diarios[mk]=[];
+  S.kpis_diarios[mk].push({dia:'',canal:CANALES[0]||'',inversion:0,leads:0});
+  save();renderLanzamientoDetail();
+}
+
+function openAddLanzamiento(){
+  const html=`<div class="mtitle">Nuevo lanzamiento</div>
+    <div class="fg"><label class="fl">Nombre del lanzamiento</label><input class="fi" id="lanz-nombre" placeholder="Ej: Workshop Mayo 2026"></div>
+    <div class="fg"><label class="fl">Fecha de inicio</label><input class="fi" id="lanz-fecha" type="date"></div>
+    <div class="mfooter">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-p" onclick="doAddLanzamiento()">Crear lanzamiento</button>
+    </div>`;
+  openModal(html);
+}
+
+function doAddLanzamiento(){
+  const nombre=document.getElementById('lanz-nombre').value.trim();
+  const fecha=document.getElementById('lanz-fecha').value;
+  if(!nombre){alert('Escribe un nombre para el lanzamiento');return;}
+  if(!S.lanzamientos)S.lanzamientos=[];
+  const id=Date.now().toString(36);
+  S.lanzamientos.push({id,nombre,fecha});
+  S.llamadas[`lanz_${id}`]=[];
+  S.kpis_diarios[`lanz_${id}`]=[];
+  save();closeModal();buildSidebar();goTo('lanzamiento_detail',null,id);
+}
+
+function deleteLanzamiento(lanzId){
+  if(!confirm('¿Eliminar este lanzamiento y todos sus datos? Esta acción no se puede deshacer.'))return;
+  S.lanzamientos=(S.lanzamientos||[]).filter(l=>l.id!==lanzId);
+  delete S.llamadas[`lanz_${lanzId}`];
+  delete S.kpis_diarios[`lanz_${lanzId}`];
+  save();buildSidebar();goTo('lanzamientos');
 }
 
 // ── BALANCE ───────────────────────────────────────────────
