@@ -1177,13 +1177,17 @@ function renderKpiDRows(mk){
     const isMeta=r.source==='meta';
     const diaStr=isMeta?(r.fecha?r.fecha.split('-')[2]:r.dia?(r.dia.includes('-')?r.dia.split('-')[2]:r.dia):''):(r.dia||'');
     if(isMeta){
-      // Meta-imported row: read-only display with Meta badge
+      // Meta-imported row: inversión read-only, seguidores editable for social campaigns
+      const isSocial=!r.leads&&(r.seguidores!==undefined||leadsVal===0);
+      const segVal=r.seguidores||0;
+      const displayLeads=r.leads||0;
+      const metaCpl=isSocial?(segVal>0?fmt(r.inversion/segVal,2)+'€':'-'):(cpl!=='-'?cpl+'€':'-');
       return`<tr style="background:rgba(24,119,242,0.04)">
         <td style="text-align:center;font-weight:600;color:var(--text2)">${diaStr}</td>
         <td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e7f3ff;color:#1877f2">${r.canal}</span></td>
         <td style="text-align:right;font-weight:600">${fmt(r.inversion||0,2)}</td>
-        <td style="text-align:right;font-weight:600">${leadsVal}</td>
-        <td style="font-size:12px;font-weight:600;color:var(--amber);text-align:right">${cpl!=='-'?cpl+'€':'-'}</td>
+        <td>${isSocial?`<input class="ce" type="number" inputmode="numeric" value="${segVal||''}" oninput="upMetaSeg('${mk}',${i},this.value)" placeholder="Seguidores" style="text-align:right;background:rgba(24,119,242,0.06)">`:`<span style="font-weight:600">${displayLeads}</span>`}</td>
+        <td style="font-size:12px;font-weight:600;color:var(--amber);text-align:right">${metaCpl}</td>
         <td><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:#e7f3ff;color:#1877f2;font-weight:700">META</span></td>
       </tr>`;
     }
@@ -1197,6 +1201,7 @@ function renderKpiDRows(mk){
 }
 function upKD(mk,i,f,v){S.kpis_diarios[mk][i][f]=v;save();renderKpisD();}
 function upKDText(mk,i,f,v){S.kpis_diarios[mk][i][f]=v;save();}
+function upMetaSeg(mk,i,v){S.kpis_diarios[mk][i].seguidores=parseNum(v);save();renderKpisD();}
 function upKDNum(mk,i,f,v){
   S.kpis_diarios[mk][i][f]=parseNum(v);
   save();
