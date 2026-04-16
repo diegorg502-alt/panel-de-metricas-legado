@@ -1139,60 +1139,120 @@ function addLlamadaRow(mi){
 function renderKpisD(){
   const mk=mKey(curMonth);if(!S.kpis_diarios[mk])S.kpis_diarios[mk]=[];if(!S.ads[mk])S.ads[mk]=[];
   const rows=S.kpis_diarios[mk];
-  const canalTotals=CANALES.map(canal=>{const cr=rows.filter(r=>r.canal===canal);const inv=cr.reduce((s,r)=>s+Number(r.inversion||0),0);const leads=cr.reduce((s,r)=>s+Number(r.leads||0)+Number(r.seguidores||0),0);return{canal,inv,leads,cpl:leads&&inv?inv/leads:null};}).filter(c=>c.inv>0||c.leads>0);
   const totalInv=rows.reduce((s,r)=>s+Number(r.inversion||0),0);
   const totalLeads=rows.reduce((s,r)=>s+Number(r.leads||0)+Number(r.seguidores||0),0);
   const totalCpl=totalLeads&&totalInv?totalInv/totalLeads:null;
-  const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
+
+  // Group by canal
+  const canalesActivos=CANALES.filter(canal=>rows.some(r=>r.canal===canal));
+
+  // Build per-canal sections
+  const canalSections=canalesActivos.map(canal=>{
+    const cr=rows.filter(r=>r.canal===canal);
+    const inv=cr.reduce((s,r)=>s+Number(r.inversion||0),0);
+    const leads=cr.reduce((s,r)=>s+Number(r.leads||0)+Number(r.seguidores||0),0);
+    const cpl=leads&&inv?inv/leads:null;
+    const isSocial=cr.some(r=>r.seguidores!==undefined&&!r.leads);
+    const labelResult=isSocial?'Seguidores':'Resultados';
+    const labelCost=isSocial?'Coste/Seguidor':'CPL';
+
+    return`<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
+      <div style="padding:14px 18px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="this.parentElement.querySelector('.kpid-canal-body').classList.toggle('open');this.querySelector('.nav-arr').classList.toggle('open')">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="badge b-blue" style="font-size:12px">${canal}</span>
+          <span style="font-size:12px;color:var(--text2)">Inversión: <b style="color:var(--blue)">${fmt(inv,2)}</b></span>
+          <span style="font-size:12px;color:var(--text2)">${labelResult}: <b>${leads}</b></span>
+          <span style="font-size:12px;color:var(--text2)">${labelCost}: <b style="color:var(--amber)">${cpl?fmt(cpl,2):'-'}</b></span>
+        </div>
+        <svg class="nav-arr open" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><polyline points="2,4 6,8 10,4"/></svg>
+      </div>
+      <div class="kpid-canal-body open" style="display:none">
+        <div class="tw"><table>
+          <thead><tr><th style="width:80px;text-align:center">Día</th><th style="width:140px;text-align:right">Inversión (€)</th><th style="width:120px;text-align:right">${labelResult}</th><th style="width:100px;text-align:right">${labelCost}</th><th style="width:60px"></th></tr></thead>
+          <tbody id="kpid-body-${canal}"></tbody>
+          <tfoot><tr><td style="font-weight:600">Total</td><td style="text-align:right;font-weight:600">${fmt(inv,2)}</td><td style="text-align:right;font-weight:600">${leads}</td><td style="text-align:right;font-weight:600;color:var(--amber)">${cpl?fmt(cpl,2):'-'}</td><td></td></tr></tfoot>
+        </table></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Ads grouped by canal
+  const allAds=S.ads[mk]||[];
+  const adCanales=[...new Set(allAds.map(a=>a.canal))];
+  const adSections=adCanales.map(canal=>{
+    const cAds=allAds.filter(a=>a.canal===canal);
+    return`<div style="margin-bottom:16px">
+      <div style="margin-bottom:8px"><span class="badge b-blue">${canal}</span></div>
+      ${cAds.map((ad,i)=>{
+        const globalIdx=allAds.indexOf(ad);
+        return`<div class="ad-card">
+          <span class="ad-num">TOP ${i+1}</span>
+          <div style="flex:1">
+            <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:6px;align-items:center">
+              <input class="ce" value="${esc(ad.nombre)}" oninput="upAd('${mk}',${globalIdx},'nombre',this.value)" placeholder="Nombre del ad" style="font-weight:600;font-size:13px">
+            </div>
+            ${ad.url?`<a href="${esc(ad.url)}" target="_blank" style="font-size:11px;color:var(--blue);display:block;margin-bottom:8px;text-decoration:none;word-break:break-all">${esc(ad.url)}</a>`:'<input class="ce" value="" oninput="upAd(\''+mk+'\','+globalIdx+',\'url\',this.value)" placeholder="URL del anuncio" style="font-size:12px;color:var(--blue);display:block;width:100%;margin-bottom:8px">'}
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div><div class="ml" style="font-size:10px">Inversión (€)</div><div style="font-size:13px;font-weight:600;padding-top:4px">${ad.inversion?fmt(ad.inversion,2):'-'}</div></div>
+              <div><div class="ml" style="font-size:10px">Resultados</div><div style="font-size:13px;font-weight:600;padding-top:4px">${ad.leads||'-'}</div></div>
+              <div><div class="ml" style="font-size:10px">CPL</div><div style="font-size:13px;font-weight:600;padding-top:4px;color:var(--amber)">${ad.leads&&ad.inversion?fmt(ad.inversion/ad.leads,2):'-'}</div></div>
+            </div>
+          </div>
+          <button class="btn btn-red btn-xs" onclick="delAd('${mk}',${globalIdx})">✕</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+
   document.getElementById('content').innerHTML=`
-    ${canalTotals.length?`<div class="card" style="margin-bottom:14px"><div class="card-title">Resumen por canal — ${MFULL[curMonth]} ${curYear}</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
-        ${canalTotals.map(c=>`<div style="background:var(--bg2);border-radius:9px;padding:12px"><div style="margin-bottom:8px"><span class="badge ${cbc[c.canal]}">${c.canal}</span></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-            <div><div class="ml">Inversión</div><div id="canal-inv-${c.canal}" style="font-weight:600;font-size:14px">${fmt(c.inv,2)}</div></div>
-            <div><div class="ml">Leads</div><div id="canal-leads-${c.canal}" style="font-weight:600;font-size:14px">${c.leads}</div></div>
-            <div><div class="ml">CPL</div><div id="canal-cpl-${c.canal}" style="font-weight:600;font-size:14px;color:var(--amber)">${c.cpl?fmt(c.cpl,2):'-'}</div></div>
-          </div></div>`).join('')}
-      </div></div>`:''}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
       <div class="metric"><div class="ml">Inversión total</div><div class="mv blue" id="kpid-sum-inv">${fmt(totalInv,2)}</div></div>
       <div class="metric"><div class="ml">Leads / Seguidores</div><div class="mv" id="kpid-sum-leads">${totalLeads}</div></div>
       <div class="metric"><div class="ml">CPL total</div><div class="mv amber" id="kpid-sum-cpl">${totalCpl?fmt(totalCpl,2):'-'}</div></div>
     </div>
-    <div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
-      <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:13px;font-weight:600">Registro diario — ${MFULL[curMonth]} ${curYear}</div>
-        <button class="btn btn-p btn-xs" onclick="addKpiRow('${mk}')">+ Añadir día</button>
-      </div>
-      <div class="tw"><table>
-        <thead><tr><th style="width:60px">Día</th><th style="width:120px">Canal</th><th style="width:140px;text-align:right">Inversión (€)</th><th style="width:120px;text-align:right">Leads / Seg.</th><th style="width:100px;text-align:right">CPL</th><th style="width:60px"></th></tr></thead>
-        <tbody id="kpid-body"></tbody>
-        <tfoot><tr><td colspan="2">Total</td><td id="kpid-total-inv">${fmt(totalInv,2)}</td><td id="kpid-total-leads">${totalLeads}</td><td id="kpid-total-cpl">${totalCpl?fmt(totalCpl,2):'-'}</td><td></td></tr></tfoot>
-      </table></div>
-    </div>
+    ${canalSections}
+    ${!canalesActivos.length?'<div class="card"><div class="empty">Sin datos este mes. Los datos de Meta se sincronizan automáticamente cada día.</div></div>':''}
     <div class="card">
       <div class="card-title">Ads Ganadores — ${MFULL[curMonth]} ${curYear}<button class="btn btn-xs" onclick="addAd('${mk}')">+ Añadir</button></div>
       <div id="ads-list">
-        ${(S.ads[mk]||[]).length===0?'<div class="empty" style="padding:16px">Sin ads este mes.</div>':''}
-        ${(S.ads[mk]||[]).map((ad,i)=>`<div class="ad-card">
-          <span class="ad-num">TOP ${i+1}</span>
-          <div style="flex:1">
-            <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:6px;align-items:center">
-              <input class="ce" value="${esc(ad.nombre)}" oninput="upAd('${mk}',${i},'nombre',this.value)" placeholder="Nombre del ad" style="font-weight:600;font-size:13px">
-              <select class="ce" onchange="upAd('${mk}',${i},'canal',this.value)" style="min-width:100px;font-size:12px">${CANALES.map(c=>`<option value="${c}"${ad.canal===c?' selected':''}>${c}</option>`).join('')}</select>
-            </div>
-            <input class="ce" value="${esc(ad.url)}" oninput="upAd('${mk}',${i},'url',this.value)" placeholder="URL del anuncio" style="font-size:12px;color:var(--blue);display:block;width:100%;margin-bottom:8px">
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-              <div><div class="ml" style="font-size:10px">Inversión (€)</div><input class="ce" type="number" inputmode="numeric" value="${ad.inversion||''}" oninput="upAdNum('${mk}',${i},'inversion',this.value)" placeholder="0" style="font-size:12px"></div>
-              <div><div class="ml" style="font-size:10px">Leads</div><input class="ce" type="number" inputmode="numeric" value="${ad.leads||''}" oninput="upAdNum('${mk}',${i},'leads',this.value)" placeholder="0" style="font-size:12px"></div>
-              <div><div class="ml" style="font-size:10px">CPL</div><div style="font-size:13px;font-weight:600;padding-top:6px;color:var(--amber)">${ad.leads&&ad.inversion?fmt(ad.inversion/ad.leads,2):'-'}</div></div>
-            </div>
-          </div>
-          <button class="btn btn-red btn-xs" onclick="delAd('${mk}',${i})">✕</button>
-        </div>`).join('')}
+        ${!allAds.length?'<div class="empty" style="padding:16px">Sin ads este mes.</div>':''}
+        ${adSections}
       </div>
     </div>`;
-  renderKpiDRows(mk);
+  // Render rows per canal
+  canalesActivos.forEach(canal=>{
+    const tbody=document.getElementById(`kpid-body-${canal}`);if(!tbody)return;
+    const cr=rows.map((r,i)=>({...r,_idx:i})).filter(r=>r.canal===canal);
+    tbody.innerHTML=cr.map(r=>{
+      const i=r._idx;
+      const leadsVal=r.leads||r.seguidores||0;
+      const cpl=leadsVal&&r.inversion?(r.inversion/leadsVal).toFixed(2):'-';
+      const isMeta=r.source==='meta';
+      const diaStr=isMeta?(r.dia?(r.dia.includes('-')?r.dia.split('-')[2]:r.dia):''):(r.dia||'');
+      if(isMeta){
+        const isSocial=!r.leads&&(r.seguidores!==undefined||leadsVal===0);
+        const segVal=r.seguidores||0;
+        const displayLeads=r.leads||0;
+        const metaCpl=isSocial?(segVal>0?fmt(r.inversion/segVal,2):'-'):(cpl!=='-'?cpl:'-');
+        return`<tr style="background:rgba(24,119,242,0.04)">
+          <td style="text-align:center;font-weight:600;color:var(--text2)">${diaStr}</td>
+          <td style="text-align:right;font-weight:600">${fmt(r.inversion||0,2)}</td>
+          <td style="text-align:right">${isSocial?`<input class="ce" type="number" inputmode="numeric" value="${segVal||''}" oninput="upMetaSeg('${mk}',${i},this.value)" placeholder="Seguidores" style="text-align:right;background:rgba(24,119,242,0.06)">`:`<span style="font-weight:600">${displayLeads}</span>`}</td>
+          <td style="text-align:right;font-weight:600;color:var(--amber)">${metaCpl}</td>
+          <td><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:#e7f3ff;color:#1877f2;font-weight:700">META</span></td>
+        </tr>`;
+      }
+      return`<tr>
+        <td><input class="ce" value="${r.dia||''}" oninput="upKDText('${mk}',${i},'dia',this.value)" placeholder="Día" style="text-align:center;max-width:60px"></td>
+        <td><input class="ce" type="text" inputmode="decimal" value="${r.inversion||''}" oninput="upKDNum('${mk}',${i},'inversion',this.value)" placeholder="0" style="text-align:right"></td>
+        <td><input class="ce" type="number" inputmode="numeric" value="${r.leads||''}" oninput="upKDNum('${mk}',${i},'leads',this.value)" placeholder="0" style="text-align:right"></td>
+        <td id="cpl-${i}" style="font-size:12px;font-weight:600;color:var(--amber);text-align:right">${cpl!=='-'?cpl:'-'}</td>
+        <td><button class="btn btn-red btn-xs" onclick="delKD('${mk}',${i})">✕</button></td>
+      </tr>`;
+    }).join('');
+  });
+  // Toggle open by default
+  document.querySelectorAll('.kpid-canal-body').forEach(el=>el.style.display='block');
 }
 function renderKpiDRows(mk){
   const rows=S.kpis_diarios[mk]||[];const tbody=document.getElementById('kpid-body');if(!tbody)return;
