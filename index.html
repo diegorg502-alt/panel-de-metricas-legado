@@ -719,15 +719,21 @@ function getBajasMes(year, monthIdx) {
   const hoy = new Date();
   hoy.setHours(0,0,0,0);
   return S.cuotas.filter(c => {
+    // Priority: use fechaPerdido if available (webhook from GHL)
+    if (c.perdido && c.fechaPerdido) {
+      const fp = new Date(c.fechaPerdido);
+      fp.setHours(0,0,0,0);
+      return fp >= mesStart && fp <= mesEnd;
+    }
+    // For PRO/BUSINESS without perdido flag, they're NOT bajas (they auto-renew)
+    if (['PRO','BUSINESS'].includes(c.plan)) return false;
+    // For ANUAL or non-plan clients, use vencimiento logic
     const venc = new Date(getVenc(c));
     venc.setHours(0,0,0,0);
-    // Vencimiento debe estar en este mes
     if (venc < mesStart || venc > mesEnd) return false;
-    // Al menos 1 día desde el vencimiento
     const unDiaDespues = new Date(venc);
     unDiaDespues.setDate(unDiaDespues.getDate() + 1);
     if (hoy < unDiaDespues) return false;
-    // Sin renovación posterior al vencimiento
     const tieneRenov = S.renovaciones.some(r =>
       r.nombre === c.nombre && new Date(r.fechaInicio) >= unDiaDespues
     );
@@ -1640,10 +1646,21 @@ function renderCuotas(){
       const mediaRenovs = getMediaRenovacionesMensual();
       const bajasAnio = MONTHS.map((_,mi) => getBajasMes(curYear, mi));
       const renovsAnio = MONTHS.map((_,mi) => getRenovacionesMes(curYear, mi));
+      // Altas por mes: clientes nuevos cuya fechaInicio cae en ese mes (no renovaciones, no perdidos)
+      const altasAnio = MONTHS.map((_,mi) => {
+        return S.cuotas.filter(c => {
+          if (!c.fechaInicio) return false;
+          const d = new Date(c.fechaInicio);
+          return d.getFullYear()===curYear && d.getMonth()===mi && c.source!=='auto-renew';
+        });
+      });
+      const totalAltas = altasAnio.reduce((s,a)=>s+a.length,0);
+      const mesesAltas = altasAnio.filter(a=>a.length>0).length;
+      const mediaAltas = mesesAltas?Math.round(totalAltas/mesesAltas):0;
       const hoyM = new Date().getMonth();
       const hoyY = new Date().getFullYear();
 
-      function fila(titulo, emoji, datosAnio, colorPos, colorPosL, colorNeg, colorNegL, mediaVal) {
+      function fila(titulo, emoji, datosAnio, colorPos, colorPosL, mediaVal) {
         return `<div class="card" style="margin-bottom:10px;padding:14px 18px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
             <span style="font-size:13px;font-weight:600">${emoji} ${titulo} — ${curYear}</span>
@@ -1656,18 +1673,18 @@ function renderCuotas(){
               const esMesActual=mi===hoyM&&curYear===hoyY;
               const color=n>0?colorPos:esMesActual?'var(--blue)':'var(--text3)';
               const bg=n>0?colorPosL:esMesActual?'var(--blue-l)':'var(--bg2)';
-              return `<div style="border-radius:8px;padding:8px 4px;background:${bg}">
-                <div style="font-size:10px;font-weight:600;text-transform:uppercase;color:${color};margin-bottom:4px">${m}</div>
-                <div style="font-size:20px;font-weight:700;color:${color};line-height:1">${n}</div>
-                ${n>0?`<div style="font-size:9px;color:var(--text3);margin-top:3px;line-height:1.3">${items.map(c=>c.nombre.split(' ')[0]).join(', ')}</div>`:''}
+              return `<div style="border-radius:8px;padding:10px 4px;background:${bg}">
+                <div style="font-size:10px;font-weight:600;text-transform:uppercase;color:${color};margin-bottom:6px">${m}</div>
+                <div style="font-size:22px;font-weight:700;color:${color};line-height:1">${n}</div>
               </div>`;
             }).join('')}
           </div>
         </div>`;
       }
 
-      return fila('Bajas por mes','📉',bajasAnio,'var(--red)','var(--red-l)','var(--text3)','var(--bg2)',mediaBajas)
-           + fila('Renovaciones por mes','🔄',renovsAnio,'var(--green)','var(--green-l)','var(--text3)','var(--bg2)',mediaRenovs);
+      return fila('Altas por mes','📈',altasAnio,'var(--green)','var(--green-l)',mediaAltas)
+           + fila('Bajas por mes','📉',bajasAnio,'var(--red)','var(--red-l)',mediaBajas)
+           + fila('Renovaciones por mes','🔄',renovsAnio,'var(--blue)','var(--blue-l)',mediaRenovs);
     })()}
     <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Caja por cobrar desde ${MFULL[todayM]} (día ${todayDayOfMonth()}) en adelante.</div>`:''}
     <div class="card" style="padding:0;overflow:hidden">
