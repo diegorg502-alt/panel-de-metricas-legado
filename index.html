@@ -334,6 +334,12 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
           </div>
           <div id="lanz-sub-items"></div>
         </div>
+        <div id="utms-nav-section" style="display:none">
+          <div class="nav-g">Marketing</div>
+          <div class="nav-i" id="ni-utms" onclick="goTo('utms')">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M2 8 L14 8 M8 2 L8 14"/><circle cx="8" cy="8" r="6"/></svg>UTMs
+          </div>
+        </div>
       </nav>
       <div class="sb-foot">
         <div class="sb-sync"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Conectando...</span></div>
@@ -388,6 +394,9 @@ let RECORD_ID='';
 let CLIENT_NOMBRE='';
 let SEMANAS_MODO=false; // true = use weeks for vencimiento
 let HAS_LANZAMIENTOS=false; // true = show lanzamientos section
+let SHOW_RENOVACIONES=true; // false = hide renovaciones section (auto-renew clients)
+let HAS_UTMS=false; // true = show UTMs section
+let HAS_PLANES=false; // true = show plan selector in llamadas
 let curLanzamiento=''; // current selected launch id
 
 let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[]};
@@ -523,8 +532,13 @@ async function loadClientConfig(email){
     ENTRENADOR_EMAIL=data.entrenador_email||'';
     SEMANAS_MODO=data.semanas_modo||false;
     HAS_LANZAMIENTOS=data.has_lanzamientos||false;
+    SHOW_RENOVACIONES=data.show_renovaciones!==false; // default true
+    HAS_UTMS=data.has_utms||false;
+    HAS_PLANES=data.has_planes||false;
     // Auto-enable lanzamientos if client has LANZAMIENTO or WORKSHOP channels
     if(!HAS_LANZAMIENTOS&&CANALES.some(c=>c.toUpperCase().includes('LANZAMIENTO')||c.toUpperCase().includes('WORKSHOP')))HAS_LANZAMIENTOS=true;
+    // Auto-enable UTMs + planes for Zerochats-like clients (auto-renew)
+    if(data.auto_renew){SHOW_RENOVACIONES=false;HAS_UTMS=true;HAS_PLANES=true;}
     // Update UI
     const sbbrand=document.querySelector('#sb-brand-text');if(sbbrand)sbbrand.textContent='CRM · '+CLIENT_NOMBRE;
     const sbfoot=document.querySelector('.sb-foot div:last-child');if(sbfoot)sbfoot.textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
@@ -827,6 +841,12 @@ function buildSidebar(){
       lanzSub.appendChild(d);
     });
   } else if(lanzNav){ lanzNav.style.display='none'; }
+  // UTMs nav
+  const utmsNav=document.getElementById('utms-nav-section');
+  if(utmsNav)utmsNav.style.display=HAS_UTMS?'block':'none';
+  // Hide renovaciones if auto-renew
+  const niRenov=document.getElementById('ni-renovaciones');
+  if(niRenov)niRenov.style.display=SHOW_RENOVACIONES?'':'none';
   // Hide sections for entrenador
   if(isEntrenador){
     ['nhdr-mes','nhdr-kd','ni-dashboard','ni-objetivos'].forEach(id=>{
@@ -843,12 +863,12 @@ function toggleG(id){document.getElementById(`nhdr-${id}`).classList.toggle('ope
 function goTo(page,month,lanzId){
   if(month!==undefined)curMonth=month;if(lanzId!==undefined)curLanzamiento=lanzId;curPage=page;
   document.querySelectorAll('.nav-i').forEach(el=>el.classList.remove('active'));
-  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance',lanzamientos:'ni-lanzamientos'};
+  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance',lanzamientos:'ni-lanzamientos',utms:'ni-utms'};
   if(ids[page])document.getElementById(ids[page])?.classList.add('active');
   if(page==='mes')document.getElementById(`ni-mes-${MONTHS[curMonth]}`)?.classList.add('active');
   if(page==='kpis_d')document.getElementById(`ni-kd-${MONTHS[curMonth]}`)?.classList.add('active');
   if(page==='lanzamiento_detail')document.getElementById(`ni-lanz-${curLanzamiento}`)?.classList.add('active');
-  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación',ia:'Conversa con la IA',balance:'Balance',lanzamientos:'Lanzamientos'};
+  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación',ia:'Conversa con la IA',balance:'Balance',lanzamientos:'Lanzamientos',utms:'UTMs'};
   updateAlertaBadge();
   let pageTitle=titles[page]||(page==='mes'?`Llamadas — ${MFULL[curMonth]} ${curYear}`:page==='kpis_d'?`KPIs diarios — ${MFULL[curMonth]} ${curYear}`:'');
   if(page==='lanzamiento_detail'){const lz=(S.lanzamientos||[]).find(l=>l.id===curLanzamiento);pageTitle=lz?lz.nombre:'Lanzamiento';}
@@ -859,7 +879,8 @@ function goTo(page,month,lanzId){
   if(page==='renovaciones'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva renovación';b.onclick=openAddRenov;ex.appendChild(b);}
   if(page==='lanzamientos'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nuevo lanzamiento';b.onclick=openAddLanzamiento;ex.appendChild(b);}
   if(page==='lanzamiento_detail'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLanzRow(curLanzamiento);ex.appendChild(b);const bd=document.createElement('button');bd.className='btn btn-red';bd.textContent='Eliminar lanzamiento';bd.style.marginLeft='8px';bd.onclick=()=>deleteLanzamiento(curLanzamiento);ex.appendChild(bd);}
-  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,ia:renderIA,mes:renderMes,kpis_d:renderKpisD,balance:renderBalance,lanzamientos:renderLanzamientos,lanzamiento_detail:renderLanzamientoDetail}[page]||renderDashboard)();
+  if(page==='utms'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva UTM';b.onclick=openAddUtm;ex.appendChild(b);}
+  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,ia:renderIA,mes:renderMes,kpis_d:renderKpisD,balance:renderBalance,lanzamientos:renderLanzamientos,lanzamiento_detail:renderLanzamientoDetail,utms:renderUTMs}[page]||renderDashboard)();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────
@@ -1028,7 +1049,7 @@ function renderMes(){
     </div>
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:32px">
       <div class="tw"><table id="lt">
-        <thead><tr><th style="min-width:160px">Nombre</th><th style="min-width:120px">Fecha</th><th style="min-width:120px">Teléfono</th><th style="min-width:110px">Embudo</th><th style="min-width:90px">Closer</th>${SETTERS.length?'<th style="min-width:100px">Setter</th>':''}${SEMANAS_MODO?'<th style="min-width:140px">Semanas</th>':''}<th style="min-width:100px">Asistencia</th><th style="min-width:90px">Incidencia</th><th style="min-width:120px">Estado</th><th style="min-width:120px">Entrenador</th><th style="min-width:110px">Facturación</th><th style="min-width:90px">Caja</th><th style="min-width:90px">Cuotas</th><th style="min-width:120px">Meses servicio</th><th style="min-width:180px">Comentarios</th><th></th></tr></thead>
+        <thead><tr><th style="min-width:160px">Nombre</th><th style="min-width:120px">Fecha</th><th style="min-width:120px">Teléfono</th><th style="min-width:110px">Embudo</th><th style="min-width:90px">Closer</th>${SETTERS.length?'<th style="min-width:100px">Setter</th>':''}${SEMANAS_MODO?'<th style="min-width:140px">Semanas</th>':''}<th style="min-width:100px">Asistencia</th><th style="min-width:90px">Incidencia</th><th style="min-width:120px">Estado</th>${ENTRENADORES.length>1?'<th style="min-width:120px">Entrenador</th>':''}${HAS_PLANES?'<th style="min-width:120px">Plan</th>':''}<th style="min-width:110px">Facturación</th><th style="min-width:90px">Caja</th><th style="min-width:90px">Cuotas</th><th style="min-width:120px">Meses servicio</th><th style="min-width:180px">Comentarios</th><th></th></tr></thead>
         <tbody id="lb"></tbody>
       </table></div>
     </div>
@@ -1048,7 +1069,8 @@ function renderLlamadasRows(mk){
     <td><select class="ce" onchange="upL('${mk}',${i},'asistencia',this.value)" style="min-width:95px"><option value="">-</option>${['SI','NO','PENDIENTE'].map(v=>`<option value="${v}"${r.asistencia===v?' selected':''}>${v}</option>`).join('')}</select></td>
     <td><input class="ce" value="${esc(r.incidencia)}" oninput="upL('${mk}',${i},'incidencia',this.value)" placeholder="-" style="min-width:70px"></td>
     <td><select class="ce" onchange="upLEstado('${mk}',${i},this.value)" style="min-width:110px"><option value="">-</option>${ESTADOS.map(v=>`<option value="${v}"${r.estado===v?' selected':''}>${v}</option>`).join('')}</select></td>
-    <td><select class="ce" onchange="upLEntrenador('${mk}',${i},this.value)">${ENTRENADORES.map(e=>`<option value="${e}"${r.entrenador===e?' selected':''}>${e||'Sin asignar'}</option>`).join('')}</select></td>
+    ${ENTRENADORES.length>1?`<td><select class="ce" onchange="upLEntrenador('${mk}',${i},this.value)">${ENTRENADORES.map(e=>`<option value="${e}"${r.entrenador===e?' selected':''}>${e||'Sin asignar'}</option>`).join('')}</select></td>`:''}
+    ${HAS_PLANES?`<td><select class="ce" onchange="upLPlan('${mk}',${i},this.value)" style="min-width:110px"><option value="">-</option>${['PRO','BUSINESS','ANUAL'].map(p=>`<option value="${p}"${r.plan===p?' selected':''}>${p}</option>`).join('')}</select></td>`:''}
     <td><input class="ce" type="number" inputmode="numeric" value="${r.facturacion||''}" oninput="upLNum('${mk}',${i},'facturacion',this.value)" placeholder="0" style="text-align:right"></td>
     <td><input class="ce" type="number" inputmode="numeric" value="${r.caja||''}" oninput="upLNum('${mk}',${i},'caja',this.value)" placeholder="0" style="text-align:right"></td>
     <td><select class="ce" onchange="upLNum('${mk}',${i},'nCuotas',this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${Number(r.nCuotas)===n?' selected':''}>${n===1?'1 (único)':n}</option>`).join('')}</select></td>
@@ -1068,6 +1090,18 @@ function upLNum(mk,i,f,v){
   save();
   // Always re-render mes to reflect updated vencimiento badges
   if(f==='mesesServicio') renderLlamadasRows(mk);
+}
+function upLPlan(mk,i,plan){
+  const row=S.llamadas[mk][i];
+  row.plan=plan;
+  // Auto-fill facturación + caja based on plan
+  const PLAN_AMOUNTS={PRO:247,BUSINESS:397,ANUAL:4000};
+  if(plan && PLAN_AMOUNTS[plan]){
+    row.facturacion=PLAN_AMOUNTS[plan];
+    row.caja=PLAN_AMOUNTS[plan];
+    row.mesesServicio=plan==='ANUAL'?12:1;
+  }
+  save();syncCuota(mk,i);renderLlamadasRows(mk);
 }
 function upLSemanas(mk,i,val){
   S.llamadas[mk][i].semanas=parseInt(val)||0;
@@ -2431,6 +2465,74 @@ function deleteLanzamiento(lanzId){
   delete S.llamadas[`lanz_${lanzId}`];
   delete S.kpis_diarios[`lanz_${lanzId}`];
   save();buildSidebar();goTo('lanzamientos');
+}
+
+// ── UTMs ─────────────────────────────────────────────────
+function renderUTMs(){
+  if(!S.utms)S.utms=[];
+  const c=document.getElementById('content');
+  if(!S.utms.length){
+    c.innerHTML='<div class="empty">No hay UTMs guardadas.<br><br><button class="btn btn-p" onclick="openAddUtm()">+ Añadir primera UTM</button></div>';
+    return;
+  }
+  // Group by conjunto
+  const byConjunto={};
+  S.utms.forEach((u,i)=>{
+    const key=u.conjunto||'Principal';
+    if(!byConjunto[key])byConjunto[key]=[];
+    byConjunto[key].push({...u,_idx:i});
+  });
+  let html='<div class="sec-title">UTMs</div>';
+  Object.entries(byConjunto).forEach(([conjunto,utms])=>{
+    html+=`<div class="card" style="margin-bottom:14px">
+      <div class="card-title">${esc(conjunto)}<span style="font-size:11px;color:var(--text3);font-weight:400">${utms.length} anuncios</span></div>
+      <div class="tw"><table>
+        <thead><tr><th style="min-width:180px">Nombre del anuncio</th><th style="min-width:120px">Conjunto</th><th style="min-width:300px">URL</th><th style="width:120px"></th></tr></thead>
+        <tbody>
+          ${utms.map(u=>`<tr>
+            <td><input class="ce" value="${esc(u.nombre)}" oninput="upUtm(${u._idx},'nombre',this.value)" placeholder="Nombre del anuncio"></td>
+            <td><input class="ce" value="${esc(u.conjunto)}" oninput="upUtm(${u._idx},'conjunto',this.value)" placeholder="Conjunto"></td>
+            <td><input class="ce" value="${esc(u.url)}" oninput="upUtm(${u._idx},'url',this.value)" placeholder="https://..." style="color:var(--blue)"></td>
+            <td style="text-align:right">
+              <button class="btn btn-xs" onclick="copyUtmUrl(${u._idx})">📋 Copiar</button>
+              <button class="btn btn-red btn-xs" onclick="delUtm(${u._idx})">✕</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+  });
+  c.innerHTML=html;
+}
+
+function upUtm(i,f,v){S.utms[i][f]=v;save();}
+function delUtm(i){if(!confirm('¿Eliminar esta UTM?'))return;S.utms.splice(i,1);save();renderUTMs();}
+function copyUtmUrl(i){navigator.clipboard.writeText(S.utms[i].url);setSyncStatus('ok','URL copiada ✓');}
+
+function openAddUtm(){
+  const conjuntos=[...new Set((S.utms||[]).map(u=>u.conjunto).filter(Boolean))];
+  const html=`<div class="mtitle">Nueva UTM</div>
+    <div class="fg"><label class="fl">Nombre del anuncio</label><input class="fi" id="utm-nombre" placeholder="Ej: Anuncio reel post it"></div>
+    <div class="fg"><label class="fl">Conjunto</label>
+      <input class="fi" id="utm-conjunto" list="utm-conjuntos" placeholder="Nombre del conjunto">
+      <datalist id="utm-conjuntos">${conjuntos.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+    </div>
+    <div class="fg"><label class="fl">URL con UTMs</label><input class="fi" id="utm-url" placeholder="https://..."></div>
+    <div class="mfooter">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-p" onclick="doAddUtm()">Crear UTM</button>
+    </div>`;
+  openModal(html);
+}
+
+function doAddUtm(){
+  const nombre=document.getElementById('utm-nombre').value.trim();
+  const conjunto=document.getElementById('utm-conjunto').value.trim()||'Principal';
+  const url=document.getElementById('utm-url').value.trim();
+  if(!nombre||!url){alert('Nombre y URL son obligatorios');return;}
+  if(!S.utms)S.utms=[];
+  S.utms.push({nombre,conjunto,url});
+  save();closeModal();renderUTMs();
 }
 
 // ── BALANCE ───────────────────────────────────────────────
