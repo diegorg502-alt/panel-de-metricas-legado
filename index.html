@@ -800,7 +800,7 @@ function edate(d,m){const dt=new Date(d);dt.setMonth(dt.getMonth()+m);return dt.
 function daysDiff(d){return Math.round((new Date(d)-new Date())/86400000)}
 function alertInfo(v){const d=daysDiff(v);if(d<0)return{label:'Vencido',cls:'b-red',ai:'red'};if(d<30)return{label:'Renovar ya',cls:'b-amber',ai:'amber'};if(d<60)return{label:'Próximo',cls:'b-blue',ai:''};return{label:'Activo',cls:'b-green',ai:''};}
 function getVenc(c){const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);if(rs.length){const last=rs.sort((a,b)=>new Date(b.fechaInicio)-new Date(a.fechaInicio))[0];const lastMeses=Number(last.mesesServicio)||Number(last.nCuotas)||1;return edate(last.fechaInicio,lastMeses);}const meses=Number(c.mesesServicio)||1;return edate(c.fechaInicio,meses);}
-function isActive(c){const v=getVenc(c),t=new Date();return new Date(c.fechaInicio)<=t&&new Date(v)>=t;}
+function isActive(c){if(c.perdido)return false;const v=getVenc(c),t=new Date();return new Date(c.fechaInicio)<=t&&new Date(v)>=t;}
 function mKey(i){return`${curYear}-${String(i+1).padStart(2,'0')}`}
 function esc(s){return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
 function todayMonth(){return new Date().getMonth();}
@@ -1690,10 +1690,13 @@ function renderCuotasFiltered(){
   if(!tbody){renderCuotas();return;}
   tbody.innerHTML=filtered.map((c,ci)=>{
     const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const ltv=Number(c.ticket||0)+rs.reduce((s,r)=>s+Number(r.ticket||0),0);
-    const venc=getVenc(c);const inf=alertInfo(venc);const cm=c.nCuotas?Math.round(Number(c.ticket||0)/c.nCuotas):Number(c.ticket||0);
+    const venc=getVenc(c);const inf=c.perdido?{label:'Perdido',cls:'b-red',ai:'red'}:alertInfo(venc);
+    const cm=c.nCuotas?Math.round(Number(c.ticket||0)/c.nCuotas):Number(c.ticket||0);
     const origIdx=S.cuotas.indexOf(c);
-    return`<tr><td><input class="ce" value="${esc(c.nombre)}" oninput="upCuota(${origIdx},'nombre',this.value)" style="font-weight:600;min-width:120px"></td>
-      <td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--blue-l);color:var(--blue)">${c.entrenador||'Sin asignar'}</span></td>
+    const rowStyle=c.perdido?'background:#fef2f2;opacity:.75':'';
+    const nameCell=c.perdido?`<div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;text-decoration:line-through">${esc(c.nombre)}</span><span style="font-size:9px;padding:1px 6px;border-radius:10px;background:#fee2e2;color:#c81e1e;font-weight:700">PERDIDO ${c.fechaPerdido||''}</span></div>`:`<input class="ce" value="${esc(c.nombre)}" oninput="upCuota(${origIdx},'nombre',this.value)" style="font-weight:600;min-width:120px">`;
+    return`<tr style="${rowStyle}"><td>${nameCell}</td>
+      <td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--blue-l);color:var(--blue)">${c.entrenador||(c.plan?'Plan '+c.plan:'Sin asignar')}</span></td>
       <td><input class="ce" type="date" value="${c.fechaInicio}" oninput="upCuota(${origIdx},'fechaInicio',this.value)"></td>
       <td style="text-align:center">${c.nCuotas}</td>
       <td><input class="ce" type="number" inputmode="numeric" value="${c.ticket}" oninput="upCuotaNum(${origIdx},'ticket',this.value)" style="text-align:right;min-width:70px"></td>
@@ -1702,7 +1705,7 @@ function renderCuotasFiltered(){
         const isPast=curYear<new Date().getFullYear()||(curYear===new Date().getFullYear()&&mi<todayM);
         const isCur=curYear===new Date().getFullYear()&&mi===todayM;
         return`<td style="text-align:center;${isPast?'opacity:.5':isCur?'background:#fff9e6':''}">${total>0?`<span class="cpaid">${fmt(total)}</span>`:`<span class="cpen">—</span>`}</td>`;}).join('')}
-      <td style="font-size:12px;white-space:nowrap">${venc}</td><td><span class="badge ${inf.cls}">${inf.label}</span></td>
+      <td style="font-size:12px;white-space:nowrap">${c.perdido?(c.fechaPerdido||''):venc}</td><td><span class="badge ${inf.cls}">${inf.label}</span></td>
       <td style="text-align:center">${rs.length}</td><td style="font-weight:600">${fmt(ltv)}</td></tr>`;
   }).join('');
   // restore focus
