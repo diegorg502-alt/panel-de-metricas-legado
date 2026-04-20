@@ -403,6 +403,8 @@ let HAS_LANZAMIENTOS=false; // true = show lanzamientos section
 let SHOW_RENOVACIONES=true; // false = hide renovaciones section (auto-renew clients)
 let HAS_UTMS=false; // true = show UTMs section
 let HAS_PLANES=false; // true = show plan selector in llamadas
+let SHOW_ALERTAS=true; // false = hide alerts section
+let SHOW_IA=true; // false = hide IA chat section
 let curLanzamiento=''; // current selected launch id
 
 let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[]};
@@ -544,7 +546,8 @@ async function loadClientConfig(email){
     // Auto-enable lanzamientos if client has LANZAMIENTO or WORKSHOP channels
     if(!HAS_LANZAMIENTOS&&CANALES.some(c=>c.toUpperCase().includes('LANZAMIENTO')||c.toUpperCase().includes('WORKSHOP')))HAS_LANZAMIENTOS=true;
     // Auto-enable UTMs + planes for Zerochats-like clients (auto-renew)
-    if(data.auto_renew){SHOW_RENOVACIONES=false;HAS_UTMS=true;HAS_PLANES=true;}
+    // Also hide alertas and IA chat for these clients (until matching is fully set up)
+    if(data.auto_renew){SHOW_RENOVACIONES=false;HAS_UTMS=true;HAS_PLANES=true;SHOW_ALERTAS=false;SHOW_IA=false;}
     // Update UI
     const sbbrand=document.querySelector('#sb-brand-text');if(sbbrand)sbbrand.textContent='CRM · '+CLIENT_NOMBRE;
     const sbfoot=document.querySelector('.sb-foot div:last-child');if(sbfoot)sbfoot.textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
@@ -869,6 +872,11 @@ function buildSidebar(){
   // Hide renovaciones if auto-renew
   const niRenov=document.getElementById('ni-renovaciones');
   if(niRenov)niRenov.style.display=SHOW_RENOVACIONES?'':'none';
+  // Hide alertas and IA for auto-renew clients (Zerochats)
+  const niAlertas=document.getElementById('ni-alertas');
+  if(niAlertas)niAlertas.style.display=(typeof SHOW_ALERTAS!=='undefined'&&!SHOW_ALERTAS)?'none':'';
+  const niIa=document.getElementById('ni-ia');
+  if(niIa)niIa.style.display=(typeof SHOW_IA!=='undefined'&&!SHOW_IA)?'none':'';
   // Hide sections for entrenador
   if(isEntrenador){
     ['nhdr-mes','nhdr-kd','ni-dashboard','ni-objetivos'].forEach(id=>{
