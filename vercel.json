@@ -1,1 +1,26 @@
-{"rewrites":[{"source":"/(.*)","destination":"/index.html"}]}
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "has": [{"type": "header", "key": "user-agent", "value": "(?i).*(gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|anthropic-ai|ccbot|perplexitybot|google-extended|bytespider|amazonbot|applebot-extended|facebookbot|meta-externalagent|dataforseobot|semrushbot|ahrefsbot|mj12bot|dotbot|python-requests|scrapy|curl|wget|httpclient|axios|node-fetch).*"}],
+      "destination": "/403.html"
+    },
+    {"source": "/(.*)", "destination": "/index.html"}
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {"key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive, nosnippet, noimageindex"},
+        {"key": "X-Frame-Options", "value": "DENY"},
+        {"key": "X-Content-Type-Options", "value": "nosniff"},
+        {"key": "Referrer-Policy", "value": "no-referrer"},
+        {"key": "Permissions-Policy", "value": "interest-cohort=()"}
+      ]
+    }
+  ]
+}
