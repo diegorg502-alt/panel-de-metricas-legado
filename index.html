@@ -405,6 +405,7 @@ let HAS_UTMS=false; // true = show UTMs section
 let HAS_PLANES=false; // true = show plan selector in llamadas
 let SHOW_ALERTAS=true; // false = hide alerts section
 let SHOW_IA=true; // false = hide IA chat section
+let SHOW_ADS_GANADORES=true; // false = hide winning ads section
 let curLanzamiento=''; // current selected launch id
 
 let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[]};
@@ -547,7 +548,7 @@ async function loadClientConfig(email){
     if(!HAS_LANZAMIENTOS&&CANALES.some(c=>c.toUpperCase().includes('LANZAMIENTO')||c.toUpperCase().includes('WORKSHOP')))HAS_LANZAMIENTOS=true;
     // Auto-enable UTMs + planes for Zerochats-like clients (auto-renew)
     // Also hide alertas and IA chat for these clients (until matching is fully set up)
-    if(data.auto_renew){SHOW_RENOVACIONES=false;HAS_UTMS=true;HAS_PLANES=true;SHOW_ALERTAS=false;SHOW_IA=false;}
+    if(data.auto_renew){SHOW_RENOVACIONES=false;HAS_UTMS=true;HAS_PLANES=true;SHOW_ALERTAS=false;SHOW_IA=false;SHOW_ADS_GANADORES=false;}
     // Update UI
     const sbbrand=document.querySelector('#sb-brand-text');if(sbbrand)sbbrand.textContent='CRM · '+CLIENT_NOMBRE;
     const sbfoot=document.querySelector('.sb-foot div:last-child');if(sbfoot)sbfoot.textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
@@ -1276,13 +1277,13 @@ function renderKpisD(){
     </div>
     ${canalSections}
     ${!canalesActivos.length?'<div class="card"><div class="empty">Sin datos este mes. Los datos de Meta se sincronizan automáticamente cada día.</div></div>':''}
-    <div class="card">
+    ${typeof SHOW_ADS_GANADORES==='undefined'||SHOW_ADS_GANADORES?`<div class="card">
       <div class="card-title">Ads Ganadores — ${MFULL[curMonth]} ${curYear}<button class="btn btn-xs" onclick="addAd('${mk}')">+ Añadir</button></div>
       <div id="ads-list">
         ${!allAds.length?'<div class="empty" style="padding:16px">Sin ads este mes.</div>':''}
         ${adSections}
       </div>
-    </div>`;
+    </div>`:''}`;
   // Render rows per canal
   canalesActivos.forEach(canal=>{
     const tbody=document.getElementById(`kpid-body-${canal}`);if(!tbody)return;
