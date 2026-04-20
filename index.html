@@ -938,6 +938,7 @@ function renderDashboard(){
   const activos=S.cuotas.filter(isActive).length;
   const proximos=S.cuotas.filter(c=>{const d=daysDiff(getVenc(c));return d>=0&&d<30;}).length;
   const ltv_med=S.cuotas.length?Math.round(S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);return s+Number(c.ticket||0)+rs.reduce((x,r)=>x+Number(r.ticket||0),0);},0)/S.cuotas.length):0;
+  const ticketMedioAnual=ventas.length?ventas.reduce((s,l)=>s+ticketMensualizado(l),0)/ventas.length:0;
   if(!S.contactados)S.contactados=[];
   const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple','VSL ADS':'b-purple','ADS':'b-purple',QUIZ:'b-amber',WORKSHOP:'b-blue',LANZAMIENTO:'b-amber',GOOGLE:'b-red','ORGÁNICO':'b-green',ORGANICO:'b-green',REFERIDOS:'b-gray'};
   const canalRowBg={YOUTUBE:'var(--red-l)',SOCIAL:'var(--blue-l)',VSL:'var(--purple-l)','VSL ADS':'var(--purple-l)','ADS':'var(--purple-l)',QUIZ:'var(--amber-l)',WORKSHOP:'var(--blue-l)',LANZAMIENTO:'var(--amber-l)',GOOGLE:'var(--red-l)','ORGÁNICO':'var(--green-l)',ORGANICO:'var(--green-l)',REFERIDOS:'var(--bg3)'};
@@ -956,6 +957,7 @@ function renderDashboard(){
       <div class="metric"><div class="ml">Media bajas/mes</div><div class="mv ${getMediaBajasMensual()>2?'amber':''}">${getMediaBajasMensual()}</div></div>
       <div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${S.renovaciones.length}</div></div>
       <div class="metric"><div class="ml">LTV medio</div><div class="mv">${fmt(ltv_med)}</div></div>
+      ${HAS_TICKET_MENSUAL?`<div class="metric"><div class="ml">Ticket medio</div><div class="mv purple">${fmt(ticketMedioAnual,0)}</div></div>`:''}
       <div class="metric"><div class="ml">% Cierre global</div><div class="mv">${pct(ventas.length,allL.length)}%</div></div>
     </div>
     <div class="sec-title">KPIs por canal</div>
