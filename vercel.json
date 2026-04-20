@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/(.*)",
-      "has": [{"type": "header", "key": "user-agent", "value": "(?i).*(gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|anthropic-ai|ccbot|perplexitybot|google-extended|bytespider|amazonbot|applebot-extended|facebookbot|meta-externalagent|dataforseobot|semrushbot|ahrefsbot|mj12bot|dotbot|python-requests|scrapy|curl|wget|httpclient|axios|node-fetch).*"}],
+      "has": [{"type": "header", "key": "user-agent", "value": ".*(GPTBot|ChatGPT-User|OAI-SearchBot|ClaudeBot|Claude-Web|claudebot|anthropic-ai|CCBot|PerplexityBot|Google-Extended|Bytespider|Amazonbot|Applebot-Extended|FacebookBot|Meta-ExternalAgent|DataForSeoBot|SemrushBot|AhrefsBot|MJ12bot|DotBot|python-requests|Scrapy|curl/|Wget/|HttpClient|axios/|node-fetch).*"}],
       "destination": "/403.html"
     },
     {"source": "/(.*)", "destination": "/index.html"}
