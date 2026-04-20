@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-:root{--bg:#fff;--bg2:#f8f8f7;--bg3:#f0f0ee;--border:rgba(0,0,0,.07);--border2:rgba(0,0,0,.13);--text:#111;--text2:#555;--text3:#999;--blue:#1a6bdb;--blue-l:#eff6ff;--green:#057a55;--green-l:#f0fdf4;--amber:#b45309;--amber-l:#fffbeb;--red:#c81e1e;--red-l:#fef2f2;--purple:#6d28d9;--purple-l:#f5f3ff;--sidebar:232px;--font:'Inter',sans-serif;}
+:root{--bg:#fff;--bg2:#fafaf9;--bg3:#f4f4f2;--border:rgba(0,0,0,.06);--border2:rgba(0,0,0,.09);--text:#0a0a0a;--text2:#525252;--text3:#a3a3a3;--blue:#1a6bdb;--blue-l:#eff6ff;--green:#057a55;--green-l:#f0fdf4;--amber:#b45309;--amber-l:#fffbeb;--red:#c81e1e;--red-l:#fef2f2;--purple:#6d28d9;--purple-l:#f5f3ff;--sidebar:232px;--font:'Inter',sans-serif;--shadow:0 1px 2px rgba(0,0,0,.04),0 0 0 1px rgba(0,0,0,.05);--shadow-h:0 2px 8px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.06);}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 /* LOGIN */
@@ -67,7 +67,7 @@ aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border
 .btn-token-renew:hover{background:#dbeafe}
 .topbar{height:50px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:10px;flex-shrink:0;background:var(--bg)}
 .topbar-title{font-size:14px;font-weight:600;flex:1}
-.content{flex:1;overflow-y:auto;padding:22px;background:var(--bg2)}
+.content{flex:1;overflow-y:auto;padding:28px 32px;background:#fff}
 .btn{padding:7px 13px;border:1px solid var(--border2);border-radius:7px;background:var(--bg);font-family:var(--font);font-size:13px;font-weight:500;color:var(--text);cursor:pointer;transition:all .12s;white-space:nowrap}
 .btn:hover{background:var(--bg3)}
 .btn-p{background:var(--text);color:#fff;border-color:transparent}
@@ -75,28 +75,40 @@ aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border
 .btn-xs{padding:3px 8px;font-size:11px}
 .btn-red{background:var(--red-l);color:var(--red);border-color:#fecaca}
 .btn-red:hover{background:#fee2e2}
-.card{background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:18px 20px;margin-bottom:14px}
-.card-title{font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
-.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
-.metric{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
-.ml{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:7px}
-.mv{font-size:22px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.card{background:var(--bg);border-radius:12px;padding:20px 22px;margin-bottom:18px;box-shadow:var(--shadow);transition:box-shadow .15s}
+.card-title{font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;letter-spacing:-.005em}
+.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:22px}
+.metric{background:var(--bg);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);transition:box-shadow .15s}
+.metric:hover{box-shadow:var(--shadow-h)}
+.ml{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:7px}
+.mv{font-size:22px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .mv.blue{color:var(--blue)}.mv.green{color:var(--green)}.mv.amber{color:var(--amber)}.mv.red{color:var(--red)}.mv.purple{color:var(--purple)}
 .tw{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;padding:8px 9px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap;background:var(--bg2)}
-td{padding:5px 6px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
-tr:last-child td{border-bottom:none}
-tbody tr:hover td{background:var(--bg2)}
+th{text-align:left;padding:11px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);border-bottom:1.5px solid var(--border2);white-space:nowrap;background:#fff;vertical-align:bottom}
+td{padding:10px 12px;border-top:1px solid var(--border);color:var(--text);vertical-align:middle}
+tbody tr:first-child td{border-top:none}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:rgba(0,0,0,.02)}
 .ce{background:transparent;border:none;font-family:var(--font);font-size:13px;color:var(--text);width:100%;padding:3px 5px;border-radius:5px;min-width:55px}
 .ce:focus{outline:none;background:#f0f4ff;box-shadow:0 0 0 1px var(--blue)}
 .ce:hover:not(:focus){background:var(--bg3)}
 select.ce{cursor:pointer}
 input[type=number].ce::-webkit-inner-spin-button,input[type=number].ce::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 input[type=number].ce{-moz-appearance:textfield}
-.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge{display:inline-flex;align-items:center;padding:3px 11px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
 .b-green{background:var(--green-l);color:var(--green)}.b-amber{background:var(--amber-l);color:var(--amber)}.b-red{background:var(--red-l);color:var(--red)}.b-blue{background:var(--blue-l);color:var(--blue)}.b-gray{background:var(--bg3);color:var(--text2)}.b-purple{background:var(--purple-l);color:var(--purple)}
-.sec-title{font-size:16px;font-weight:600;margin-bottom:18px}
+.sec-title{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-bottom:22px;color:var(--text)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:#fff;border:1px solid var(--border2);font-size:12px;color:var(--text2);cursor:pointer;transition:all .12s;font-weight:500;font-family:var(--font);position:relative}
+.chip:hover{border-color:var(--text3);color:var(--text)}
+.chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+.chip .x{opacity:.6;font-size:14px;line-height:1;margin-left:2px;cursor:pointer;padding:0 2px}
+.chip .x:hover{opacity:1}
+.chip-reset{color:var(--text3);background:transparent;border:1px dashed var(--border2)}
+.chip-reset:hover{color:var(--text);border-color:var(--text3)}
+.chip select.chip-native{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:none;background:transparent;font-size:0;color:transparent;appearance:none}
+.filters-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--bg2);border-radius:12px 12px 0 0}
+.filters-bar .flabel{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-right:4px}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .empty{text-align:center;padding:32px;color:var(--text3);font-size:13px}
 .moverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:300;align-items:center;justify-content:center;padding:16px}
@@ -403,6 +415,7 @@ let HAS_LANZAMIENTOS=false; // true = show lanzamientos section
 let SHOW_RENOVACIONES=true; // false = hide renovaciones section (auto-renew clients)
 let HAS_UTMS=false; // true = show UTMs section
 let HAS_PLANES=false; // true = show plan selector in llamadas
+let HAS_TICKET_MENSUAL=false; // true = show Ticket medio con plan ANUAL dividido /12 (solo Zerochats por ahora)
 let MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:''};
 let SHOW_ALERTAS=true; // false = hide alerts section
 let SHOW_IA=true; // false = hide IA chat section
@@ -549,7 +562,7 @@ async function loadClientConfig(email){
     if(!HAS_LANZAMIENTOS&&CANALES.some(c=>c.toUpperCase().includes('LANZAMIENTO')||c.toUpperCase().includes('WORKSHOP')))HAS_LANZAMIENTOS=true;
     // Auto-enable UTMs + planes for Zerochats-like clients (auto-renew)
     // Also hide alertas and IA chat for these clients (until matching is fully set up)
-    if(data.auto_renew){SHOW_RENOVACIONES=false;HAS_UTMS=true;HAS_PLANES=true;SHOW_ALERTAS=false;SHOW_IA=false;SHOW_ADS_GANADORES=false;}
+    if(data.auto_renew){SHOW_RENOVACIONES=false;HAS_UTMS=true;HAS_PLANES=true;SHOW_ALERTAS=false;SHOW_IA=false;SHOW_ADS_GANADORES=false;HAS_TICKET_MENSUAL=true;}
     // Update UI
     const sbbrand=document.querySelector('#sb-brand-text');if(sbbrand)sbbrand.textContent='CRM · '+CLIENT_NOMBRE;
     const sbfoot=document.querySelector('.sb-foot div:last-child');if(sbfoot)sbfoot.textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
@@ -925,6 +938,7 @@ function renderDashboard(){
   const activos=S.cuotas.filter(isActive).length;
   const proximos=S.cuotas.filter(c=>{const d=daysDiff(getVenc(c));return d>=0&&d<30;}).length;
   const ltv_med=S.cuotas.length?Math.round(S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);return s+Number(c.ticket||0)+rs.reduce((x,r)=>x+Number(r.ticket||0),0);},0)/S.cuotas.length):0;
+  const ticketMedioAnual=ventas.length?ventas.reduce((s,l)=>s+ticketMensualizado(l),0)/ventas.length:0;
   if(!S.contactados)S.contactados=[];
   const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple','VSL ADS':'b-purple','ADS':'b-purple',QUIZ:'b-amber',WORKSHOP:'b-blue',LANZAMIENTO:'b-amber',GOOGLE:'b-red','ORGÁNICO':'b-green',ORGANICO:'b-green',REFERIDOS:'b-gray'};
   const canalRowBg={YOUTUBE:'var(--red-l)',SOCIAL:'var(--blue-l)',VSL:'var(--purple-l)','VSL ADS':'var(--purple-l)','ADS':'var(--purple-l)',QUIZ:'var(--amber-l)',WORKSHOP:'var(--blue-l)',LANZAMIENTO:'var(--amber-l)',GOOGLE:'var(--red-l)','ORGÁNICO':'var(--green-l)',ORGANICO:'var(--green-l)',REFERIDOS:'var(--bg3)'};
@@ -943,6 +957,7 @@ function renderDashboard(){
       <div class="metric"><div class="ml">Media bajas/mes</div><div class="mv ${getMediaBajasMensual()>2?'amber':''}">${getMediaBajasMensual()}</div></div>
       <div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${S.renovaciones.length}</div></div>
       <div class="metric"><div class="ml">LTV medio</div><div class="mv">${fmt(ltv_med)}</div></div>
+      ${HAS_TICKET_MENSUAL?`<div class="metric"><div class="ml">Ticket medio</div><div class="mv purple">${fmt(ticketMedioAnual,0)}</div></div>`:''}
       <div class="metric"><div class="ml">% Cierre global</div><div class="mv">${pct(ventas.length,allL.length)}%</div></div>
     </div>
     <div class="sec-title">KPIs por canal</div>
@@ -967,6 +982,7 @@ function renderDashboard(){
 }
 
 // ── MES ───────────────────────────────────────────────────
+function ticketMensualizado(r){const f=Number(r.facturacion||0);return r.plan==='ANUAL'?f/12:f;}
 function kpisCanal(mk, canal){
   const rows=S.llamadas[mk]||[];
   const cl=rows.filter(r=>r.embudo===canal);
@@ -978,7 +994,8 @@ function kpisCanal(mk, canal){
   const fact=cv.reduce((s,r)=>s+Number(r.facturacion||0),0);
   const caja=cv.reduce((s,r)=>s+Number(r.caja||0),0);
   const llamadas=cl.length;
-  return{inv,leads,llamadas,realizadas,ventas:cv.length,fact,caja,
+  const ticketMedio=cv.length?cv.reduce((s,r)=>s+ticketMensualizado(r),0)/cv.length:null;
+  return{inv,leads,llamadas,realizadas,ventas:cv.length,fact,caja,ticketMedio,
     cpl:leads&&inv?inv/leads:null,
     costeLlamada:llamadas&&inv?inv/llamadas:null,
     pctAgend:leads?llamadas/leads:null,
@@ -1028,6 +1045,7 @@ function renderMes(){
   const pctAsist=llamadasTotal?realizadas/llamadasTotal:null;
   const pctCierre=realizadas?ventas.length/realizadas:null;
   const roas=inv?fact/inv:null;const roi=inv?caja/inv:null;const cpa=ventas.length&&inv?inv/ventas.length:null;
+  const ticketMedio=ventas.length?ventas.reduce((s,r)=>s+ticketMensualizado(r),0)/ventas.length:null;
 
   const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple','VSL ADS':'b-purple','ADS':'b-purple',QUIZ:'b-amber',WORKSHOP:'b-blue',LANZAMIENTO:'b-amber',GOOGLE:'b-red','ORGÁNICO':'b-green',ORGANICO:'b-green',REFERIDOS:'b-gray'};
 
@@ -1048,6 +1066,7 @@ function renderMes(){
         ['% Asistencia',ks.pctAsist!=null?(ks.pctAsist*100).toFixed(1)+'%':'-',''],
         ['Realizadas',ks.realizadas,''],['% Cierre',ks.pctCierre!=null?(ks.pctCierre*100).toFixed(1)+'%':'-','blue'],
         ['Ventas',ks.ventas,'green'],['Facturación',fmt(ks.fact),'blue'],['Caja',fmt(ks.caja),'green'],
+        ...(HAS_TICKET_MENSUAL?[['Ticket medio',ks.ticketMedio?fmt(ks.ticketMedio,0):'-','purple']]:[]),
         ['ROAS',ks.roas?ks.roas.toFixed(2)+'x':'-','amber'],['ROI',ks.roi?ks.roi.toFixed(2)+'x':'-','purple'],['CPA',ks.cpa?fmt(ks.cpa,2):'-','']
       ].map(([l,v,c])=>kpiCard(l,v,c,true)).join('')}
     </div>`;
@@ -1061,7 +1080,8 @@ function renderMes(){
       ${[
         ['Llamadas',kr.llamadas,''],['% Asistencia',kr.pctAsist!=null?(kr.pctAsist*100).toFixed(1)+'%':'-',''],
         ['Realizadas',kr.realizadas,''],['% Cierre',kr.pctCierre!=null?(kr.pctCierre*100).toFixed(1)+'%':'-','blue'],
-        ['Ventas',kr.ventas,'green'],['Facturación',fmt(kr.fact),'blue'],['Caja',fmt(kr.caja),'green']
+        ['Ventas',kr.ventas,'green'],['Facturación',fmt(kr.fact),'blue'],['Caja',fmt(kr.caja),'green'],
+        ...(HAS_TICKET_MENSUAL?[['Ticket medio',kr.ticketMedio?fmt(kr.ticketMedio,0):'-','purple']]:[])
       ].map(([l,v,c])=>kpiCard(l,v,c,true)).join('')}
     </div>`;
     acordeonesHTML+=acordeon(canal,canal,cbc[canal]||'b-gray',refMetricas,false);
@@ -1077,6 +1097,7 @@ function renderMes(){
           ['€/Llamada',costeLlamada?fmt(costeLlamada,2):'-','amber'],['% Asistencia',pctAsist!=null?(pctAsist*100).toFixed(1)+'%':'-',''],
           ['Realizadas',realizadas,''],['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue'],
           ['Ventas',ventas.length,'green'],['Facturación',fmt(fact),'blue'],['Caja',fmt(caja),'green'],
+          ...(HAS_TICKET_MENSUAL?[['Ticket medio',ticketMedio?fmt(ticketMedio,0):'-','purple']]:[]),
           ['ROAS',roas?roas.toFixed(2)+'x':'-','amber'],['ROI',roi?roi.toFixed(2)+'x':'-','purple'],['CPA',cpa?fmt(cpa,2):'-','']
         ].map(([l,v,c])=>`<div class="kpi-m"><div class="ml">${l}</div><div class="mv ${c}" style="font-size:16px">${v}</div></div>`).join('')}
       </div>
@@ -1086,24 +1107,31 @@ function renderMes(){
       ${acordeonesHTML}
     </div>
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:32px">
-      <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-        <div style="font-size:12px;font-weight:600;color:var(--text2)">Registro de llamadas</div>
-        <div style="display:flex;align-items:center;gap:8px"><span id="fcount" style="font-size:11px;color:var(--text3)"></span><button class="btn btn-xs" onclick="resetMesFilters()" style="font-size:11px">Limpiar filtros</button></div>
+      <div class="filters-bar">
+        <span class="flabel">Filtros</span>
+        ${filterChip('embudo','Embudo',['',...CANALES])}
+        ${filterChip('closer','Closer',['',...CLOSERS])}
+        ${filterChip('asistencia','Asistencia',['','SI','NO','PENDIENTE'])}
+        ${filterChip('estado','Estado',['',...ESTADOS])}
+        ${HAS_PLANES?filterChip('plan','Plan',['','PRO','BUSINESS','ANUAL']):''}
+        <div style="flex:1"></div>
+        <span id="fcount" style="font-size:11px;color:var(--text3)"></span>
+        <div class="chip chip-reset" onclick="resetMesFilters()">Limpiar</div>
       </div>
       <div class="tw"><table id="lt">
         <thead><tr>
           <th style="min-width:160px">Nombre</th>
           <th style="min-width:120px">Fecha</th>
           <th style="min-width:120px">Teléfono</th>
-          <th style="min-width:110px">Embudo${filterSelect('embudo',['',...CANALES])}</th>
-          <th style="min-width:90px">Closer${filterSelect('closer',['',...CLOSERS])}</th>
+          <th style="min-width:110px">Embudo</th>
+          <th style="min-width:90px">Closer</th>
           ${SETTERS.length?'<th style="min-width:100px">Setter</th>':''}
           ${SEMANAS_MODO?'<th style="min-width:140px">Semanas</th>':''}
-          <th style="min-width:100px">Asistencia${filterSelect('asistencia',['','SI','NO','PENDIENTE'])}</th>
+          <th style="min-width:100px">Asistencia</th>
           <th style="min-width:90px">Incidencia</th>
-          <th style="min-width:120px">Estado${filterSelect('estado',['',...ESTADOS])}</th>
+          <th style="min-width:120px">Estado</th>
           ${ENTRENADORES.length>1?'<th style="min-width:120px">Entrenador</th>':''}
-          ${HAS_PLANES?`<th style="min-width:120px">Plan${filterSelect('plan',['','PRO','BUSINESS','ANUAL'])}</th>`:''}
+          ${HAS_PLANES?`<th style="min-width:120px">Plan</th>`:''}
           <th style="min-width:110px">Facturación</th>
           <th style="min-width:90px">Caja</th>
           <th style="min-width:90px">Cuotas</th>
@@ -1117,9 +1145,11 @@ function renderMes(){
     `;
   renderLlamadasRows(mk);
 }
-function filterSelect(field,opts){
+function filterChip(field,label,opts){
   const v=MES_FILTERS[field]||'';
-  return `<div style="margin-top:4px"><select class="ce" onchange="setMesFilter('${field}',this.value)" style="width:100%;font-size:11px;padding:2px 4px;font-weight:400">${opts.map(o=>`<option value="${esc(o)}"${v===o?' selected':''}>${o===''?'Todos':esc(o)}</option>`).join('')}</select></div>`;
+  const active=!!v;
+  const displayText=active?`${label}: ${v}`:label;
+  return `<label class="chip ${active?'active':''}"><span>${esc(displayText)}</span>${active?`<span class="x" onclick="event.stopPropagation();event.preventDefault();setMesFilter('${field}','')">×</span>`:''}<select class="chip-native" onchange="setMesFilter('${field}',this.value)">${opts.map(o=>`<option value="${esc(o)}"${v===o?' selected':''}>${o===''?'Todos':esc(o)}</option>`).join('')}</select></label>`;
 }
 function setMesFilter(field,value){MES_FILTERS[field]=value;renderLlamadasRows(mKey(curMonth));}
 function resetMesFilters(){MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:''};renderMes();}
