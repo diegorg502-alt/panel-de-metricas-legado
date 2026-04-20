@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Preview rediseño — CRM</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fff;--bg2:#fafaf9;--bg3:#f4f4f2;
+  --border:rgba(0,0,0,.06);--border2:rgba(0,0,0,.09);
+  --text:#0a0a0a;--text2:#525252;--text3:#a3a3a3;
+  --blue:#1a6bdb;--blue-l:#eff6ff;
+  --green:#057a55;--green-l:#f0fdf4;
+  --amber:#b45309;--amber-l:#fffbeb;
+  --red:#c81e1e;--red-l:#fef2f2;
+  --purple:#6d28d9;--purple-l:#f5f3ff;
+  --shadow:0 1px 2px rgba(0,0,0,.04), 0 0 0 1px rgba(0,0,0,.04);
+  --shadow-hover:0 2px 8px rgba(0,0,0,.06), 0 0 0 1px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#fff;color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.tabular{font-variant-numeric:tabular-nums}
+
+/* Layout */
+.layout{display:flex;min-height:100vh}
+.sb{width:232px;border-right:1px solid var(--border);padding:18px 0;background:#fff;position:sticky;top:0;height:100vh;overflow-y:auto}
+.main{flex:1;padding:28px 40px;max-width:1400px}
+
+/* Sidebar */
+.sb-brand{padding:0 18px 20px;font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase}
+.sb-g{padding:14px 18px 6px;font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.1em;text-transform:uppercase}
+.sb-i{display:flex;align-items:center;gap:10px;padding:8px 18px;font-size:13px;color:var(--text2);cursor:pointer;border-radius:0;transition:background .12s}
+.sb-i:hover{background:var(--bg2);color:var(--text)}
+.sb-i.active{background:#000;color:#fff;font-weight:600}
+.sb-i .dot{width:6px;height:6px;border-radius:50%;background:var(--text3)}
+
+/* Section titles */
+.page-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px;letter-spacing:.02em}
+.page-h1{font-size:28px;font-weight:800;letter-spacing:-.02em;margin-bottom:28px;color:var(--text)}
+.sec-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.sec-h2{font-size:16px;font-weight:700;letter-spacing:-.01em;margin-bottom:14px;color:var(--text)}
+
+/* Metric grid */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:28px}
+.metric{background:#fff;border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);transition:box-shadow .15s}
+.metric:hover{box-shadow:var(--shadow-hover)}
+.metric .label{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.metric .value{font-size:22px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--text)}
+.metric .value.blue{color:var(--blue)}
+.metric .value.green{color:var(--green)}
+.metric .value.amber{color:var(--amber)}
+.metric .value.red{color:var(--red)}
+.metric .value.purple{color:var(--purple)}
+.metric .trend{font-size:11px;color:var(--green);font-weight:600;margin-top:4px}
+.metric .trend.down{color:var(--red)}
+
+/* Cards */
+.card{background:#fff;border-radius:12px;box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden}
+.card-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.card-head .title{font-size:13px;font-weight:700;letter-spacing:-.005em}
+.card-head .meta{font-size:11px;color:var(--text3)}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+thead th{background:#fff;text-align:left;padding:10px 16px;font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;border-bottom:1.5px solid var(--border2);white-space:nowrap;vertical-align:bottom}
+thead th.ralign{text-align:right}
+tbody td{padding:13px 16px;border-top:1px solid var(--border);vertical-align:middle}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:rgba(0,0,0,.02)}
+tbody tr.venta{background:var(--green-l)}
+tbody tr.perdido{background:var(--red-l)}
+tbody tr.reserva{background:var(--blue-l)}
+tfoot td{padding:12px 16px;font-weight:700;background:var(--bg3);border-top:1.5px solid var(--border2)}
+.ralign{text-align:right}
+
+/* KPIs por canal — con acento lateral */
+.kpi-row{position:relative}
+.kpi-row td:first-child{position:relative;padding-left:20px}
+.kpi-row td:first-child::before{content:'';position:absolute;left:0;top:20%;bottom:20%;width:2px;border-radius:2px}
+.kpi-row.c-organic td:first-child::before{background:var(--green)}
+.kpi-row.c-ads td:first-child::before{background:var(--purple)}
+.kpi-row.c-referidos td:first-child::before{background:var(--text3)}
+.kpi-row.c-youtube td:first-child::before{background:var(--red)}
+.kpi-row.c-social td:first-child::before{background:var(--blue)}
+.kpi-row.c-organic{background:rgba(5,122,85,.025)}
+.kpi-row.c-ads{background:rgba(109,40,217,.025)}
+.kpi-row.c-referidos{background:rgba(0,0,0,.015)}
+
+/* Badges — pill */
+.badge{display:inline-flex;align-items:center;padding:3px 11px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.b-green{background:var(--green-l);color:var(--green)}
+.b-amber{background:var(--amber-l);color:var(--amber)}
+.b-red{background:var(--red-l);color:var(--red)}
+.b-blue{background:var(--blue-l);color:var(--blue)}
+.b-purple{background:var(--purple-l);color:var(--purple)}
+.b-gray{background:var(--bg3);color:var(--text2)}
+
+/* Colores de valor */
+.t-blue{color:var(--blue)}
+.t-green{color:var(--green)}
+.t-amber{color:var(--amber)}
+.t-red{color:var(--red)}
+.t-purple{color:var(--purple)}
+.t-gray{color:var(--text3)}
+
+/* Filter chips */
+.filters-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.filters-bar .flabel{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-right:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:#fff;border:1px solid var(--border2);font-size:12px;color:var(--text2);cursor:pointer;transition:all .12s;font-weight:500}
+.chip:hover{border-color:var(--text3);color:var(--text)}
+.chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+.chip .x{opacity:.6;font-size:14px;line-height:1}
+.chip-reset{color:var(--text3);background:transparent;border:1px dashed var(--border2)}
+
+/* Input filter-select (alternative, kept for comparison) */
+.filter-sel{width:100%;padding:4px 8px;font-size:11px;border:1px solid var(--border);border-radius:6px;background:#fff;margin-top:6px;color:var(--text2)}
+
+/* Row cells */
+.cell-input{width:100%;padding:6px 10px;border:1px solid transparent;border-radius:7px;background:transparent;font-family:inherit;font-size:13px;color:var(--text);transition:all .12s}
+.cell-input:hover{background:var(--bg2)}
+.cell-input:focus{outline:none;background:#fff;border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,107,219,.12)}
+
+/* Sub-tag (colored accent) for table header */
+.th-filter{display:block;margin-top:6px;font-weight:500;text-transform:none;letter-spacing:0}
+
+/* Small hr */
+.hr{height:1px;background:var(--border);margin:32px 0}
+.note{background:var(--amber-l);border:1px solid #fde68a;border-radius:10px;padding:12px 16px;font-size:12px;color:var(--amber);margin-bottom:20px}
+.note b{font-weight:700}
+
+.wrap-compare{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+@media (max-width:1000px){.wrap-compare{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sb">
+    <div class="sb-brand">CRM · Zerochats</div>
+    <div class="sb-g">Principal</div>
+    <div class="sb-i active"><span class="dot" style="background:#fff"></span>Dashboard</div>
+    <div class="sb-i"><span class="dot"></span>Objetivos</div>
+    <div class="sb-i"><span class="dot"></span>Balance</div>
+    <div class="sb-g">Registros</div>
+    <div class="sb-i"><span class="dot"></span>KPIs por mes ▾</div>
+    <div class="sb-i"><span class="dot"></span>KPIs diarios ▾</div>
+    <div class="sb-g">Seguimiento</div>
+    <div class="sb-i"><span class="dot"></span>Cuotas</div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <div class="note"><b>Preview de rediseño</b> — esta pantalla es solo visual con datos mock. No está aplicado al CRM. Compara con el actual y dime qué mantener/cambiar antes de llevarlo a index.html.</div>
+
+    <div class="page-title">Resumen 2026</div>
+    <h1 class="page-h1">Dashboard</h1>
+
+    <!-- MÉTRICAS -->
+    <div class="sec-label">Métricas principales</div>
+    <div class="metrics">
+      <div class="metric"><div class="label">Facturación total</div><div class="value blue">167.536 €</div><div class="trend">↑ 12% vs mes ant.</div></div>
+      <div class="metric"><div class="label">Caja cobrada</div><div class="value green">142.759 €</div><div class="trend">↑ 8%</div></div>
+      <div class="metric"><div class="label">Bola de nieve</div><div class="value amber">24.777 €</div></div>
+      <div class="metric"><div class="label">Ventas cerradas</div><div class="value green">123</div></div>
+      <div class="metric"><div class="label">Reservas</div><div class="value blue">1</div></div>
+      <div class="metric"><div class="label">Activos hoy</div><div class="value">124</div></div>
+      <div class="metric"><div class="label">Próx. vencimiento</div><div class="value red">9</div></div>
+      <div class="metric"><div class="label">Media bajas/mes</div><div class="value">0</div></div>
+      <div class="metric"><div class="label">Renovaciones</div><div class="value purple">0</div></div>
+      <div class="metric"><div class="label">LTV medio</div><div class="value">1.355 €</div></div>
+      <div class="metric"><div class="label">% Cierre global</div><div class="value">79%</div></div>
+    </div>
+
+    <!-- KPIS POR CANAL -->
+    <div class="sec-label">KPIs por canal</div>
+    <div class="card">
+      <div class="card-head">
+        <div class="title">Rendimiento por canal — 2026</div>
+        <div class="meta">Actualizado hoy · 06:00</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Canal</th>
+            <th class="ralign">Inversión</th>
+            <th class="ralign">Leads</th>
+            <th class="ralign">CPL</th>
+            <th class="ralign">Llamadas</th>
+            <th class="ralign">% Agenda.</th>
+            <th class="ralign">€/Llamada</th>
+            <th class="ralign">Realizadas</th>
+            <th class="ralign">% Asist.</th>
+            <th class="ralign">% Cierre</th>
+            <th class="ralign">Ventas</th>
+            <th class="ralign">Facturación</th>
+            <th class="ralign">Caja</th>
+            <th class="ralign">ROAS</th>
+            <th class="ralign">ROI</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="kpi-row c-organic">
+            <td><span class="badge b-green">ORGÁNICO</span></td>
+            <td class="ralign t-gray">0 €</td>
+            <td class="ralign t-gray">0</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign">8</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign">8</td>
+            <td class="ralign">100%</td>
+            <td class="ralign">100%</td>
+            <td class="ralign t-green"><b>8</b></td>
+            <td class="ralign t-blue"><b>15.687 €</b></td>
+            <td class="ralign t-green">13.687 €</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign t-gray">—</td>
+          </tr>
+          <tr class="kpi-row c-ads">
+            <td><span class="badge b-purple">ADS</span></td>
+            <td class="ralign t-red">5.073 €</td>
+            <td class="ralign">276</td>
+            <td class="ralign t-amber">18,38 €</td>
+            <td class="ralign">28</td>
+            <td class="ralign">10,1%</td>
+            <td class="ralign t-amber">181,17 €</td>
+            <td class="ralign">21</td>
+            <td class="ralign">75,0%</td>
+            <td class="ralign">109,5%</td>
+            <td class="ralign t-green"><b>23</b></td>
+            <td class="ralign t-blue"><b>36.251 €</b></td>
+            <td class="ralign t-green">28.747 €</td>
+            <td class="ralign t-amber"><b>7,15x</b></td>
+            <td class="ralign t-purple"><b>5,67x</b></td>
+          </tr>
+          <tr class="kpi-row c-referidos">
+            <td><span class="badge b-gray">REFERIDOS</span></td>
+            <td class="ralign t-gray">0 €</td>
+            <td class="ralign t-gray">0</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign">95</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign">95</td>
+            <td class="ralign">100%</td>
+            <td class="ralign">95,8%</td>
+            <td class="ralign t-green"><b>91</b></td>
+            <td class="ralign t-blue"><b>115.351 €</b></td>
+            <td class="ralign t-green">100.078 €</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign t-gray">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="hr"></div>
+
+    <!-- FILTROS CHIP STYLE -->
+    <div class="page-title">Registros</div>
+    <h1 class="page-h1">KPIs por mes — Abril 2026</h1>
+
+    <div class="sec-label">Registro de llamadas</div>
+    <div class="card">
+      <div class="filters-bar">
+        <span class="flabel">Filtros</span>
+        <div class="chip active">Embudo: ADS <span class="x">×</span></div>
+        <div class="chip">Closer</div>
+        <div class="chip active">Asistencia: SI <span class="x">×</span></div>
+        <div class="chip">Estado</div>
+        <div class="chip">Plan</div>
+        <div style="flex:1"></div>
+        <div class="chip chip-reset">Limpiar filtros</div>
+        <span class="meta" style="font-size:11px;color:var(--text3)">4 de 28 filas</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Fecha</th>
+            <th>Embudo</th>
+            <th>Closer</th>
+            <th>Asistencia</th>
+            <th>Estado</th>
+            <th>Plan</th>
+            <th class="ralign">Facturación</th>
+            <th class="ralign">Caja</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="venta">
+            <td><b>Raúl Robles</b></td>
+            <td>14/04/2026</td>
+            <td><span class="badge b-purple">ADS</span></td>
+            <td>Bruno</td>
+            <td><span class="badge b-green">SI</span></td>
+            <td><span class="badge b-green">Venta</span></td>
+            <td><span class="badge b-blue">BUSINESS</span></td>
+            <td class="ralign t-blue"><b>397 €</b></td>
+            <td class="ralign t-green">397 €</td>
+          </tr>
+          <tr class="venta">
+            <td><b>Sergio Retuerto</b></td>
+            <td>15/04/2026</td>
+            <td><span class="badge b-purple">ADS</span></td>
+            <td>Bruno</td>
+            <td><span class="badge b-green">SI</span></td>
+            <td><span class="badge b-green">Venta</span></td>
+            <td><span class="badge b-blue">PRO</span></td>
+            <td class="ralign t-blue"><b>247 €</b></td>
+            <td class="ralign t-green">247 €</td>
+          </tr>
+          <tr>
+            <td><b>Alejandro Martin</b></td>
+            <td>16/04/2026</td>
+            <td><span class="badge b-purple">ADS</span></td>
+            <td>Bruno</td>
+            <td><span class="badge b-green">SI</span></td>
+            <td><span class="badge b-amber">En seguimiento</span></td>
+            <td class="t-gray">—</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign t-gray">—</td>
+          </tr>
+          <tr class="perdido">
+            <td><b>Arnau Guzman</b></td>
+            <td>17/04/2026</td>
+            <td><span class="badge b-purple">ADS</span></td>
+            <td>Bruno</td>
+            <td><span class="badge b-green">SI</span></td>
+            <td><span class="badge b-red">Perdido</span></td>
+            <td class="t-gray">—</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign t-gray">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="hr"></div>
+
+    <!-- BALANCE COMPARATIVA -->
+    <div class="page-title">Balance 2026</div>
+    <h1 class="page-h1">Comparativa por canal</h1>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="title">Comparativa por canal — 2026</div>
+        <div class="meta">Acumulado anual</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Canal</th>
+            <th class="ralign">Inversión</th>
+            <th class="ralign">Ventas</th>
+            <th class="ralign">Facturación</th>
+            <th class="ralign">% Fact.</th>
+            <th class="ralign">Caja</th>
+            <th class="ralign">ROAS</th>
+            <th class="ralign">ROI</th>
+            <th class="ralign">CPA</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="kpi-row c-organic">
+            <td><span class="badge b-green">ORGÁNICO</span></td>
+            <td class="ralign t-gray">0 €</td>
+            <td class="ralign t-green"><b>8</b></td>
+            <td class="ralign t-blue"><b>15.687 €</b></td>
+            <td class="ralign">9,4%</td>
+            <td class="ralign t-green">13.687 €</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign t-gray">—</td>
+          </tr>
+          <tr class="kpi-row c-ads">
+            <td><span class="badge b-purple">ADS</span></td>
+            <td class="ralign t-red">5.073 €</td>
+            <td class="ralign t-green"><b>23</b></td>
+            <td class="ralign t-blue"><b>36.251 €</b></td>
+            <td class="ralign">21,6%</td>
+            <td class="ralign t-green">28.747 €</td>
+            <td class="ralign t-amber"><b>7,15x</b></td>
+            <td class="ralign t-purple"><b>5,67x</b></td>
+            <td class="ralign">220,57 €</td>
+          </tr>
+          <tr class="kpi-row c-referidos">
+            <td><span class="badge b-gray">REFERIDOS</span></td>
+            <td class="ralign t-gray">0 €</td>
+            <td class="ralign t-green"><b>91</b></td>
+            <td class="ralign t-blue"><b>115.351 €</b></td>
+            <td class="ralign">68,9%</td>
+            <td class="ralign t-green">100.078 €</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign t-gray">—</td>
+            <td class="ralign t-gray">—</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>TOTAL</td>
+            <td class="ralign t-red">5.073 €</td>
+            <td class="ralign t-green">122</td>
+            <td class="ralign t-blue">167.289 €</td>
+            <td class="ralign">100%</td>
+            <td class="ralign t-green">142.512 €</td>
+            <td class="ralign t-amber">32,98x</td>
+            <td class="ralign t-purple">28,09x</td>
+            <td class="ralign">41,58 €</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div style="margin-top:40px;padding:20px;background:var(--bg2);border-radius:12px;font-size:13px;color:var(--text2)">
+      <b style="color:var(--text);display:block;margin-bottom:8px">Cambios aplicados en este preview:</b>
+      <ol style="margin-left:20px;line-height:1.9">
+        <li>Jerarquía tipográfica — títulos h1 grandes negros con tracking negativo, labels uppercase tracking positivo</li>
+        <li>Cards con <b>sombra sutil</b> (0 1px 2px) y border-radius 12px en vez de borde sólido</li>
+        <li>Headers de tabla en <b>blanco con borde doble</b>, texto 10px uppercase tracking .1em</li>
+        <li>Hover sutil en filas (rgba .02)</li>
+        <li>Badges <b>pill</b> (border-radius 999px) con padding horizontal mayor</li>
+        <li>Métricas: label pequeño gris + valor 22px peso 700 + mini-trend opcional abajo</li>
+        <li>KPIs por canal con <b>acento lateral fino 2px</b> (solo en columna canal) + fondo teñido muy suave</li>
+        <li>Filtros como <b>chips</b> clickables (activos = negro / inactivos = bordeados) — mucho más legible que selects</li>
+      </ol>
+    </div>
+
+  </main>
+</div>
+
+</body>
+</html>
