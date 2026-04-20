@@ -924,8 +924,10 @@ function renderDashboard(){
   const activos=S.cuotas.filter(isActive).length;
   const proximos=S.cuotas.filter(c=>{const d=daysDiff(getVenc(c));return d>=0&&d<30;}).length;
   const ltv_med=S.cuotas.length?Math.round(S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);return s+Number(c.ticket||0)+rs.reduce((x,r)=>x+Number(r.ticket||0),0);},0)/S.cuotas.length):0;
-  if(!S.contactados)S.contactados=[];const alertas=S.cuotas.filter(c=>{const d=daysDiff(getVenc(c));return d<60&&d>=0&&!S.contactados.includes(c.nombre);}).sort((a,b)=>daysDiff(getVenc(a))-daysDiff(getVenc(b)));
-  const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple',REFERIDOS:'b-gray'};
+  if(!S.contactados)S.contactados=[];
+  const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple','VSL ADS':'b-purple','ADS':'b-purple',QUIZ:'b-amber',WORKSHOP:'b-blue',LANZAMIENTO:'b-amber',GOOGLE:'b-red','ORGÁNICO':'b-green',ORGANICO:'b-green',REFERIDOS:'b-gray'};
+  const canalRowBg={YOUTUBE:'var(--red-l)',SOCIAL:'var(--blue-l)',VSL:'var(--purple-l)','VSL ADS':'var(--purple-l)','ADS':'var(--purple-l)',QUIZ:'var(--amber-l)',WORKSHOP:'var(--blue-l)',LANZAMIENTO:'var(--amber-l)',GOOGLE:'var(--red-l)','ORGÁNICO':'var(--green-l)',ORGANICO:'var(--green-l)',REFERIDOS:'var(--bg3)'};
+  const canalRowAccent={YOUTUBE:'var(--red)',SOCIAL:'var(--blue)',VSL:'var(--purple)','VSL ADS':'var(--purple)','ADS':'var(--purple)',QUIZ:'var(--amber)',WORKSHOP:'var(--blue)',LANZAMIENTO:'var(--amber)',GOOGLE:'var(--red)','ORGÁNICO':'var(--green)',ORGANICO:'var(--green)',REFERIDOS:'var(--text2)'};
   const statsAll=CANALES.map(c=>canalStats(c,null));
   document.getElementById('content').innerHTML=`
     <div class="sec-title" id="dash-title">Resumen ${curYear}</div>
@@ -946,8 +948,8 @@ function renderDashboard(){
     <div class="card" style="padding:0;overflow:hidden">
       <div class="tw"><table>
         <thead><tr><th>Canal</th><th>Inversión</th><th>Leads</th><th>CPL</th><th>Llamadas</th><th>% Agenda.</th><th>€/Llamada</th><th>Realizadas</th><th>% Asist.</th><th>% Cierre</th><th>Ventas</th><th>Facturación</th><th>Caja</th><th>ROAS</th><th>ROI</th><th>CPA</th></tr></thead>
-        <tbody>${statsAll.map(cs=>`<tr>
-          <td><span class="badge ${cbc[cs.canal]}">${cs.canal}</span></td>
+        <tbody>${statsAll.map(cs=>{const bg=canalRowBg[cs.canal]||'transparent';const accent=canalRowAccent[cs.canal]||'var(--border2)';return`<tr style="background:${bg};box-shadow:inset 3px 0 0 ${accent}">
+          <td><span class="badge ${cbc[cs.canal]||'b-gray'}">${cs.canal}</span></td>
           <td>${fmt(cs.inv)}</td><td>${cs.leads}</td><td>${cs.cpl?fmt(cs.cpl,2):'-'}</td>
           <td>${cs.llamadasAgend}</td><td>${cs.pctAgend!=null?(cs.pctAgend*100).toFixed(1)+'%':'-'}</td>
           <td>${cs.costeLlamada?fmt(cs.costeLlamada,2):'-'}</td><td>${cs.realizadas}</td>
@@ -958,10 +960,9 @@ function renderDashboard(){
           <td style="color:var(--amber)">${cs.roas?cs.roas.toFixed(2)+'x':'-'}</td>
           <td style="color:var(--purple)">${cs.roi?cs.roi.toFixed(2)+'x':'-'}</td>
           <td>${cs.cpa?fmt(cs.cpa,2):'-'}</td>
-        </tr>`).join('')}</tbody>
+        </tr>`;}).join('')}</tbody>
       </table></div>
-    </div>
-    ${alertas.length?`<div class="card"><div class="card-title">Alertas de renovación</div>${alertas.map(c=>{const inf=alertInfo(getVenc(c));const d=daysDiff(getVenc(c));return`<div class="ai ${inf.ai}"><span style="font-weight:600">${c.nombre}</span><span style="color:var(--text2);font-size:12px">${d<0?'Venció hace '+Math.abs(d)+' días':'Vence en '+d+' días'}</span><span class="badge ${inf.cls}">${inf.label}</span></div>`;}).join('')}</div>`:''}`;
+    </div>`;
 }
 
 // ── MES ───────────────────────────────────────────────────
