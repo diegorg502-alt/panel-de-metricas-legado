@@ -415,6 +415,7 @@ let HAS_LANZAMIENTOS=false; // true = show lanzamientos section
 let SHOW_RENOVACIONES=true; // false = hide renovaciones section (auto-renew clients)
 let HAS_UTMS=false; // true = show UTMs section
 let HAS_PLANES=false; // true = show plan selector in llamadas
+let HAS_TICKET_MENSUAL=false; // true = show Ticket medio con plan ANUAL dividido /12 (solo Zerochats por ahora)
 let MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:''};
 let SHOW_ALERTAS=true; // false = hide alerts section
 let SHOW_IA=true; // false = hide IA chat section
@@ -561,7 +562,7 @@ async function loadClientConfig(email){
     if(!HAS_LANZAMIENTOS&&CANALES.some(c=>c.toUpperCase().includes('LANZAMIENTO')||c.toUpperCase().includes('WORKSHOP')))HAS_LANZAMIENTOS=true;
     // Auto-enable UTMs + planes for Zerochats-like clients (auto-renew)
     // Also hide alertas and IA chat for these clients (until matching is fully set up)
-    if(data.auto_renew){SHOW_RENOVACIONES=false;HAS_UTMS=true;HAS_PLANES=true;SHOW_ALERTAS=false;SHOW_IA=false;SHOW_ADS_GANADORES=false;}
+    if(data.auto_renew){SHOW_RENOVACIONES=false;HAS_UTMS=true;HAS_PLANES=true;SHOW_ALERTAS=false;SHOW_IA=false;SHOW_ADS_GANADORES=false;HAS_TICKET_MENSUAL=true;}
     // Update UI
     const sbbrand=document.querySelector('#sb-brand-text');if(sbbrand)sbbrand.textContent='CRM · '+CLIENT_NOMBRE;
     const sbfoot=document.querySelector('.sb-foot div:last-child');if(sbfoot)sbfoot.textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
@@ -1063,7 +1064,7 @@ function renderMes(){
         ['% Asistencia',ks.pctAsist!=null?(ks.pctAsist*100).toFixed(1)+'%':'-',''],
         ['Realizadas',ks.realizadas,''],['% Cierre',ks.pctCierre!=null?(ks.pctCierre*100).toFixed(1)+'%':'-','blue'],
         ['Ventas',ks.ventas,'green'],['Facturación',fmt(ks.fact),'blue'],['Caja',fmt(ks.caja),'green'],
-        ['Ticket medio',ks.ticketMedio?fmt(ks.ticketMedio,0):'-','purple'],
+        ...(HAS_TICKET_MENSUAL?[['Ticket medio',ks.ticketMedio?fmt(ks.ticketMedio,0):'-','purple']]:[]),
         ['ROAS',ks.roas?ks.roas.toFixed(2)+'x':'-','amber'],['ROI',ks.roi?ks.roi.toFixed(2)+'x':'-','purple'],['CPA',ks.cpa?fmt(ks.cpa,2):'-','']
       ].map(([l,v,c])=>kpiCard(l,v,c,true)).join('')}
     </div>`;
@@ -1078,7 +1079,7 @@ function renderMes(){
         ['Llamadas',kr.llamadas,''],['% Asistencia',kr.pctAsist!=null?(kr.pctAsist*100).toFixed(1)+'%':'-',''],
         ['Realizadas',kr.realizadas,''],['% Cierre',kr.pctCierre!=null?(kr.pctCierre*100).toFixed(1)+'%':'-','blue'],
         ['Ventas',kr.ventas,'green'],['Facturación',fmt(kr.fact),'blue'],['Caja',fmt(kr.caja),'green'],
-        ['Ticket medio',kr.ticketMedio?fmt(kr.ticketMedio,0):'-','purple']
+        ...(HAS_TICKET_MENSUAL?[['Ticket medio',kr.ticketMedio?fmt(kr.ticketMedio,0):'-','purple']]:[])
       ].map(([l,v,c])=>kpiCard(l,v,c,true)).join('')}
     </div>`;
     acordeonesHTML+=acordeon(canal,canal,cbc[canal]||'b-gray',refMetricas,false);
@@ -1094,7 +1095,7 @@ function renderMes(){
           ['€/Llamada',costeLlamada?fmt(costeLlamada,2):'-','amber'],['% Asistencia',pctAsist!=null?(pctAsist*100).toFixed(1)+'%':'-',''],
           ['Realizadas',realizadas,''],['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue'],
           ['Ventas',ventas.length,'green'],['Facturación',fmt(fact),'blue'],['Caja',fmt(caja),'green'],
-          ['Ticket medio',ticketMedio?fmt(ticketMedio,0):'-','purple'],
+          ...(HAS_TICKET_MENSUAL?[['Ticket medio',ticketMedio?fmt(ticketMedio,0):'-','purple']]:[]),
           ['ROAS',roas?roas.toFixed(2)+'x':'-','amber'],['ROI',roi?roi.toFixed(2)+'x':'-','purple'],['CPA',cpa?fmt(cpa,2):'-','']
         ].map(([l,v,c])=>`<div class="kpi-m"><div class="ml">${l}</div><div class="mv ${c}" style="font-size:16px">${v}</div></div>`).join('')}
       </div>
