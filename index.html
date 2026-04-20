@@ -1292,7 +1292,8 @@ function renderKpisD(){
       const leadsVal=r.leads||r.seguidores||0;
       const cpl=leadsVal&&r.inversion?(r.inversion/leadsVal).toFixed(2):'-';
       const isMeta=r.source==='meta';
-      const diaStr=isMeta?(r.dia?(r.dia.includes('-')?r.dia.split('-')[2]:r.dia):''):(r.dia||'');
+      // Always show only day number if date is full ISO format
+      const diaStr=r.dia?(String(r.dia).includes('-')?String(r.dia).split('-')[2]:String(r.dia)):'';
       if(isMeta){
         const isSocial=!r.leads&&(r.seguidores!==undefined||leadsVal===0);
         const segVal=r.seguidores||0;
@@ -1307,7 +1308,7 @@ function renderKpisD(){
         </tr>`;
       }
       return`<tr>
-        <td><input class="ce" value="${r.dia||''}" oninput="upKDText('${mk}',${i},'dia',this.value)" placeholder="Día" style="text-align:center;max-width:60px"></td>
+        <td style="text-align:center;font-weight:600;color:var(--text2)">${diaStr}</td>
         <td><input class="ce" type="text" inputmode="decimal" value="${r.inversion||''}" oninput="upKDNum('${mk}',${i},'inversion',this.value)" placeholder="0" style="text-align:right"></td>
         <td><input class="ce" type="number" inputmode="numeric" value="${r.leads||''}" oninput="upKDNum('${mk}',${i},'leads',this.value)" placeholder="0" style="text-align:right"></td>
         <td id="cpl-${i}" style="font-size:12px;font-weight:600;color:var(--amber);text-align:right">${cpl!=='-'?cpl:'-'}</td>
