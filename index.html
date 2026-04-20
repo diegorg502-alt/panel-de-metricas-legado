@@ -2555,40 +2555,59 @@ function deleteLanzamiento(lanzId){
 }
 
 // ── UTMs ─────────────────────────────────────────────────
+let curUtmConjunto='__all__';
+
+function getUtmConjuntos(){
+  // Union of saved conjuntos array + conjuntos from existing UTMs
+  const fromUtms=[...new Set((S.utms||[]).map(u=>u.conjunto).filter(Boolean))];
+  const saved=S.utm_conjuntos||[];
+  return [...new Set([...saved, ...fromUtms])];
+}
+
 function renderUTMs(){
   if(!S.utms)S.utms=[];
+  if(!S.utm_conjuntos)S.utm_conjuntos=[];
   const c=document.getElementById('content');
-  if(!S.utms.length){
-    c.innerHTML='<div class="empty">No hay UTMs guardadas.<br><br><button class="btn btn-p" onclick="openAddUtm()">+ Añadir primera UTM</button></div>';
+  const conjuntos=getUtmConjuntos();
+  const filtered=curUtmConjunto==='__all__'?S.utms.map((u,i)=>({...u,_idx:i})):S.utms.map((u,i)=>({...u,_idx:i})).filter(u=>(u.conjunto||'')===curUtmConjunto);
+
+  let html=`<div class="card" style="margin-bottom:14px;padding:14px 18px">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--text2);font-weight:600">Conjunto:</span>
+      <select onchange="curUtmConjunto=this.value;renderUTMs()" style="padding:6px 12px;border:1px solid var(--border2);border-radius:7px;font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);min-width:180px">
+        <option value="__all__"${curUtmConjunto==='__all__'?' selected':''}>Todos los conjuntos (${S.utms.length})</option>
+        ${conjuntos.map(cj=>{const n=S.utms.filter(u=>u.conjunto===cj).length;return`<option value="${esc(cj)}"${curUtmConjunto===cj?' selected':''}>${esc(cj)} (${n})</option>`;}).join('')}
+      </select>
+      <button class="btn btn-xs" onclick="openAddConjunto()">+ Nuevo conjunto</button>
+      ${curUtmConjunto!=='__all__'?`<button class="btn btn-red btn-xs" onclick="delConjunto('${esc(curUtmConjunto).replace(/'/g,"\\'")}')">Eliminar conjunto</button>`:''}
+    </div>
+  </div>`;
+
+  if(!filtered.length){
+    html+=`<div class="empty" style="padding:32px">${curUtmConjunto==='__all__'?'No hay UTMs guardadas.':'Este conjunto no tiene anuncios aún.'}<br><br><button class="btn btn-p" onclick="openAddUtm()">+ Añadir UTM</button></div>`;
+    c.innerHTML=html;
     return;
   }
-  // Group by conjunto
-  const byConjunto={};
-  S.utms.forEach((u,i)=>{
-    const key=u.conjunto||'Principal';
-    if(!byConjunto[key])byConjunto[key]=[];
-    byConjunto[key].push({...u,_idx:i});
-  });
-  let html='<div class="sec-title">UTMs</div>';
-  Object.entries(byConjunto).forEach(([conjunto,utms])=>{
-    html+=`<div class="card" style="margin-bottom:14px">
-      <div class="card-title">${esc(conjunto)}<span style="font-size:11px;color:var(--text3);font-weight:400">${utms.length} anuncios</span></div>
-      <div class="tw"><table>
-        <thead><tr><th style="min-width:180px">Nombre del anuncio</th><th style="min-width:120px">Conjunto</th><th style="min-width:300px">URL</th><th style="width:120px"></th></tr></thead>
-        <tbody>
-          ${utms.map(u=>`<tr>
-            <td><input class="ce" value="${esc(u.nombre)}" oninput="upUtm(${u._idx},'nombre',this.value)" placeholder="Nombre del anuncio"></td>
-            <td><input class="ce" value="${esc(u.conjunto)}" oninput="upUtm(${u._idx},'conjunto',this.value)" placeholder="Conjunto"></td>
-            <td><input class="ce" value="${esc(u.url)}" oninput="upUtm(${u._idx},'url',this.value)" placeholder="https://..." style="color:var(--blue)"></td>
-            <td style="text-align:right">
-              <button class="btn btn-xs" onclick="copyUtmUrl(${u._idx})">📋 Copiar</button>
-              <button class="btn btn-red btn-xs" onclick="delUtm(${u._idx})">✕</button>
-            </td>
-          </tr>`).join('')}
-        </tbody>
-      </table></div>
-    </div>`;
-  });
+
+  html+=`<div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:13px;font-weight:600">${curUtmConjunto==='__all__'?'Todos los anuncios':esc(curUtmConjunto)} <span style="font-size:11px;color:var(--text3);font-weight:400">${filtered.length} anuncios</span></div>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th style="min-width:180px">Nombre del anuncio</th>${curUtmConjunto==='__all__'?'<th style="min-width:140px">Conjunto</th>':''}<th style="min-width:300px">URL</th><th style="width:140px"></th></tr></thead>
+      <tbody>
+        ${filtered.map(u=>`<tr>
+          <td><input class="ce" value="${esc(u.nombre)}" oninput="upUtm(${u._idx},'nombre',this.value)" placeholder="Nombre del anuncio"></td>
+          ${curUtmConjunto==='__all__'?`<td><select class="ce" onchange="upUtm(${u._idx},'conjunto',this.value);renderUTMs()">${conjuntos.map(cj=>`<option value="${esc(cj)}"${(u.conjunto||'')===cj?' selected':''}>${esc(cj)}</option>`).join('')}</select></td>`:''}
+          <td><input class="ce" value="${esc(u.url)}" oninput="upUtm(${u._idx},'url',this.value)" placeholder="https://..." style="color:var(--blue)"></td>
+          <td style="text-align:right;white-space:nowrap">
+            <button class="btn btn-xs" onclick="copyUtmUrl(${u._idx})">📋 Copiar</button>
+            <button class="btn btn-red btn-xs" onclick="delUtm(${u._idx})">✕</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div>`;
   c.innerHTML=html;
 }
 
@@ -2596,13 +2615,45 @@ function upUtm(i,f,v){S.utms[i][f]=v;save();}
 function delUtm(i){if(!confirm('¿Eliminar esta UTM?'))return;S.utms.splice(i,1);save();renderUTMs();}
 function copyUtmUrl(i){navigator.clipboard.writeText(S.utms[i].url);setSyncStatus('ok','URL copiada ✓');}
 
+function openAddConjunto(){
+  const html=`<div class="mtitle">Nuevo conjunto</div>
+    <div class="fg"><label class="fl">Nombre del conjunto</label><input class="fi" id="conj-nombre" placeholder="Ej: Campaña Febrero"></div>
+    <div class="mfooter">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-p" onclick="doAddConjunto()">Crear conjunto</button>
+    </div>`;
+  openModal(html);
+  setTimeout(()=>document.getElementById('conj-nombre')?.focus(),50);
+}
+
+function doAddConjunto(){
+  const nombre=document.getElementById('conj-nombre').value.trim();
+  if(!nombre){alert('Escribe un nombre');return;}
+  if(!S.utm_conjuntos)S.utm_conjuntos=[];
+  if(getUtmConjuntos().includes(nombre)){alert('Ya existe un conjunto con ese nombre');return;}
+  S.utm_conjuntos.push(nombre);
+  save();closeModal();curUtmConjunto=nombre;renderUTMs();
+}
+
+function delConjunto(nombre){
+  const count=S.utms.filter(u=>u.conjunto===nombre).length;
+  const msg=count>0?`¿Eliminar el conjunto "${nombre}" y sus ${count} anuncios?`:`¿Eliminar el conjunto "${nombre}"?`;
+  if(!confirm(msg))return;
+  S.utms=S.utms.filter(u=>u.conjunto!==nombre);
+  S.utm_conjuntos=(S.utm_conjuntos||[]).filter(c=>c!==nombre);
+  save();curUtmConjunto='__all__';renderUTMs();
+}
+
 function openAddUtm(){
-  const conjuntos=[...new Set((S.utms||[]).map(u=>u.conjunto).filter(Boolean))];
+  const conjuntos=getUtmConjuntos();
+  const defaultConj=curUtmConjunto!=='__all__'?curUtmConjunto:(conjuntos[0]||'Principal');
   const html=`<div class="mtitle">Nueva UTM</div>
     <div class="fg"><label class="fl">Nombre del anuncio</label><input class="fi" id="utm-nombre" placeholder="Ej: Anuncio reel post it"></div>
     <div class="fg"><label class="fl">Conjunto</label>
-      <input class="fi" id="utm-conjunto" list="utm-conjuntos" placeholder="Nombre del conjunto">
-      <datalist id="utm-conjuntos">${conjuntos.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+      <select class="fi" id="utm-conjunto">
+        ${conjuntos.map(c=>`<option value="${esc(c)}"${c===defaultConj?' selected':''}>${esc(c)}</option>`).join('')}
+        ${!conjuntos.length?'<option value="Principal">Principal</option>':''}
+      </select>
     </div>
     <div class="fg"><label class="fl">URL con UTMs</label><input class="fi" id="utm-url" placeholder="https://..."></div>
     <div class="mfooter">
