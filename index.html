@@ -311,7 +311,7 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
         <div class="nav-g">Registros</div>
         <div class="nav-gh" id="nhdr-mes" onclick="toggleG('mes')">
           <div style="display:flex;align-items:center;gap:8px">
-            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="13" rx="1.5"/><line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/><line x1="1" y1="7" x2="15" y2="7"/></svg>Llamadas por mes</div>
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="13" rx="1.5"/><line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/><line x1="1" y1="7" x2="15" y2="7"/></svg>KPIs por mes</div>
           <svg class="nav-arr" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><polyline points="2,4 6,8 10,4"/></svg>
         </div>
         <div class="nav-sub" id="nsub-mes"></div>
@@ -901,7 +901,7 @@ function goTo(page,month,lanzId){
   if(page==='lanzamiento_detail')document.getElementById(`ni-lanz-${curLanzamiento}`)?.classList.add('active');
   const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación',ia:'Conversa con la IA',balance:'Balance',lanzamientos:'Lanzamientos',utms:'UTMs'};
   updateAlertaBadge();
-  let pageTitle=titles[page]||(page==='mes'?`Llamadas — ${MFULL[curMonth]} ${curYear}`:page==='kpis_d'?`KPIs diarios — ${MFULL[curMonth]} ${curYear}`:'');
+  let pageTitle=titles[page]||(page==='mes'?`KPIs — ${MFULL[curMonth]} ${curYear}`:page==='kpis_d'?`KPIs diarios — ${MFULL[curMonth]} ${curYear}`:'');
   if(page==='lanzamiento_detail'){const lz=(S.lanzamientos||[]).find(l=>l.id===curLanzamiento);pageTitle=lz?lz.nombre:'Lanzamiento';}
   document.getElementById('topbar-title').textContent=pageTitle;
   const ex=document.getElementById('topbar-extra');ex.innerHTML='';
@@ -2741,6 +2741,15 @@ function renderBalance(){
   const hoyMi = new Date().getMonth();
   const hoyY = new Date().getFullYear();
 
+  const canalCompRowBg={YOUTUBE:'var(--red-l)',SOCIAL:'var(--blue-l)',VSL:'var(--purple-l)','VSL ADS':'var(--purple-l)','ADS':'var(--purple-l)',QUIZ:'var(--amber-l)',WORKSHOP:'var(--blue-l)',LANZAMIENTO:'var(--amber-l)',GOOGLE:'var(--red-l)','ORGÁNICO':'var(--green-l)',ORGANICO:'var(--green-l)',REFERIDOS:'var(--bg3)'};
+  const canalCompAccent={YOUTUBE:'var(--red)',SOCIAL:'var(--blue)',VSL:'var(--purple)','VSL ADS':'var(--purple)','ADS':'var(--purple)',QUIZ:'var(--amber)',WORKSHOP:'var(--blue)',LANZAMIENTO:'var(--amber)',GOOGLE:'var(--red)','ORGÁNICO':'var(--green)',ORGANICO:'var(--green)',REFERIDOS:'var(--text2)'};
+  const canalCompBadge={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple','VSL ADS':'b-purple','ADS':'b-purple',QUIZ:'b-amber',WORKSHOP:'b-blue',LANZAMIENTO:'b-amber',GOOGLE:'b-red','ORGÁNICO':'b-green',ORGANICO:'b-green',REFERIDOS:'b-gray'};
+  const canalesComp=CANALES.map(c=>canalStats(c,null));
+  const totCanalInv=canalesComp.reduce((s,c)=>s+c.inv,0);
+  const totCanalFact=canalesComp.reduce((s,c)=>s+c.fact,0);
+  const totCanalCaja=canalesComp.reduce((s,c)=>s+c.caja,0);
+  const totCanalVentas=canalesComp.reduce((s,c)=>s+c.ventas,0);
+
   document.getElementById('content').innerHTML=`
     <div style="max-width:1200px">
 
@@ -2813,6 +2822,52 @@ function renderBalance(){
               <td style="padding:12px 16px;text-align:right;font-weight:600;color:var(--red)">${fmt(totYear.totalSinIva)}</td>
               <td style="padding:12px 16px;text-align:right;font-weight:700;font-size:14px;color:${totYear.bruto>=0?'var(--green)':'var(--red)'}">${fmt(totYear.bruto)}</td>
               <td style="padding:12px 16px;text-align:right;font-weight:700;font-size:14px;color:${totYear.neto>=0?'var(--green)':'var(--red)'}">${fmt(totYear.neto)}</td>
+            </tr>
+          </tfoot>
+        </table></div>
+      </div>
+
+      <!-- COMPARATIVA POR CANAL -->
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden">
+        <div style="padding:14px 20px 12px;border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:600">Comparativa por canal — ${curYear}</div>
+        </div>
+        <div class="tw"><table style="min-width:900px">
+          <thead><tr style="background:var(--bg2)">
+            <th style="padding:10px 16px;text-align:left;font-size:11px">CANAL</th>
+            <th style="padding:10px 16px;text-align:right;font-size:11px">INVERSIÓN</th>
+            <th style="padding:10px 16px;text-align:right;font-size:11px">VENTAS</th>
+            <th style="padding:10px 16px;text-align:right;font-size:11px">FACTURACIÓN</th>
+            <th style="padding:10px 16px;text-align:right;font-size:11px">% FACT.</th>
+            <th style="padding:10px 16px;text-align:right;font-size:11px">CAJA</th>
+            <th style="padding:10px 16px;text-align:right;font-size:11px">ROAS</th>
+            <th style="padding:10px 16px;text-align:right;font-size:11px">ROI</th>
+            <th style="padding:10px 16px;text-align:right;font-size:11px">CPA</th>
+          </tr></thead>
+          <tbody>
+            ${canalesComp.map(cs=>{const bg=canalCompRowBg[cs.canal]||'transparent';const accent=canalCompAccent[cs.canal]||'var(--border2)';const pctFact=totCanalFact?cs.fact/totCanalFact*100:0;return`<tr style="background:${bg};box-shadow:inset 3px 0 0 ${accent};border-top:1px solid var(--border)">
+              <td style="padding:11px 16px"><span class="badge ${canalCompBadge[cs.canal]||'b-gray'}">${cs.canal}</span></td>
+              <td style="padding:11px 16px;text-align:right;font-size:13px;color:${cs.inv>0?'var(--red)':'var(--text3)'}">${cs.inv>0?fmt(cs.inv):'—'}</td>
+              <td style="padding:11px 16px;text-align:right;font-size:13px;font-weight:600;color:${cs.ventas>0?'var(--green)':'var(--text3)'}">${cs.ventas||'—'}</td>
+              <td style="padding:11px 16px;text-align:right;font-size:13px;font-weight:600;color:${cs.fact>0?'var(--blue)':'var(--text3)'}">${cs.fact>0?fmt(cs.fact):'—'}</td>
+              <td style="padding:11px 16px;text-align:right;font-size:13px;color:var(--text2)">${cs.fact>0?pctFact.toFixed(1)+'%':'—'}</td>
+              <td style="padding:11px 16px;text-align:right;font-size:13px;color:${cs.caja>0?'var(--green)':'var(--text3)'}">${cs.caja>0?fmt(cs.caja):'—'}</td>
+              <td style="padding:11px 16px;text-align:right;font-size:13px;color:${cs.roas?'var(--amber)':'var(--text3)'}">${cs.roas?cs.roas.toFixed(2)+'x':'—'}</td>
+              <td style="padding:11px 16px;text-align:right;font-size:13px;color:${cs.roi?'var(--purple)':'var(--text3)'}">${cs.roi?cs.roi.toFixed(2)+'x':'—'}</td>
+              <td style="padding:11px 16px;text-align:right;font-size:13px;color:${cs.cpa?'var(--text)':'var(--text3)'}">${cs.cpa?fmt(cs.cpa,2):'—'}</td>
+            </tr>`;}).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background:var(--bg3);border-top:2px solid var(--border2)">
+              <td style="padding:12px 16px;font-weight:700;font-size:13px">TOTAL</td>
+              <td style="padding:12px 16px;text-align:right;font-weight:700;color:var(--red)">${fmt(totCanalInv)}</td>
+              <td style="padding:12px 16px;text-align:right;font-weight:700;color:var(--green)">${totCanalVentas}</td>
+              <td style="padding:12px 16px;text-align:right;font-weight:700;color:var(--blue)">${fmt(totCanalFact)}</td>
+              <td style="padding:12px 16px;text-align:right;font-weight:700">100%</td>
+              <td style="padding:12px 16px;text-align:right;font-weight:700;color:var(--green)">${fmt(totCanalCaja)}</td>
+              <td style="padding:12px 16px;text-align:right;font-weight:700;color:var(--amber)">${totCanalInv?(totCanalFact/totCanalInv).toFixed(2)+'x':'—'}</td>
+              <td style="padding:12px 16px;text-align:right;font-weight:700;color:var(--purple)">${totCanalInv?(totCanalCaja/totCanalInv).toFixed(2)+'x':'—'}</td>
+              <td style="padding:12px 16px;text-align:right;font-weight:700">${totCanalVentas&&totCanalInv?fmt(totCanalInv/totCanalVentas,2):'—'}</td>
             </tr>
           </tfoot>
         </table></div>
