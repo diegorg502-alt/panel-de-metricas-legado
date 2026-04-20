@@ -403,6 +403,7 @@ let HAS_LANZAMIENTOS=false; // true = show lanzamientos section
 let SHOW_RENOVACIONES=true; // false = hide renovaciones section (auto-renew clients)
 let HAS_UTMS=false; // true = show UTMs section
 let HAS_PLANES=false; // true = show plan selector in llamadas
+let MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:''};
 let SHOW_ALERTAS=true; // false = hide alerts section
 let SHOW_IA=true; // false = hide IA chat section
 let SHOW_ADS_GANADORES=true; // false = hide winning ads section
@@ -1085,17 +1086,56 @@ function renderMes(){
       ${acordeonesHTML}
     </div>
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:32px">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div style="font-size:12px;font-weight:600;color:var(--text2)">Registro de llamadas</div>
+        <div style="display:flex;align-items:center;gap:8px"><span id="fcount" style="font-size:11px;color:var(--text3)"></span><button class="btn btn-xs" onclick="resetMesFilters()" style="font-size:11px">Limpiar filtros</button></div>
+      </div>
       <div class="tw"><table id="lt">
-        <thead><tr><th style="min-width:160px">Nombre</th><th style="min-width:120px">Fecha</th><th style="min-width:120px">Teléfono</th><th style="min-width:110px">Embudo</th><th style="min-width:90px">Closer</th>${SETTERS.length?'<th style="min-width:100px">Setter</th>':''}${SEMANAS_MODO?'<th style="min-width:140px">Semanas</th>':''}<th style="min-width:100px">Asistencia</th><th style="min-width:90px">Incidencia</th><th style="min-width:120px">Estado</th>${ENTRENADORES.length>1?'<th style="min-width:120px">Entrenador</th>':''}${HAS_PLANES?'<th style="min-width:120px">Plan</th>':''}<th style="min-width:110px">Facturación</th><th style="min-width:90px">Caja</th><th style="min-width:90px">Cuotas</th><th style="min-width:120px">Meses servicio</th><th style="min-width:180px">Comentarios</th><th></th></tr></thead>
+        <thead><tr>
+          <th style="min-width:160px">Nombre</th>
+          <th style="min-width:120px">Fecha</th>
+          <th style="min-width:120px">Teléfono</th>
+          <th style="min-width:110px">Embudo${filterSelect('embudo',['',...CANALES])}</th>
+          <th style="min-width:90px">Closer${filterSelect('closer',['',...CLOSERS])}</th>
+          ${SETTERS.length?'<th style="min-width:100px">Setter</th>':''}
+          ${SEMANAS_MODO?'<th style="min-width:140px">Semanas</th>':''}
+          <th style="min-width:100px">Asistencia${filterSelect('asistencia',['','SI','NO','PENDIENTE'])}</th>
+          <th style="min-width:90px">Incidencia</th>
+          <th style="min-width:120px">Estado${filterSelect('estado',['',...ESTADOS])}</th>
+          ${ENTRENADORES.length>1?'<th style="min-width:120px">Entrenador</th>':''}
+          ${HAS_PLANES?`<th style="min-width:120px">Plan${filterSelect('plan',['','PRO','BUSINESS','ANUAL'])}</th>`:''}
+          <th style="min-width:110px">Facturación</th>
+          <th style="min-width:90px">Caja</th>
+          <th style="min-width:90px">Cuotas</th>
+          <th style="min-width:120px">Meses servicio</th>
+          <th style="min-width:180px">Comentarios</th>
+          <th></th>
+        </tr></thead>
         <tbody id="lb"></tbody>
       </table></div>
     </div>
     `;
   renderLlamadasRows(mk);
 }
+function filterSelect(field,opts){
+  const v=MES_FILTERS[field]||'';
+  return `<div style="margin-top:4px"><select class="ce" onchange="setMesFilter('${field}',this.value)" style="width:100%;font-size:11px;padding:2px 4px;font-weight:400">${opts.map(o=>`<option value="${esc(o)}"${v===o?' selected':''}>${o===''?'Todos':esc(o)}</option>`).join('')}</select></div>`;
+}
+function setMesFilter(field,value){MES_FILTERS[field]=value;renderLlamadasRows(mKey(curMonth));}
+function resetMesFilters(){MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:''};renderMes();}
+function mesFilterMatch(r){
+  if(MES_FILTERS.embudo&&r.embudo!==MES_FILTERS.embudo)return false;
+  if(MES_FILTERS.closer&&r.closer!==MES_FILTERS.closer)return false;
+  if(MES_FILTERS.asistencia&&r.asistencia!==MES_FILTERS.asistencia)return false;
+  if(MES_FILTERS.estado&&r.estado!==MES_FILTERS.estado)return false;
+  if(MES_FILTERS.plan&&r.plan!==MES_FILTERS.plan)return false;
+  return true;
+}
 function renderLlamadasRows(mk){
   const rows=S.llamadas[mk]||[];const tbody=document.getElementById('lb');if(!tbody)return;
-  tbody.innerHTML=rows.map((r,i)=>`<tr id="lr-${i}" style="${r.estado==='Venta'?'background:#f0fdf4':r.estado==='Perdido'?'background:#fef2f2':r.estado==='Reserva'?'background:#eff6ff':''}">
+  const filtered=rows.map((r,i)=>[r,i]).filter(([r])=>mesFilterMatch(r));
+  const fc=document.getElementById('fcount');if(fc)fc.textContent=filtered.length===rows.length?`${rows.length} filas`:`${filtered.length} de ${rows.length} filas`;
+  tbody.innerHTML=filtered.map(([r,i])=>`<tr id="lr-${i}" style="${r.estado==='Venta'?'background:#f0fdf4':r.estado==='Perdido'?'background:#fef2f2':r.estado==='Reserva'?'background:#eff6ff':''}">
     <td style="white-space:nowrap;display:flex;align-items:center;gap:2px"><input class="ce" value="${esc(r.nombre)}" oninput="upL('${mk}',${i},'nombre',this.value)" placeholder="Nombre completo" style="min-width:100px"><button onclick="openFicha('${mk}',${i})" title="Ver ficha" style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--blue);font-size:12px;line-height:1;flex-shrink:0">👤</button></td>
     <td><input class="ce" type="date" value="${r.fecha||''}" oninput="upL('${mk}',${i},'fecha',this.value)"></td>
     <td><input class="ce" value="${esc(r.telefono)}" oninput="upL('${mk}',${i},'telefono',this.value)" placeholder="+34..."></td>
