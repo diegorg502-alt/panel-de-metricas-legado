@@ -117,6 +117,12 @@ input[type=number].ce{-moz-appearance:textfield}
 .filters-bar .flabel{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-right:4px}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .empty{text-align:center;padding:32px;color:var(--text3);font-size:13px}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px 24px;color:var(--text2)}
+.empty-state-icon{width:64px;height:64px;border-radius:14px;background:var(--brand-l);color:var(--brand);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.empty-state-icon svg{width:32px;height:32px}
+.empty-state-title{font-family:var(--font-display);font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px;letter-spacing:-.01em}
+.empty-state-desc{font-size:13px;color:var(--text3);max-width:380px;line-height:1.55;margin-bottom:18px}
+.empty-state-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .moverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:300;align-items:center;justify-content:center;padding:16px}
 .moverlay.open{display:flex}
 .mbox{background:var(--bg);border-radius:12px;padding:26px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;border:1px solid var(--border2);box-shadow:0 8px 32px rgba(0,0,0,.1)}
@@ -902,6 +908,18 @@ function getAlertInfo(c){
 }
 function mKey(i){return`${curYear}-${String(i+1).padStart(2,'0')}`}
 function esc(s){return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+// Estado vacío con icono de marca (rombo + 3 líneas) y microcopy.
+// Uso: emptyState({title, desc, action, icon}) — icon es opcional, devuelve HTML.
+function emptyState(opts){
+  const o=opts||{};
+  const ic=o.icon||'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M16 5 L27 16 L16 27 L5 16 Z"/><line x1="13" y1="11" x2="13" y2="21"/><line x1="16" y1="9" x2="16" y2="23"/><line x1="19" y1="11" x2="19" y2="21"/></svg>';
+  return `<div class="empty-state">
+    <div class="empty-state-icon">${ic}</div>
+    <div class="empty-state-title">${esc(o.title||'Aún no hay nada por aquí')}</div>
+    ${o.desc?`<div class="empty-state-desc">${esc(o.desc)}</div>`:''}
+    ${o.action?`<div class="empty-state-actions">${o.action}</div>`:''}
+  </div>`;
+}
 function todayMonth(){return new Date().getMonth();}
 function todayDayOfMonth(){return new Date().getDate();}
 function canalStats(canal,mk){
@@ -1463,11 +1481,11 @@ function renderKpisD(){
       <div class="metric"><div class="ml">CPL total</div><div class="mv amber" id="kpid-sum-cpl">${totalCpl?fmt(totalCpl,2):'-'}</div></div>
     </div>
     ${canalSections}
-    ${!canalesActivos.length?'<div class="card"><div class="empty">Sin datos este mes. Los datos de Meta se sincronizan automáticamente cada día.</div></div>':''}
+    ${!canalesActivos.length?`<div class="card">${emptyState({title:'Sin datos este mes',desc:'Los datos de Meta Ads se sincronizan automáticamente cada noche. Si llevas pocos días con campañas activas, vuelve a comprobarlo mañana.'})}</div>`:''}
     ${typeof SHOW_ADS_GANADORES==='undefined'||SHOW_ADS_GANADORES?`<div class="card">
       <div class="card-title">Ads Ganadores — ${MFULL[curMonth]} ${curYear}<button class="btn btn-xs" onclick="addAd('${mk}')">+ Añadir</button></div>
       <div id="ads-list">
-        ${!allAds.length?'<div class="empty" style="padding:16px">Sin ads este mes.</div>':''}
+        ${!allAds.length?emptyState({title:'Sin ads este mes',desc:'Aún no se han registrado anuncios para este periodo. En cuanto Meta sincronice o añadas uno manualmente aparecerán aquí.'}):''}
         ${adSections}
       </div>
     </div>`:''}`;
@@ -1988,7 +2006,7 @@ function renderRenovFiltered(){
   const filtered=S.renovaciones.filter(r=>!renovSearch||r.nombre.toLowerCase().includes(renovSearch.toLowerCase()));
   const listEl=document.getElementById('rv-filtered-list');
   if(!listEl){renderRenovaciones();return;}
-  listEl.innerHTML=filtered.length===0?'<div class="empty" style="padding:20px">Sin renovaciones que coincidan.</div>':
+  listEl.innerHTML=filtered.length===0?emptyState({title:'Sin renovaciones que coincidan',desc:'Prueba a ajustar el filtro o la búsqueda para ver más resultados.'}):
     filtered.map((r)=>{const venc=edate(r.fechaInicio,6);const inf=alertInfo(venc);const cm=r.nCuotas?Math.round(Number(r.ticket||0)/r.nCuotas):Number(r.ticket||0);const origIdx=S.renovaciones.indexOf(r);return`
       <div class="rv-card"><div class="rv-head"><div><div class="rv-name">${r.nombre}</div><div class="rv-meta">${r.nRenov}ª renovación · Inicio: ${r.fechaInicio} · Vence: ${venc}</div></div>
         <div style="display:flex;align-items:center;gap:8px"><span class="badge ${inf.cls}">${inf.label}</span><button class="btn btn-red btn-xs" onclick="delRenov(${origIdx})">Eliminar</button></div></div>
@@ -2023,7 +2041,7 @@ function renderRenovaciones(){
         <input id="renov-search-input" placeholder="Buscar cliente..." value="${renovSearch}" oninput="renovSearch=this.value;renderRenovFiltered()" style="padding:5px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;width:200px;font-family:var(--font)">
       </div>
       <div id="rv-filtered-list" style="padding:0 18px 14px">
-        ${filtered.length===0?'<div class="empty" style="padding:20px">Sin renovaciones que coincidan.</div>':''}
+        ${filtered.length===0?emptyState({title:'Sin renovaciones que coincidan',desc:'Prueba a ajustar el filtro o la búsqueda para ver más resultados.'}):''}
         ${filtered.map((r,i)=>{const venc=edate(r.fechaInicio,6);const inf=alertInfo(venc);const cm=r.nCuotas?Math.round(Number(r.ticket||0)/r.nCuotas):Number(r.ticket||0);const origIdx=S.renovaciones.indexOf(r);return`
           <div class="rv-card"><div class="rv-head"><div><div class="rv-name">${r.nombre}</div><div class="rv-meta">${r.nRenov}ª renovación · Inicio: ${r.fechaInicio} · Vence: ${venc}</div></div>
             <div style="display:flex;align-items:center;gap:8px"><span class="badge ${inf.cls}">${inf.label}</span><button class="btn btn-red btn-xs" onclick="delRenov(${origIdx})">Eliminar</button></div></div>
@@ -2094,7 +2112,7 @@ function renderAlertas(){
     <div style="font-size:12px;color:var(--text2);margin-bottom:16px;padding:10px 14px;background:var(--amber-l);border:1px solid #fde68a;border-radius:8px">
       Clientes que vencen en los próximos <strong>21 días</strong> — contacta para agendar llamada de renovación.
     </div>
-    ${proximos.length===0&&expired.length===0?`<div class="card"><div class="empty">Sin alertas activas. Todos los clientes están dentro de su periodo.</div></div>`:''}
+    ${proximos.length===0&&expired.length===0?`<div class="card">${emptyState({title:'Todo en orden',desc:'No hay alertas activas. Todos los clientes están dentro de su periodo de servicio.'})}</div>`:''}
     ${proximos.length>0?`
     <div class="card" style="margin-bottom:14px">
       <div class="card-title" style="color:var(--amber)">⚠️ Próximos a vencer (${proximos.length})</div>
@@ -2756,7 +2774,7 @@ function renderLanzamientos(){
   if(!S.lanzamientos)S.lanzamientos=[];
   const c=document.getElementById('content');
   if(!S.lanzamientos.length){
-    c.innerHTML='<div class="empty">No hay lanzamientos creados aún.<br><br><button class="btn btn-p" onclick="openAddLanzamiento()">+ Crear primer lanzamiento</button></div>';
+    c.innerHTML=emptyState({title:'Aún no hay lanzamientos',desc:'Crea uno para registrar las llamadas, KPIs e ingresos específicos de un lanzamiento o workshop.',action:'<button class="btn btn-p" onclick="openAddLanzamiento()">+ Crear primer lanzamiento</button>'});
     return;
   }
   let html='<div class="sec-title">Todos los lanzamientos</div>';
@@ -2789,7 +2807,7 @@ function renderLanzamientos(){
 
 function renderLanzamientoDetail(){
   const lz=(S.lanzamientos||[]).find(l=>l.id===curLanzamiento);
-  if(!lz){document.getElementById('content').innerHTML='<div class="empty">Lanzamiento no encontrado</div>';return;}
+  if(!lz){document.getElementById('content').innerHTML=emptyState({title:'Lanzamiento no encontrado',desc:'Es posible que se haya eliminado o cambiado de nombre. Vuelve al listado para verlo todo.'});return;}
   const mk=`lanz_${lz.id}`;
   if(!S.llamadas[mk])S.llamadas[mk]=[];
   if(!S.kpis_diarios[mk])S.kpis_diarios[mk]=[];
@@ -2979,7 +2997,7 @@ function renderUTMs(){
   </div>`;
 
   if(!filtered.length){
-    html+=`<div class="empty" style="padding:32px">${curUtmConjunto==='__all__'?'No hay UTMs guardadas.':'Este conjunto no tiene anuncios aún.'}<br><br><button class="btn btn-p" onclick="openAddUtm()">+ Añadir UTM</button></div>`;
+    html+=emptyState({title:curUtmConjunto==='__all__'?'Aún no hay UTMs':'Este conjunto está vacío',desc:curUtmConjunto==='__all__'?'Crea tu primera UTM para empezar a hacer seguimiento de tus anuncios y orígenes de tráfico.':'Añade anuncios a este conjunto para verlos agrupados aquí.',action:'<button class="btn btn-p" onclick="openAddUtm()">+ Añadir UTM</button>'});
     c.innerHTML=html;
     return;
   }
