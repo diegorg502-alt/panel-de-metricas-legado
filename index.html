@@ -61,14 +61,12 @@ aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .btn-logout{width:100%;padding:7px;border:1px solid var(--border2);background:var(--bg);border-radius:7px;font-family:var(--font);font-size:12px;color:var(--text2);cursor:pointer}
 .btn-logout:hover{background:var(--bg3)}
-.token-box{background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:11px}
-.token-label{color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
-.token-days{font-size:22px;font-weight:700;color:var(--text);line-height:1}
-.token-days.warn{color:var(--amber)}
-.token-days.danger{color:var(--red)}
-.token-sub{color:var(--text3);font-size:10px;margin-top:2px}
-.token-bar-wrap{background:var(--bg3);border-radius:4px;height:4px;margin-top:6px;overflow:hidden}
-.token-bar{height:4px;border-radius:4px;background:var(--green);transition:width .5s,background .5s}
+.token-mini{display:flex;align-items:center;gap:5px;padding:5px 8px;font-size:11px;color:var(--text3);margin-bottom:6px;border-radius:6px;line-height:1.4;background:var(--bg);border:1px solid var(--border)}
+.token-mini.warn{color:var(--amber);background:var(--amber-l);border-color:#fde68a}
+.token-mini.danger{color:var(--red);background:var(--red-l);border-color:#fecaca;font-weight:500}
+.token-days{font-weight:700;color:var(--text2)}
+.token-mini.warn .token-days{color:var(--amber)}
+.token-mini.danger .token-days{color:var(--red)}
 .btn-token-renew{width:100%;padding:7px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:7px;font-family:var(--font);font-size:12px;color:var(--blue);cursor:pointer;font-weight:500;margin-bottom:6px}
 .btn-token-renew:hover{background:#dbeafe}
 .topbar{height:50px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:10px;flex-shrink:0;background:var(--bg)}
@@ -273,9 +271,6 @@ details.acordeon>summary:hover{background:var(--bg3)!important}
   #topbar-extra { display: flex; gap: 6px; flex-wrap: wrap; }
   #topbar-extra .btn, #topbar-extra .btn-p { font-size: 12px; padding: 6px 10px; }
 
-  /* Token box */
-  .token-days { font-size: 18px !important; }
-
   /* Mobile footer inside sidebar */
   #mob-sb-foot {
     display: block;
@@ -396,11 +391,10 @@ details.acordeon>summary:hover{background:var(--bg3)!important}
       </nav>
       <div class="sb-foot">
         <div class="sb-sync"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Conectando...</span></div>
-        <div class="token-box" id="token-countdown-box">
-          <div class="token-label">🔑 Token Meta</div>
-          <div class="token-days" id="token-days-num">—</div>
-          <div class="token-sub" id="token-days-sub">días restantes</div>
-          <div class="token-bar-wrap"><div class="token-bar" id="token-bar" style="width:0%"></div></div>
+        <div class="token-mini" id="token-countdown-box" title="Token de Meta — se renueva manualmente cada ~60 días">
+          <span>🔑</span>
+          <span style="flex:1">Token Meta · <span class="token-days" id="token-days-num">—</span> <span id="token-days-sub">días</span></span>
+          <span id="token-bar" style="display:none"></span>
         </div>
         <button class="btn-token-renew" id="btn-token-renew" onclick="openTokenRenewModal()" style="display:none">🔄 Renovar token</button>
         <div class="sb-user" id="sb-user"></div>
@@ -3415,27 +3409,24 @@ function updateTokenCountdown(){
   barEl.style.width = pct + '%';
 
   // Color según urgencia
-  numEl.className = 'token-days';
+  const boxEl = document.getElementById('token-countdown-box');
+  if(boxEl) boxEl.className = 'token-mini';
   if(remaining <= 0){
-    numEl.classList.add('danger');
-    barEl.style.background = 'var(--red)';
+    if(boxEl) boxEl.classList.add('danger');
     btnRenew.style.display = 'block';
     btnRenew.textContent = '🚨 Token expirado — Renovar';
     btnRenew.style.background = '#fef2f2';
     btnRenew.style.borderColor = '#fca5a5';
     btnRenew.style.color = 'var(--red)';
   } else if(remaining <= 7){
-    numEl.classList.add('danger');
-    barEl.style.background = 'var(--red)';
+    if(boxEl) boxEl.classList.add('danger');
     btnRenew.style.display = 'block';
     btnRenew.textContent = '🔄 Renovar token ahora';
   } else if(remaining <= 14){
-    numEl.classList.add('warn');
-    barEl.style.background = 'var(--amber)';
+    if(boxEl) boxEl.classList.add('warn');
     btnRenew.style.display = 'block';
     btnRenew.textContent = '🔄 Renovar token pronto';
   } else {
-    barEl.style.background = 'var(--green)';
     btnRenew.style.display = 'none';
   }
 }
