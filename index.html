@@ -141,6 +141,13 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
 .kpi-m{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:10px 12px}
 .kpi-m .ml{font-size:9px;margin-bottom:4px}
 .kpi-m .mv{font-size:18px}
+.kpi-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.kpi-group{background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:12px}
+.kpi-group-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.kpi-group-title .dot{width:7px;height:7px;border-radius:999px;display:inline-block}
+.kpi-group-body{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.kpi-group-body .kpi-m{padding:8px 10px}
+@media (max-width:520px){.kpi-group-body{grid-template-columns:1fr}}
 #loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
 .spinner{width:32px;height:32px;border:3px solid var(--bg3);border-top-color:var(--text);border-radius:50%;animation:spin .8s linear infinite}
 details.acordeon>summary::-webkit-details-marker{display:none}
@@ -1037,6 +1044,19 @@ function kpisCanal(mk, canal){
 function kpiCard(label,val,cls,small){
   return`<div class="kpi-m"><div class="ml">${label}</div><div class="mv ${cls||''}" style="font-size:${small?'14px':'16px'}">${val}</div></div>`;
 }
+// Renderiza KPIs agrupados por categoría. groups = [{title, dot, items:[[label,val,cls], ...]}]
+// Se omiten grupos sin items (filtrado de items null/false permitido para condicionales).
+function kpiGroups(groups){
+  const inner=groups.map(g=>{
+    const items=(g.items||[]).filter(Boolean);
+    if(!items.length)return '';
+    return `<div class="kpi-group">
+      <div class="kpi-group-title"><span class="dot" style="background:${g.dot||'#94a3b8'}"></span>${esc(g.title)}</div>
+      <div class="kpi-group-body">${items.map(([l,v,c])=>kpiCard(l,v,c,true)).join('')}</div>
+    </div>`;
+  }).join('');
+  return `<div class="kpi-groups">${inner}</div>`;
+}
 
 function acordeon(id,title,badgeCls,content,open){
   // Usa <details> nativo: abre/cierra de forma fiable, sin depender de IDs ni JS extra.
@@ -1087,49 +1107,86 @@ function renderMes(){
 
   adsCanales.forEach(canal=>{
     const ks=kpisCanal(mk,canal);
-    const metricas=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
-      ${[
-        ['Inversión',fmt(ks.inv),'blue'],['Leads',ks.leads,''],['CPL',ks.cpl?fmt(ks.cpl,2):'-','amber'],
-        ['Llamadas',ks.llamadas,''],['% Agenda.',ks.pctAgend!=null?(ks.pctAgend*100).toFixed(1)+'%':'-',''],
-        ['€/Llamada',ks.costeLlamada?fmt(ks.costeLlamada,2):'-','amber'],
+    const metricas=kpiGroups([
+      {title:'Tráfico',dot:'#3b82f6',items:[
+        ['Inversión',fmt(ks.inv),'blue'],
+        ['Leads',ks.leads,''],
+        ['CPL',ks.cpl?fmt(ks.cpl,2):'-','amber'],
+        ['€/Llamada',ks.costeLlamada?fmt(ks.costeLlamada,2):'-','amber']
+      ]},
+      {title:'Embudo',dot:'#8b5cf6',items:[
+        ['Llamadas',ks.llamadas,''],
+        ['% Agend.',ks.pctAgend!=null?(ks.pctAgend*100).toFixed(1)+'%':'-',''],
         ['% Asistencia',ks.pctAsist!=null?(ks.pctAsist*100).toFixed(1)+'%':'-',''],
-        ['Realizadas',ks.realizadas,''],['% Cierre',ks.pctCierre!=null?(ks.pctCierre*100).toFixed(1)+'%':'-','blue'],
-        ['Ventas',ks.ventas,'green'],['Facturación',fmt(ks.fact),'blue'],['Caja',fmt(ks.caja),'green'],
-        ...(HAS_TICKET_MENSUAL?[['Ticket medio',ks.ticketMedio?fmt(ks.ticketMedio,0):'-','purple']]:[]),
-        ['ROAS',ks.roas?ks.roas.toFixed(2)+'x':'-','amber'],['ROI',ks.roi?ks.roi.toFixed(2)+'x':'-','purple'],['CPA',ks.cpa?fmt(ks.cpa,2):'-','']
-      ].map(([l,v,c])=>kpiCard(l,v,c,true)).join('')}
-    </div>`;
+        ['Realizadas',ks.realizadas,'']
+      ]},
+      {title:'Conversión',dot:'#10b981',items:[
+        ['Ventas',ks.ventas,'green'],
+        ['% Cierre',ks.pctCierre!=null?(ks.pctCierre*100).toFixed(1)+'%':'-','blue'],
+        ['CPA',ks.cpa?fmt(ks.cpa,2):'-','']
+      ]},
+      {title:'Resultados',dot:'#f59e0b',items:[
+        ['Facturación',fmt(ks.fact),'blue'],
+        ['Caja',fmt(ks.caja),'green'],
+        HAS_TICKET_MENSUAL?['Ticket medio',ks.ticketMedio?fmt(ks.ticketMedio,0):'-','purple']:null,
+        ['ROAS',ks.roas?ks.roas.toFixed(2)+'x':'-','amber'],
+        ['ROI',ks.roi?ks.roi.toFixed(2)+'x':'-','purple']
+      ]}
+    ]);
     acordeonesHTML+=acordeon(canal,canal,cbc[canal]||'b-gray',metricas,false);
   });
 
   // Organic/referidos accordions (reduced metrics)
   orgCanales.forEach(canal=>{
     const kr=kpisCanal(mk,canal);
-    const refMetricas=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
-      ${[
-        ['Llamadas',kr.llamadas,''],['% Asistencia',kr.pctAsist!=null?(kr.pctAsist*100).toFixed(1)+'%':'-',''],
-        ['Realizadas',kr.realizadas,''],['% Cierre',kr.pctCierre!=null?(kr.pctCierre*100).toFixed(1)+'%':'-','blue'],
-        ['Ventas',kr.ventas,'green'],['Facturación',fmt(kr.fact),'blue'],['Caja',fmt(kr.caja),'green'],
-        ...(HAS_TICKET_MENSUAL?[['Ticket medio',kr.ticketMedio?fmt(kr.ticketMedio,0):'-','purple']]:[])
-      ].map(([l,v,c])=>kpiCard(l,v,c,true)).join('')}
-    </div>`;
+    const refMetricas=kpiGroups([
+      {title:'Embudo',dot:'#8b5cf6',items:[
+        ['Llamadas',kr.llamadas,''],
+        ['% Asistencia',kr.pctAsist!=null?(kr.pctAsist*100).toFixed(1)+'%':'-',''],
+        ['Realizadas',kr.realizadas,'']
+      ]},
+      {title:'Conversión',dot:'#10b981',items:[
+        ['Ventas',kr.ventas,'green'],
+        ['% Cierre',kr.pctCierre!=null?(kr.pctCierre*100).toFixed(1)+'%':'-','blue']
+      ]},
+      {title:'Resultados',dot:'#f59e0b',items:[
+        ['Facturación',fmt(kr.fact),'blue'],
+        ['Caja',fmt(kr.caja),'green'],
+        HAS_TICKET_MENSUAL?['Ticket medio',kr.ticketMedio?fmt(kr.ticketMedio,0):'-','purple']:null
+      ]}
+    ]);
     acordeonesHTML+=acordeon(canal,canal,cbc[canal]||'b-gray',refMetricas,false);
   });
 
   document.getElementById('content').innerHTML=`
     <div class="card" style="margin-bottom:14px">
       <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text2)">KPIs totales — ${MFULL[curMonth]} ${curYear}</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px">
-        ${[
-          ['Inversión',fmt(inv),'blue'],['Leads/Seg.',leads,''],['CPL',cpl?fmt(cpl,2):'-','amber'],
-          ['Llamadas agend.',llamadasTotal,''],['% Agendamiento',pctAgend!=null?(pctAgend*100).toFixed(1)+'%':'-',''],
-          ['€/Llamada',costeLlamada?fmt(costeLlamada,2):'-','amber'],['% Asistencia',pctAsist!=null?(pctAsist*100).toFixed(1)+'%':'-',''],
-          ['Realizadas',realizadas,''],['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue'],
-          ['Ventas',ventas.length,'green'],['Facturación',fmt(fact),'blue'],['Caja',fmt(caja),'green'],
-          ...(HAS_TICKET_MENSUAL?[['Ticket medio',ticketMedio?fmt(ticketMedio,0):'-','purple']]:[]),
-          ['ROAS',roas?roas.toFixed(2)+'x':'-','amber'],['ROI',roi?roi.toFixed(2)+'x':'-','purple'],['CPA',cpa?fmt(cpa,2):'-','']
-        ].map(([l,v,c])=>`<div class="kpi-m"><div class="ml">${l}</div><div class="mv ${c}" style="font-size:16px">${v}</div></div>`).join('')}
-      </div>
+      ${kpiGroups([
+        {title:'Tráfico',dot:'#3b82f6',items:[
+          ['Inversión',fmt(inv),'blue'],
+          ['Leads/Seg.',leads,''],
+          ['CPL',cpl?fmt(cpl,2):'-','amber'],
+          ['€/Llamada',costeLlamada?fmt(costeLlamada,2):'-','amber']
+        ]},
+        {title:'Embudo',dot:'#8b5cf6',items:[
+          ['Llamadas agend.',llamadasTotal,''],
+          ['% Agendamiento',pctAgend!=null?(pctAgend*100).toFixed(1)+'%':'-',''],
+          ['% Asistencia',pctAsist!=null?(pctAsist*100).toFixed(1)+'%':'-',''],
+          ['Realizadas',realizadas,'']
+        ]},
+        {title:'Conversión',dot:'#10b981',items:[
+          ['Ventas',ventas.length,'green'],
+          ['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue'],
+          ['CPA',cpa?fmt(cpa,2):'-','']
+        ]},
+        {title:'Resultados',dot:'#f59e0b',items:[
+          ['Facturación',fmt(fact),'blue'],
+          ['Caja',fmt(caja),'green'],
+          HAS_TICKET_MENSUAL?['Ticket medio',ticketMedio?fmt(ticketMedio,0):'-','purple']:null,
+          ['ROAS',roas?roas.toFixed(2)+'x':'-','amber'],
+          ['ROI',roi?roi.toFixed(2)+'x':'-','purple']
+        ]}
+      ])}
     </div>
     <div style="margin-bottom:14px">
       <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--text2)">KPIs por canal</div>
@@ -2540,16 +2597,31 @@ function renderLanzamientoDetail(){
   document.getElementById('content').innerHTML=`
     <div class="card">
       <div class="card-title"><span>Métricas del lanzamiento</span><span class="badge b-blue">${lz.fecha||''}</span></div>
-      <div class="mg" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
-        ${[
-          ['Inversión',fmt(inv),'blue'],['Leads/Seg.',leads,''],['CPL',cpl?fmt(cpl,2):'-','amber'],
-          ['Llamadas',llamadasTotal,''],['% Agendamiento',pctAgend!=null?(pctAgend*100).toFixed(1)+'%':'-',''],
-          ['€/Llamada',costeLlamada?fmt(costeLlamada,2):'-','amber'],['% Asistencia',pctAsist!=null?(pctAsist*100).toFixed(1)+'%':'-',''],
-          ['Realizadas',realizadas,''],['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue'],
-          ['Ventas',ventas.length,'green'],['Facturación',fmt(fact),'blue'],['Caja',fmt(caja),'green'],
-          ['ROAS',roas?roas.toFixed(2)+'x':'-','amber'],['ROI',roi?roi.toFixed(2)+'x':'-','purple'],['CPA',cpa?fmt(cpa,2):'-','']
-        ].map(([l,v,c])=>`<div class="kpi-m"><div class="ml">${l}</div><div class="mv ${c}" style="font-size:16px">${v}</div></div>`).join('')}
-      </div>
+      ${kpiGroups([
+        {title:'Tráfico',dot:'#3b82f6',items:[
+          ['Inversión',fmt(inv),'blue'],
+          ['Leads/Seg.',leads,''],
+          ['CPL',cpl?fmt(cpl,2):'-','amber'],
+          ['€/Llamada',costeLlamada?fmt(costeLlamada,2):'-','amber']
+        ]},
+        {title:'Embudo',dot:'#8b5cf6',items:[
+          ['Llamadas',llamadasTotal,''],
+          ['% Agendamiento',pctAgend!=null?(pctAgend*100).toFixed(1)+'%':'-',''],
+          ['% Asistencia',pctAsist!=null?(pctAsist*100).toFixed(1)+'%':'-',''],
+          ['Realizadas',realizadas,'']
+        ]},
+        {title:'Conversión',dot:'#10b981',items:[
+          ['Ventas',ventas.length,'green'],
+          ['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue'],
+          ['CPA',cpa?fmt(cpa,2):'-','']
+        ]},
+        {title:'Resultados',dot:'#f59e0b',items:[
+          ['Facturación',fmt(fact),'blue'],
+          ['Caja',fmt(caja),'green'],
+          ['ROAS',roas?roas.toFixed(2)+'x':'-','amber'],
+          ['ROI',roi?roi.toFixed(2)+'x':'-','purple']
+        ]}
+      ])}
     </div>
     <div class="card" style="margin-bottom:14px">
       <div class="card-title">KPIs diarios del lanzamiento</div>
