@@ -4,25 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>panel-de-metricas-legado</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-:root{--bg:#fff;--bg2:#fafaf9;--bg3:#f4f4f2;--border:rgba(0,0,0,.06);--border2:rgba(0,0,0,.09);--text:#0a0a0a;--text2:#525252;--text3:#a3a3a3;--blue:#1a6bdb;--blue-l:#eff6ff;--green:#057a55;--green-l:#f0fdf4;--amber:#b45309;--amber-l:#fffbeb;--red:#c81e1e;--red-l:#fef2f2;--purple:#6d28d9;--purple-l:#f5f3ff;--sidebar:232px;--font:'Inter',sans-serif;--shadow:0 1px 2px rgba(0,0,0,.04),0 0 0 1px rgba(0,0,0,.05);--shadow-h:0 2px 8px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.06);}
+:root{--bg:#fff;--bg2:#fafaf9;--bg3:#f4f4f2;--border:rgba(0,0,0,.06);--border2:rgba(0,0,0,.09);--text:#0a0a0a;--text2:#525252;--text3:#a3a3a3;--blue:#1a6bdb;--blue-l:#eff6ff;--green:#057a55;--green-l:#f0fdf4;--amber:#b45309;--amber-l:#fffbeb;--red:#c81e1e;--red-l:#fef2f2;--purple:#6d28d9;--purple-l:#f5f3ff;--brand:#3B6D11;--brand-soft:#6A9C3E;--brand-l:#EAF3DE;--sidebar:232px;--font:'Inter',sans-serif;--font-display:'Plus Jakarta Sans','Inter',sans-serif;--shadow:0 1px 2px rgba(0,0,0,.04),0 0 0 1px rgba(0,0,0,.05);--shadow-h:0 2px 8px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.06);}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 /* LOGIN */
 #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg2);padding:24px}
 .login-wrap{width:100%;max-width:380px}
-.login-brand{font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);margin-bottom:28px;text-align:center}
-.login-card{background:var(--bg);border:1px solid var(--border2);border-radius:14px;padding:36px;display:flex;flex-direction:column;gap:14px}
-.login-title{font-size:22px;font-weight:600}
+.login-brand{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);margin-bottom:24px;justify-content:center;width:100%}
+.login-brand::before,.login-brand::after{content:'';flex:1;max-width:48px;height:1px;background:var(--brand-soft);opacity:.4}
+.login-card{background:var(--bg);border:1px solid var(--border2);border-radius:14px;padding:36px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 32px rgba(59,109,17,.06)}
+.login-title{font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-.02em}
 .login-sub{font-size:13px;color:var(--text2);margin-top:-6px}
 .field{display:flex;flex-direction:column;gap:5px}
 .field label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text2)}
 .field input{padding:10px 12px;border:1px solid var(--border2);border-radius:8px;font-family:var(--font);font-size:14px;color:var(--text);background:var(--bg);transition:border-color .15s}
 .field input:focus{outline:none;border-color:var(--blue)}
-.btn-login{padding:11px;background:var(--text);color:#fff;border:none;border-radius:8px;font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s;margin-top:4px}
+.btn-login{padding:11px;background:var(--brand);color:#fff;border:none;border-radius:8px;font-family:var(--font);font-size:14px;font-weight:600;letter-spacing:.01em;cursor:pointer;transition:all .15s;margin-top:4px;box-shadow:0 1px 2px rgba(59,109,17,.2)}
+.btn-login:hover{background:var(--brand-soft)}
 .btn-login:hover{opacity:.85}
 .btn-login:disabled{opacity:.5;cursor:not-allowed}
 .login-error{font-size:12px;color:var(--red);background:var(--red-l);border-radius:7px;padding:8px 12px;display:none}
@@ -31,12 +33,15 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .shell{display:flex;height:100%}
 aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
-.sb-brand{padding:16px 14px 12px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border)}
+.sb-brand{padding:18px 14px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:4px}
+.sb-brand .sb-kicker{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--brand)}
+.sb-brand .sb-kicker::before{content:'';width:14px;height:2px;background:var(--brand);border-radius:2px}
+.sb-brand .sb-client{font-family:var(--font-display);font-size:17px;font-weight:700;letter-spacing:-.01em;color:var(--text);line-height:1.15}
 .sb-nav{flex:1;overflow-y:auto;padding:8px}
 .nav-g{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);padding:12px 8px 4px}
 .nav-i{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text2);transition:all .12s;margin-bottom:1px;user-select:none}
 .nav-i:hover{background:var(--bg3);color:var(--text)}
-.nav-i.active{background:var(--text);color:#fff}
+.nav-i.active{background:var(--brand);color:#fff;font-weight:600}
 .nav-i svg{opacity:.5;flex-shrink:0}
 .nav-i.active svg{opacity:1}
 .nav-gh{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text2);transition:all .12s;margin-bottom:1px;user-select:none}
@@ -98,7 +103,9 @@ input[type=number].ce::-webkit-inner-spin-button,input[type=number].ce::-webkit-
 input[type=number].ce{-moz-appearance:textfield}
 .badge{display:inline-flex;align-items:center;padding:3px 11px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
 .b-green{background:var(--green-l);color:var(--green)}.b-amber{background:var(--amber-l);color:var(--amber)}.b-red{background:var(--red-l);color:var(--red)}.b-blue{background:var(--blue-l);color:var(--blue)}.b-gray{background:var(--bg3);color:var(--text2)}.b-purple{background:var(--purple-l);color:var(--purple)}
-.sec-title{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-bottom:22px;color:var(--text)}
+.sec-title{font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:22px;color:var(--text);display:flex;align-items:center;gap:12px}
+.sec-title::before{content:'';width:4px;height:22px;background:var(--brand);border-radius:3px;flex-shrink:0}
+.card-title{font-family:var(--font-display);font-weight:700;letter-spacing:-.01em}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:#fff;border:1px solid var(--border2);font-size:12px;color:var(--text2);cursor:pointer;transition:all .12s;font-weight:500;font-family:var(--font);position:relative}
 .chip:hover{border-color:var(--text3);color:var(--text)}
 .chip.active{background:var(--text);color:#fff;border-color:var(--text)}
@@ -311,7 +318,8 @@ details.acordeon>summary:hover{background:var(--bg3)!important}
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </div>
       <div class="sb-brand">
-        <span id="sb-brand-text">CRM · Bruno Gómez</span>
+        <span class="sb-kicker">Agencia Legado</span>
+        <span class="sb-client" id="sb-brand-text">Bruno Gómez</span>
       </div>
     <div style="padding:6px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:11px;color:var(--text3)">Año activo</span>
@@ -609,7 +617,7 @@ async function loadClientConfig(email){
     // Also hide alertas and IA chat for these clients (until matching is fully set up)
     if(data.auto_renew){SHOW_RENOVACIONES=false;HAS_UTMS=true;HAS_PLANES=true;SHOW_ALERTAS=false;SHOW_IA=false;SHOW_ADS_GANADORES=false;HAS_TICKET_MENSUAL=true;}
     // Update UI
-    const sbbrand=document.querySelector('#sb-brand-text');if(sbbrand)sbbrand.textContent='CRM · '+CLIENT_NOMBRE;
+    const sbbrand=document.querySelector('#sb-brand-text');if(sbbrand)sbbrand.textContent=CLIENT_NOMBRE;
     const sbfoot=document.querySelector('.sb-foot div:last-child');if(sbfoot)sbfoot.textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
     document.title='Panel de Métricas — Agencia Legado';
     return true;
