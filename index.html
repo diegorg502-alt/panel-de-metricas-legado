@@ -356,6 +356,12 @@ details.acordeon>summary:hover{background:var(--bg3)!important}
         <div class="nav-i" id="ni-ia" onclick="goTo('ia')">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M5 8h6M8 5v6"/></svg>Conversa con la IA
         </div>
+        <div id="escalado-nav-section" style="display:none">
+          <div class="nav-g">Escalado</div>
+          <div class="nav-i" id="ni-escalado" onclick="goTo('escalado')">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M2 13 L6 9 L9 11 L14 4"/><polyline points="10,4 14,4 14,8"/></svg>Estrategia de Escalado
+          </div>
+        </div>
         <div id="lanz-nav-section" style="display:none">
           <div class="nav-g">Lanzamientos</div>
           <div class="nav-i" id="ni-lanzamientos" onclick="goTo('lanzamientos')">
@@ -453,13 +459,14 @@ let SHOW_RENOVACIONES=true; // false = hide renovaciones section (auto-renew cli
 let HAS_UTMS=false; // true = show UTMs section
 let HAS_PLANES=false; // true = show plan selector in llamadas
 let HAS_TICKET_MENSUAL=false; // true = show Ticket medio con plan ANUAL dividido /12 (solo Zerochats por ahora)
+let HAS_ESCALADO=false; // true = show Estrategia de Escalado section
 let MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:''};
 let SHOW_ALERTAS=true; // false = hide alerts section
 let SHOW_IA=true; // false = hide IA chat section
 let SHOW_ADS_GANADORES=true; // false = hide winning ads section
 let curLanzamiento=''; // current selected launch id
 
-let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[]};
+let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[],escalado:{config:null,evaluaciones:[]}};
 let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null;
 let isEntrenador=false;
 let curYear=new Date().getFullYear();
@@ -499,7 +506,7 @@ async function doLogout(){
   document.getElementById('shell').style.display='none';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('li-pass').value='';
-  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[]};
+  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[],escalado:{config:null,evaluaciones:[]}};
 }
 
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')doLogin();});
@@ -534,7 +541,7 @@ async function reloadFromSupabase(){
   setSyncStatus('saving','Recargando...');
   localStorage.removeItem('crm_bruno_bk');
   localStorage.removeItem('crm_last_backup');
-  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[]};
+  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[],escalado:{config:null,evaluaciones:[]}};
   await loadData();
   goTo(curPage,curMonth);
   setSyncStatus('ok','Datos recargados ✓');
@@ -595,6 +602,7 @@ async function loadClientConfig(email){
     SHOW_RENOVACIONES=data.show_renovaciones!==false; // default true
     HAS_UTMS=data.has_utms||false;
     HAS_PLANES=data.has_planes||false;
+    HAS_ESCALADO=data.has_escalado||false;
     // Auto-enable lanzamientos if client has LANZAMIENTO or WORKSHOP channels
     if(!HAS_LANZAMIENTOS&&CANALES.some(c=>c.toUpperCase().includes('LANZAMIENTO')||c.toUpperCase().includes('WORKSHOP')))HAS_LANZAMIENTOS=true;
     // Auto-enable UTMs + planes for Zerochats-like clients (auto-renew)
@@ -921,6 +929,9 @@ function buildSidebar(){
   // UTMs nav
   const utmsNav=document.getElementById('utms-nav-section');
   if(utmsNav)utmsNav.style.display=HAS_UTMS?'block':'none';
+  // Escalado nav
+  const escNav=document.getElementById('escalado-nav-section');
+  if(escNav)escNav.style.display=HAS_ESCALADO?'block':'none';
   // Hide renovaciones if auto-renew
   const niRenov=document.getElementById('ni-renovaciones');
   if(niRenov)niRenov.style.display=SHOW_RENOVACIONES?'':'none';
@@ -945,12 +956,12 @@ function toggleG(id){document.getElementById(`nhdr-${id}`).classList.toggle('ope
 function goTo(page,month,lanzId){
   if(month!==undefined)curMonth=month;if(lanzId!==undefined)curLanzamiento=lanzId;curPage=page;
   document.querySelectorAll('.nav-i').forEach(el=>el.classList.remove('active'));
-  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance',lanzamientos:'ni-lanzamientos',utms:'ni-utms'};
+  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance',lanzamientos:'ni-lanzamientos',utms:'ni-utms',escalado:'ni-escalado'};
   if(ids[page])document.getElementById(ids[page])?.classList.add('active');
   if(page==='mes')document.getElementById(`ni-mes-${MONTHS[curMonth]}`)?.classList.add('active');
   if(page==='kpis_d')document.getElementById(`ni-kd-${MONTHS[curMonth]}`)?.classList.add('active');
   if(page==='lanzamiento_detail')document.getElementById(`ni-lanz-${curLanzamiento}`)?.classList.add('active');
-  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación',ia:'Conversa con la IA',balance:'Balance',lanzamientos:'Lanzamientos',utms:'UTMs'};
+  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación',ia:'Conversa con la IA',balance:'Balance',lanzamientos:'Lanzamientos',utms:'UTMs',escalado:'Estrategia de Escalado'};
   updateAlertaBadge();
   let pageTitle=titles[page]||(page==='mes'?`KPIs — ${MFULL[curMonth]} ${curYear}`:page==='kpis_d'?`KPIs diarios — ${MFULL[curMonth]} ${curYear}`:'');
   if(page==='lanzamiento_detail'){const lz=(S.lanzamientos||[]).find(l=>l.id===curLanzamiento);pageTitle=lz?lz.nombre:'Lanzamiento';}
@@ -962,7 +973,7 @@ function goTo(page,month,lanzId){
   if(page==='lanzamientos'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nuevo lanzamiento';b.onclick=openAddLanzamiento;ex.appendChild(b);}
   if(page==='lanzamiento_detail'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLanzRow(curLanzamiento);ex.appendChild(b);const bd=document.createElement('button');bd.className='btn btn-red';bd.textContent='Eliminar lanzamiento';bd.style.marginLeft='8px';bd.onclick=()=>deleteLanzamiento(curLanzamiento);ex.appendChild(bd);}
   if(page==='utms'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva UTM';b.onclick=openAddUtm;ex.appendChild(b);}
-  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,ia:renderIA,mes:renderMes,kpis_d:renderKpisD,balance:renderBalance,lanzamientos:renderLanzamientos,lanzamiento_detail:renderLanzamientoDetail,utms:renderUTMs}[page]||renderDashboard)();
+  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,ia:renderIA,mes:renderMes,kpis_d:renderKpisD,balance:renderBalance,lanzamientos:renderLanzamientos,lanzamiento_detail:renderLanzamientoDetail,utms:renderUTMs,escalado:renderEscalado}[page]||renderDashboard)();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────
@@ -2531,6 +2542,198 @@ function exportCSV(mesIdx) {
   a.download = `Llamadas_Bruno_${mesNombre}_${curYear}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── ESTRATEGIA DE ESCALADO ───────────────────────────────
+const ESCALADO_BENCHMARKS={
+  asesoria:    {nombre:'Asesoría / high-ticket',margen:75,esc:{conservador:0.25,estandar:0.35,agresivo:0.50},nota:'Servicios high-ticket con márgenes 70-85%. El escenario estándar destina 35% del LTV con margen a publicidad.'},
+  infoproducto:{nombre:'Infoproducto / curso',margen:80,esc:{conservador:0.30,estandar:0.40,agresivo:0.55},nota:'Margen alto pero competencia alta. Agresivo solo con upsells/backend.'},
+  ecommerce:   {nombre:'Ecommerce',margen:40,esc:{conservador:0.20,estandar:0.30,agresivo:0.45},nota:'Márgenes 30-50%. El agresivo requiere recompra real medida.'},
+  servicio:    {nombre:'Servicio recurrente',margen:60,esc:{conservador:0.25,estandar:0.35,agresivo:0.50},nota:'Depende del churn. Si no está medido, conservador.'}
+};
+
+function escaladoConfig(){return S.escalado&&S.escalado.config?S.escalado.config:null;}
+function escaladoEval(){return (S.escalado&&S.escalado.evaluaciones)||[];}
+function escaladoEscenarios(cfg){
+  const b=ESCALADO_BENCHMARKS[cfg.tipo];if(!b)return null;
+  const margen=(cfg.margen||b.margen)/100;
+  const ltv=Number(cfg.ticket||0)*Number(cfg.renovaciones||0);
+  const ltvMargen=ltv*margen;
+  const breakeven=margen?1/margen:0;
+  const cacObj=k=>ltvMargen*b.esc[k];
+  return {bench:b,margen,ltv,ltvMargen,breakeven,cac:{conservador:cacObj('conservador'),estandar:cacObj('estandar'),agresivo:cacObj('agresivo')}};
+}
+function escaladoZona(cacReal,cac){
+  if(!cacReal||!cac)return null;
+  if(cacReal<=cac.conservador*0.9) return {key:'excelente',cls:'b-green',titulo:'Escalar muy agresivo — márgenes excepcionales',pct:25,cad:'5 días',cuando:'Inmediatamente',color:'#15803d'};
+  if(cacReal<=cac.conservador)     return {key:'conservador',cls:'b-green',titulo:'Escalar agresivo — zona de máximo margen',pct:20,cad:'5 días',cuando:'Inmediatamente',color:'#22c55e'};
+  if(cacReal<=cac.estandar)        return {key:'estandar-bajo',cls:'b-blue',titulo:'Escalar controlado — zona estándar',pct:15,cad:'7 días',cuando:'Inmediatamente, con cadencia prudente',color:'#3b82f6'};
+  if(cacReal<=cac.agresivo*0.85)   return {key:'estandar-alto',cls:'b-amber',titulo:'Escalar mínimo — acercándote al límite',pct:10,cad:'10 días',cuando:'Con cautela. Optimiza embudo antes de subir',color:'#f59e0b'};
+  if(cacReal<=cac.agresivo)        return {key:'agresivo',cls:'b-amber',titulo:'Mantener y optimizar — estás en el límite',pct:0,cad:'',cuando:'Cuando el CAC real baje hasta el escenario estándar',color:'#f97316'};
+  return                                  {key:'fuera',cls:'b-red',titulo:'NO escalar — CAC fuera de rango rentable',pct:0,cad:'',cuando:'Cuando el CAC real baje por debajo del agresivo',color:'#dc2626'};
+}
+
+function renderEscalado(){
+  const c=document.getElementById('content');
+  const cfg=escaladoConfig();
+  const sc=cfg?escaladoEscenarios(cfg):null;
+  const evals=escaladoEval();
+
+  // 1) Configuración del negocio
+  const tipoOpts=Object.entries(ESCALADO_BENCHMARKS).map(([k,b])=>`<option value="${k}"${cfg&&cfg.tipo===k?' selected':''}>${b.nombre}</option>`).join('');
+  const cfgCard=`<div class="card" style="margin-bottom:14px">
+    <div class="card-title"><span>Configuración del negocio</span>${cfg?'<span class="badge b-green">Configurado</span>':'<span class="badge b-amber">Sin configurar</span>'}</div>
+    <p style="font-size:13px;color:var(--text2);margin:0 0 14px">Datos del negocio para calcular los 3 escenarios de CAC objetivo. Solo se introduce una vez (puedes editarlo cuando cambien las condiciones).</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+      <div class="field"><label class="fl">Tipo de negocio</label><select id="esc-tipo" class="fi">${tipoOpts}</select></div>
+      <div class="field"><label class="fl">Ticket medio (€)</label><input id="esc-ticket" type="number" class="fi" min="0" step="1" value="${cfg?cfg.ticket:''}" placeholder="850"></div>
+      <div class="field"><label class="fl">Nº renovaciones</label><input id="esc-renov" type="number" class="fi" min="0" step="0.1" value="${cfg?cfg.renovaciones:''}" placeholder="2"></div>
+      <div class="field"><label class="fl">Margen bruto (%)</label><input id="esc-margen" type="number" class="fi" min="0" max="100" step="1" value="${cfg&&cfg.margen?cfg.margen:''}" placeholder="déjalo vacío para usar el estándar del sector"></div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-p" onclick="saveEscaladoConfig()">${cfg?'Actualizar':'Guardar'} configuración</button>${cfg?`<button class="btn btn-red" onclick="clearEscaladoConfig()">Borrar</button>`:''}</div>
+  </div>`;
+
+  // 2) Escenarios calculados
+  let escenariosHTML='';
+  if(sc){
+    const cards=[
+      {k:'conservador',title:'Conservador',color:'#22c55e',bg:'#dcfce7',desc:'Máximo margen por cliente'},
+      {k:'estandar',   title:'Estándar',   color:'#f59e0b',bg:'#fef3c7',desc:'Equilibrio rentabilidad/volumen'},
+      {k:'agresivo',   title:'Agresivo',   color:'#ef4444',bg:'#fee2e2',desc:'Límite de rentabilidad'}
+    ].map(s=>`<div class="kpi-group" style="border-left:4px solid ${s.color}">
+      <div class="kpi-group-title"><span class="dot" style="background:${s.color}"></span>${s.title}</div>
+      <div style="font-size:24px;font-weight:700;color:${s.color};margin:6px 0">${fmt(sc.cac[s.k])}</div>
+      <div style="font-size:11px;color:var(--text3)">CAC objetivo · ${Math.round(ESCALADO_BENCHMARKS[cfg.tipo].esc[s.k]*100)}% del LTV con margen</div>
+      <div style="margin-top:8px;font-size:12px;color:var(--text2)">Presupuesto mín/día: <strong>${fmt((50/7)*sc.cac[s.k])}</strong></div>
+      <div style="font-size:12px;color:var(--text2)">Beneficio/cliente: <strong>${fmt(sc.ltvMargen-sc.cac[s.k])}</strong></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">${s.desc}</div>
+    </div>`).join('');
+    escenariosHTML=`<div class="card" style="margin-bottom:14px">
+      <div class="card-title"><span>Escenarios de CAC objetivo</span><span class="badge b-blue">${sc.bench.nombre}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px">
+        <div class="kpi-m"><div class="ml">LTV</div><div class="mv blue">${fmt(sc.ltv)}</div></div>
+        <div class="kpi-m"><div class="ml">LTV con margen</div><div class="mv blue">${fmt(sc.ltvMargen)}</div></div>
+        <div class="kpi-m"><div class="ml">Margen</div><div class="mv">${Math.round(sc.margen*100)}%</div></div>
+        <div class="kpi-m"><div class="ml">Breakeven ROAS</div><div class="mv amber">${sc.breakeven.toFixed(2)}x</div></div>
+      </div>
+      <div class="kpi-groups" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">${cards}</div>
+      <p style="margin-top:12px;font-size:12px;color:var(--text3);line-height:1.6">${sc.bench.nota}</p>
+    </div>`;
+  }
+
+  // 3) Evaluación semanal
+  const lastEv=evals.length?evals[evals.length-1]:null;
+  const evalCard=sc?`<div class="card" style="margin-bottom:14px">
+    <div class="card-title"><span>Evaluación semanal del embudo</span><span class="badge b-gray">${evals.length} evaluación${evals.length===1?'':'es'}</span></div>
+    <p style="font-size:13px;color:var(--text2);margin:0 0 14px">Mete los 4 indicadores del embudo y el presupuesto actual. El sistema calcula el CAC real y lo compara con los 3 escenarios para decirte si subir, mantener o bajar el presupuesto.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+      <div class="field"><label class="fl">Fecha</label><input id="ev-fecha" type="date" class="fi" value="${new Date().toISOString().split('T')[0]}"></div>
+      <div class="field"><label class="fl">CPL (€)</label><input id="ev-cpl" type="number" class="fi" min="0" step="0.01" placeholder="3.50" value="${lastEv?lastEv.cpl:''}"></div>
+      <div class="field"><label class="fl">% Agendamiento</label><input id="ev-agenda" type="number" class="fi" min="0" max="100" step="0.1" placeholder="20" value="${lastEv?lastEv.agenda:''}"></div>
+      <div class="field"><label class="fl">% Asistencia</label><input id="ev-asistencia" type="number" class="fi" min="0" max="100" step="0.1" placeholder="70" value="${lastEv?lastEv.asistencia:''}"></div>
+      <div class="field"><label class="fl">% Cierre</label><input id="ev-cierre" type="number" class="fi" min="0" max="100" step="0.1" placeholder="30" value="${lastEv?lastEv.cierre:''}"></div>
+      <div class="field"><label class="fl">Presupuesto/día (€)</label><input id="ev-presupuesto" type="number" class="fi" min="0" step="1" placeholder="50" value="${lastEv?lastEv.presupuesto:''}"></div>
+    </div>
+    <div style="margin-top:12px"><button class="btn btn-p" onclick="evaluarEscalado()">Evaluar y guardar</button></div>
+  </div>`:'';
+
+  // 4) Diagnóstico de la última evaluación
+  let diagHTML='';
+  if(sc&&lastEv){
+    const z=escaladoZona(lastEv.cacReal,sc.cac);
+    const nuevoPresup=z&&z.pct>0?Math.round(lastEv.presupuesto*(1+z.pct/100)):lastEv.presupuesto;
+    diagHTML=`<div class="card" style="margin-bottom:14px;border-left:4px solid ${z.color}">
+      <div class="card-title"><span>Diagnóstico — ${lastEv.fecha}</span><span class="badge ${z.cls}">${z.titulo}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">
+        <div class="kpi-m"><div class="ml">CAC real</div><div class="mv" style="color:${z.color}">${fmt(lastEv.cacReal)}</div></div>
+        <div class="kpi-m"><div class="ml">CAC conservador</div><div class="mv">${fmt(sc.cac.conservador)}</div></div>
+        <div class="kpi-m"><div class="ml">CAC estándar</div><div class="mv amber">${fmt(sc.cac.estandar)}</div></div>
+        <div class="kpi-m"><div class="ml">CAC agresivo</div><div class="mv red">${fmt(sc.cac.agresivo)}</div></div>
+      </div>
+      <p style="font-size:13px;color:var(--text2);margin:0 0 10px;line-height:1.6"><strong>Cuándo:</strong> ${z.cuando}.</p>
+      ${z.pct>0?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+        <div class="kpi-m"><div class="ml">Acción recomendada</div><div class="mv green" style="font-size:14px">+${z.pct}% cada ${z.cad}</div></div>
+        <div class="kpi-m"><div class="ml">Presupuesto actual</div><div class="mv">${fmt(lastEv.presupuesto)}/día</div></div>
+        <div class="kpi-m"><div class="ml">Nuevo presupuesto</div><div class="mv green">${fmt(nuevoPresup)}/día</div></div>
+      </div>`:`<p style="font-size:13px;color:var(--text2);margin:0">Mantén el presupuesto en <strong>${fmt(lastEv.presupuesto)}/día</strong> y optimiza el embudo (bajar CPL, subir % agenda o % cierre).</p>`}
+    </div>`;
+  }
+
+  // 5) Histórico
+  let histHTML='';
+  if(evals.length){
+    const rows=[...evals].reverse().map((e,idx)=>{
+      const z=sc?escaladoZona(e.cacReal,sc.cac):null;
+      const realIdx=evals.length-1-idx;
+      return `<tr><td>${e.fecha||'-'}</td>
+        <td style="text-align:right">${fmt(e.cpl,2)}</td>
+        <td style="text-align:right">${e.agenda}%</td>
+        <td style="text-align:right">${e.asistencia}%</td>
+        <td style="text-align:right">${e.cierre}%</td>
+        <td style="text-align:right;font-weight:600">${fmt(e.cacReal)}</td>
+        <td style="text-align:right">${fmt(e.presupuesto)}/día</td>
+        <td>${z?`<span class="badge ${z.cls}">${z.titulo.split('—')[0].trim()}</span>`:'-'}</td>
+        <td style="text-align:right;font-weight:600;color:${z&&z.pct>0?'#15803d':'var(--text3)'}">${z&&z.pct>0?'+'+z.pct+'%':'—'}</td>
+        <td>${esc(e.notas||'')}</td>
+        <td><button class="btn btn-red btn-xs" onclick="delEscaladoEval(${realIdx})">✕</button></td>
+      </tr>`;
+    }).join('');
+    histHTML=`<div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:14px 18px;display:flex;justify-content:space-between;align-items:center"><div style="font-weight:600">Historial de evaluaciones</div><div style="font-size:12px;color:var(--text3)">${evals.length} registro${evals.length===1?'':'s'}</div></div>
+      <div class="tw"><table>
+        <thead><tr>
+          <th>Fecha</th><th style="text-align:right">CPL</th><th style="text-align:right">% Agend.</th><th style="text-align:right">% Asist.</th><th style="text-align:right">% Cierre</th>
+          <th style="text-align:right">CAC real</th><th style="text-align:right">Presup.</th><th>Recomendación</th><th style="text-align:right">Subir</th><th>Notas</th><th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  c.innerHTML=`<div class="sec-title">Estrategia de Escalado</div>
+    ${cfgCard}${escenariosHTML}${evalCard}${diagHTML}${histHTML}`;
+}
+
+function saveEscaladoConfig(){
+  const tipo=document.getElementById('esc-tipo').value;
+  const ticket=parseNum(document.getElementById('esc-ticket').value);
+  const renov=parseNum(document.getElementById('esc-renov').value);
+  const margenInput=document.getElementById('esc-margen').value;
+  const margen=margenInput?parseNum(margenInput):null;
+  if(!tipo||!ticket||!renov){alert('Rellena tipo, ticket y nº de renovaciones');return;}
+  if(!S.escalado)S.escalado={config:null,evaluaciones:[]};
+  S.escalado.config={tipo,ticket,renovaciones:renov,margen};
+  save();renderEscalado();
+}
+function clearEscaladoConfig(){
+  if(!confirm('¿Borrar la configuración? El historial de evaluaciones se conserva.'))return;
+  if(S.escalado)S.escalado.config=null;
+  save();renderEscalado();
+}
+function evaluarEscalado(){
+  const cfg=escaladoConfig();const sc=cfg?escaladoEscenarios(cfg):null;
+  if(!sc){alert('Configura primero el negocio');return;}
+  const fecha=document.getElementById('ev-fecha').value;
+  const cpl=parseNum(document.getElementById('ev-cpl').value);
+  const agenda=parseNum(document.getElementById('ev-agenda').value);
+  const asistencia=parseNum(document.getElementById('ev-asistencia').value);
+  const cierre=parseNum(document.getElementById('ev-cierre').value);
+  const presupuesto=parseNum(document.getElementById('ev-presupuesto').value);
+  if(!fecha||!cpl||!agenda||!asistencia||!cierre||!presupuesto){alert('Rellena todos los campos');return;}
+  const conv=(agenda/100)*(asistencia/100)*(cierre/100);
+  if(!conv){alert('Las conversiones no pueden ser 0');return;}
+  const cacReal=Math.round((cpl/conv)*100)/100;
+  const z=escaladoZona(cacReal,sc.cac);
+  const recomendacion=z?z.titulo:'';
+  const nuevoPresupuesto=z&&z.pct>0?Math.round(presupuesto*(1+z.pct/100)):presupuesto;
+  if(!S.escalado)S.escalado={config:null,evaluaciones:[]};
+  S.escalado.evaluaciones.push({fecha,cpl,agenda,asistencia,cierre,presupuesto,cacReal,zona:z?z.key:null,recomendacion,escaladoPct:z?z.pct:0,nuevoPresupuesto,notas:''});
+  save();renderEscalado();
+}
+function delEscaladoEval(i){
+  if(!confirm('¿Eliminar esta evaluación del historial?'))return;
+  S.escalado.evaluaciones.splice(i,1);
+  save();renderEscalado();
 }
 
 // ── LANZAMIENTOS ─────────────────────────────────────────
