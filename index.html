@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>panel-de-metricas-legado</title>
+<title>Agencia Legado · CRM</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23000851'/%3E%3Cpath d='M16 5 L27 16 L16 27 L5 16 Z' fill='none' stroke='white' stroke-width='1.8' stroke-linejoin='round'/%3E%3Cline x1='13' y1='10.5' x2='13' y2='21.5' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3Cline x1='16' y1='9' x2='16' y2='23' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3Cline x1='19' y1='10.5' x2='19' y2='21.5' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -157,6 +158,15 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
 @media (max-width:520px){.kpi-group-body{grid-template-columns:1fr}}
 #loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
 .spinner{width:32px;height:32px;border:3px solid var(--bg3);border-top-color:var(--text);border-radius:50%;animation:spin .8s linear infinite}
+/* Branding v2 — solo activo para clientes con clase brand-v2 en <body> */
+body.brand-v2 aside{background:#F8F9FC}
+body.brand-v2 .field input:focus,body.brand-v2 input:focus,body.brand-v2 .ce:focus,body.brand-v2 .fi:focus,body.brand-v2 select:focus{border-color:var(--brand);outline:none;box-shadow:0 0 0 3px rgba(0,8,81,.08)}
+body.brand-v2 .card{transition:box-shadow .18s ease,transform .18s ease}
+body.brand-v2 .card:hover{box-shadow:0 4px 14px rgba(0,8,81,.07),0 0 0 1px rgba(0,8,81,.08);transform:translateY(-1px)}
+body.brand-v2 tbody tr{transition:background-color .12s ease}
+body.brand-v2 tbody tr:hover{background:rgba(0,8,81,.025)}
+body.brand-v2 .nav-i:hover{background:var(--brand-l);color:var(--brand)}
+body.brand-v2 .chip:hover{border-color:var(--brand);color:var(--brand)}
 details.acordeon>summary::-webkit-details-marker{display:none}
 details.acordeon>summary{list-style:none}
 details.acordeon[open]>summary>.acordeon-arr{transform:rotate(180deg)}
@@ -618,6 +628,8 @@ async function loadClientConfig(email){
     if(data.auto_renew){SHOW_RENOVACIONES=false;HAS_UTMS=true;HAS_PLANES=true;SHOW_ALERTAS=false;SHOW_IA=false;SHOW_ADS_GANADORES=false;HAS_TICKET_MENSUAL=true;}
     // Update UI
     const sbbrand=document.querySelector('#sb-brand-text');if(sbbrand)sbbrand.textContent=CLIENT_NOMBRE;
+    document.body.classList.toggle('brand-v2',RECORD_ID==='bruno_2026');
+    document.title=CLIENT_NOMBRE+' · Agencia Legado';
     const sbfoot=document.querySelector('.sb-foot div:last-child');if(sbfoot)sbfoot.textContent=CLIENT_NOMBRE+' · '+new Date().getFullYear();
     document.title='Panel de Métricas — Agencia Legado';
     return true;
