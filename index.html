@@ -401,6 +401,32 @@ const MONTHS=['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV',
 const MFULL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const ESTADOS=['Venta','Reserva','En seguimiento','Perdido'];
 const SEMANAS_OPTIONS=[{label:'12 semanas',value:12,dias:84},{label:'24 semanas',value:24,dias:168},{label:'48 semanas',value:48,dias:336}];
+// Paleta unificada de colores por embudo/plan/semanas (aplica a todos los clientes)
+const EMBUDO_COLORS={
+  SOCIAL:      {bg:'#ede9fe',fg:'#6d28d9',bd:'#ddd6fe'},
+  QUIZ:        {bg:'#dbeafe',fg:'#1d4ed8',bd:'#bfdbfe'},
+  VSL:         {bg:'#fef3c7',fg:'#b45309',bd:'#fde68a'},
+  'VSL ADS':   {bg:'#fde68a',fg:'#92400e',bd:'#fcd34d'},
+  REFERIDOS:   {bg:'#dcfce7',fg:'#15803d',bd:'#bbf7d0'},
+  YOUTUBE:     {bg:'#fee2e2',fg:'#b91c1c',bd:'#fecaca'},
+  WORKSHOP:    {bg:'#fce7f3',fg:'#be185d',bd:'#fbcfe8'},
+  LANZAMIENTO: {bg:'#ffedd5',fg:'#c2410c',bd:'#fed7aa'},
+  GOOGLE:      {bg:'#f3f4f6',fg:'#4b5563',bd:'#e5e7eb'},
+  ADS:         {bg:'#e0e7ff',fg:'#4338ca',bd:'#c7d2fe'},
+  ORGÁNICO:    {bg:'#d1fae5',fg:'#047857',bd:'#a7f3d0'},
+  'ORGANICO':  {bg:'#d1fae5',fg:'#047857',bd:'#a7f3d0'}
+};
+const SEMANAS_COLORS={
+  12:{bg:'#d1fae5',fg:'#047857',bd:'#a7f3d0'},
+  24:{bg:'#fef3c7',fg:'#b45309',bd:'#fde68a'},
+  48:{bg:'#e9d5ff',fg:'#7e22ce',bd:'#d8b4fe'}
+};
+const PLAN_COLORS={
+  PRO:     {bg:'#dbeafe',fg:'#1d4ed8',bd:'#bfdbfe'},
+  BUSINESS:{bg:'#e9d5ff',fg:'#7e22ce',bd:'#d8b4fe'},
+  ANUAL:   {bg:'#fef3c7',fg:'#b45309',bd:'#fde68a'}
+};
+function colorStyle(map,key){const c=map[String(key||'').toUpperCase()]||map[key];return c?`background:${c.bg};color:${c.fg};border-color:${c.bd}`:''}
 
 // Dynamic client config — loaded from crm_clients after login
 let CANALES=['YOUTUBE','SOCIAL','VSL','REFERIDOS'];
@@ -1169,15 +1195,15 @@ function renderLlamadasRows(mk){
     <td style="white-space:nowrap;display:flex;align-items:center;gap:2px"><input class="ce" value="${esc(r.nombre)}" oninput="upL('${mk}',${i},'nombre',this.value)" placeholder="Nombre completo" style="min-width:100px"><button onclick="openFicha('${mk}',${i})" title="Ver ficha" style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--blue);font-size:12px;line-height:1;flex-shrink:0">👤</button></td>
     <td><input class="ce" type="date" value="${r.fecha||''}" oninput="upL('${mk}',${i},'fecha',this.value)"></td>
     <td><input class="ce" value="${esc(r.telefono)}" oninput="upL('${mk}',${i},'telefono',this.value)" placeholder="+34..."></td>
-    <td><select class="ce" onchange="upL('${mk}',${i},'embudo',this.value)" style="min-width:100px"><option value="">-</option>${CANALES.map(c=>`<option value="${c}"${r.embudo===c?' selected':''}>${c}</option>`).join('')}</select></td>
+    <td style="${colorStyle(EMBUDO_COLORS,r.embudo)}"><select class="ce" onchange="upL('${mk}',${i},'embudo',this.value)" style="min-width:100px;background:transparent;${r.embudo?'font-weight:600':''}"><option value="">-</option>${CANALES.map(c=>`<option value="${c}"${r.embudo===c?' selected':''}>${c}</option>`).join('')}</select></td>
     <td><select class="ce" onchange="upL('${mk}',${i},'closer',this.value)" style="min-width:80px"><option value="">-</option>${CLOSERS.map(c=>`<option value="${c}"${r.closer===c?' selected':''}}>${c}</option>`).join('')}</select></td>
     ${SETTERS.length?`<td><input class="ce" value="${esc(r.setter||'')}" oninput="upL('${mk}',${i},'setter',this.value)" placeholder="Setter" style="min-width:90px"></td>`:''}
-    ${SEMANAS_MODO?`<td><select class="ce" onchange="upLSemanas('${mk}',${i},this.value)" style="min-width:130px"><option value="">-</option>${SEMANAS_OPTIONS.map(s=>`<option value="${s.value}"${Number(r.semanas)===s.value?' selected':''}}>${s.label}</option>`).join('')}</select></td>`:''}
+    ${SEMANAS_MODO?`<td style="${colorStyle(SEMANAS_COLORS,Number(r.semanas))}"><select class="ce" onchange="upLSemanas('${mk}',${i},this.value)" style="min-width:130px;background:transparent;${r.semanas?'font-weight:600':''}"><option value="">-</option>${SEMANAS_OPTIONS.map(s=>`<option value="${s.value}"${Number(r.semanas)===s.value?' selected':''}}>${s.label}</option>`).join('')}</select></td>`:''}
     <td><select class="ce" onchange="upL('${mk}',${i},'asistencia',this.value)" style="min-width:95px"><option value="">-</option>${['SI','NO','PENDIENTE'].map(v=>`<option value="${v}"${r.asistencia===v?' selected':''}>${v}</option>`).join('')}</select></td>
     <td><input class="ce" value="${esc(r.incidencia)}" oninput="upL('${mk}',${i},'incidencia',this.value)" placeholder="-" style="min-width:70px"></td>
     <td><select class="ce" onchange="upLEstado('${mk}',${i},this.value)" style="min-width:110px"><option value="">-</option>${ESTADOS.map(v=>`<option value="${v}"${r.estado===v?' selected':''}>${v}</option>`).join('')}</select></td>
     ${ENTRENADORES.length>1?`<td><select class="ce" onchange="upLEntrenador('${mk}',${i},this.value)">${ENTRENADORES.map(e=>`<option value="${e}"${r.entrenador===e?' selected':''}>${e||'Sin asignar'}</option>`).join('')}</select></td>`:''}
-    ${HAS_PLANES?`<td><select class="ce" onchange="upLPlan('${mk}',${i},this.value)" style="min-width:110px"><option value="">-</option>${['PRO','BUSINESS','ANUAL'].map(p=>`<option value="${p}"${r.plan===p?' selected':''}>${p}</option>`).join('')}</select></td>`:''}
+    ${HAS_PLANES?`<td style="${colorStyle(PLAN_COLORS,r.plan)}"><select class="ce" onchange="upLPlan('${mk}',${i},this.value)" style="min-width:110px;background:transparent;${r.plan?'font-weight:600':''}"><option value="">-</option>${['PRO','BUSINESS','ANUAL'].map(p=>`<option value="${p}"${r.plan===p?' selected':''}>${p}</option>`).join('')}</select></td>`:''}
     <td><input class="ce" type="number" inputmode="numeric" value="${r.facturacion||''}" oninput="upLNum('${mk}',${i},'facturacion',this.value)" placeholder="0" style="text-align:right"></td>
     <td><input class="ce" type="number" inputmode="numeric" value="${r.caja||''}" oninput="upLNum('${mk}',${i},'caja',this.value)" placeholder="0" style="text-align:right"></td>
     <td><select class="ce" onchange="upLNum('${mk}',${i},'nCuotas',this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${Number(r.nCuotas)===n?' selected':''}>${n===1?'1 (único)':n}</option>`).join('')}</select></td>
