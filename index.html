@@ -143,6 +143,10 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
 .kpi-m .mv{font-size:18px}
 #loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
 .spinner{width:32px;height:32px;border:3px solid var(--bg3);border-top-color:var(--text);border-radius:50%;animation:spin .8s linear infinite}
+details.acordeon>summary::-webkit-details-marker{display:none}
+details.acordeon>summary{list-style:none}
+details.acordeon[open]>summary>.acordeon-arr{transform:rotate(180deg)}
+details.acordeon>summary:hover{background:var(--bg3)!important}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── MOBILE RESPONSIVE ─────────────────────────────────── */
@@ -1035,23 +1039,22 @@ function kpiCard(label,val,cls,small){
 }
 
 function acordeon(id,title,badgeCls,content,open){
-  return`<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden">
-    <div onclick="toggleAcordeon('${id}')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:var(--bg);user-select:none">
+  // Usa <details> nativo: abre/cierra de forma fiable, sin depender de IDs ni JS extra.
+  return`<details class="acordeon"${open?' open':''} style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;background:var(--bg)">
+    <summary style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:var(--bg);user-select:none;list-style:none">
       <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600">
-        <span class="badge ${badgeCls}">${title}</span>
+        <span class="badge ${badgeCls}">${esc(title)}</span>
       </div>
-      <svg id="arr-${id}" style="transition:transform .2s;${open?'transform:rotate(180deg)':''}" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><polyline points="2,4 6,8 10,4"/></svg>
-    </div>
-    <div id="ac-${id}" style="display:${open?'block':'none'};padding:14px 16px;background:var(--bg2);border-top:1px solid var(--border)">${content}</div>
-  </div>`;
+      <svg class="acordeon-arr" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12" style="transition:transform .2s"><polyline points="2,4 6,8 10,4"/></svg>
+    </summary>
+    <div style="padding:14px 16px;background:var(--bg2);border-top:1px solid var(--border)">${content}</div>
+  </details>`;
 }
 
+// Compat: por si alguna parte aún llama a toggleAcordeon, abre/cierra el <details> con ese id legible.
 function toggleAcordeon(id){
-  const el=document.getElementById('ac-'+id);
-  const arr=document.getElementById('arr-'+id);
-  const open=el.style.display==='block';
-  el.style.display=open?'none':'block';
-  arr.style.transform=open?'':'rotate(180deg)';
+  const el=document.querySelector(`details[data-id="${id}"]`);
+  if(el)el.open=!el.open;
 }
 
 function renderMes(){
