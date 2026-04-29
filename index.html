@@ -2610,11 +2610,11 @@ function renderEscalado(){
     </div>`).join('');
     escenariosHTML=`<div class="card" style="margin-bottom:14px">
       <div class="card-title"><span>Escenarios de CAC objetivo</span><span class="badge b-blue">${sc.bench.nombre}</span></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px">
-        <div class="kpi-m"><div class="ml">LTV</div><div class="mv blue">${fmt(sc.ltv)}</div></div>
-        <div class="kpi-m"><div class="ml">LTV con margen</div><div class="mv blue">${fmt(sc.ltvMargen)}</div></div>
-        <div class="kpi-m"><div class="ml">Margen</div><div class="mv">${Math.round(sc.margen*100)}%</div></div>
-        <div class="kpi-m"><div class="ml">Breakeven ROAS</div><div class="mv amber">${sc.breakeven.toFixed(2)}x</div></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px">
+        <div class="kpi-m" title="Lifetime Value bruto: ticket × renovaciones."><div class="ml">LTV</div><div class="mv blue">${fmt(sc.ltv)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px">${fmt(cfg.ticket)} × ${cfg.renovaciones} pagos</div></div>
+        <div class="kpi-m" title="LTV multiplicado por el margen bruto. Es lo que realmente te queda antes de publicidad."><div class="ml">LTV con margen</div><div class="mv blue">${fmt(sc.ltvMargen)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px">${fmt(sc.ltv)} × ${Math.round(sc.margen*100)}%</div></div>
+        <div class="kpi-m" title="Margen bruto antes de descontar publicidad."><div class="ml">Margen</div><div class="mv">${Math.round(sc.margen*100)}%</div><div style="font-size:10px;color:var(--text3);margin-top:2px">${cfg.margen?'introducido':'estándar del sector'}</div></div>
+        <div class="kpi-m" title="ROAS mínimo para no perder dinero. Tienes que facturar al menos esta cifra por cada 1€ invertido."><div class="ml">Breakeven ROAS</div><div class="mv amber">${sc.breakeven.toFixed(2)}x</div><div style="font-size:10px;color:var(--text3);margin-top:2px">facturar ≥ ${sc.breakeven.toFixed(2)}€ por cada 1€ invertido</div></div>
       </div>
       <div class="kpi-groups" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">${cards}</div>
       <p style="margin-top:12px;font-size:12px;color:var(--text3);line-height:1.6">${sc.bench.nota}</p>
@@ -2651,11 +2651,12 @@ function renderEscalado(){
         <div class="kpi-m"><div class="ml">CAC agresivo</div><div class="mv red">${fmt(sc.cac.agresivo)}</div></div>
       </div>
       <p style="font-size:13px;color:var(--text2);margin:0 0 10px;line-height:1.6"><strong>Cuándo:</strong> ${z.cuando}.</p>
-      ${z.pct>0?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+      ${z.pct>0?(()=>{const delta=nuevoPresup-lastEv.presupuesto;return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
         <div class="kpi-m"><div class="ml">Acción recomendada</div><div class="mv green" style="font-size:14px">+${z.pct}% cada ${z.cad}</div></div>
         <div class="kpi-m"><div class="ml">Presupuesto actual</div><div class="mv">${fmt(lastEv.presupuesto)}/día</div></div>
-        <div class="kpi-m"><div class="ml">Nuevo presupuesto</div><div class="mv green">${fmt(nuevoPresup)}/día</div></div>
-      </div>`:`<p style="font-size:13px;color:var(--text2);margin:0">Mantén el presupuesto en <strong>${fmt(lastEv.presupuesto)}/día</strong> y optimiza el embudo (bajar CPL, subir % agenda o % cierre).</p>`}
+        <div class="kpi-m"><div class="ml">Subir</div><div class="mv green" style="font-size:14px">+${fmt(delta,2)}/día</div><div style="font-size:10px;color:var(--text3);margin-top:2px">${fmt(lastEv.presupuesto)} × ${z.pct}%</div></div>
+        <div class="kpi-m"><div class="ml">Nuevo presupuesto</div><div class="mv green">${fmt(nuevoPresup)}/día</div><div style="font-size:10px;color:var(--text3);margin-top:2px">a partir de la próxima cadencia (${z.cad})</div></div>
+      </div>`;})():`<p style="font-size:13px;color:var(--text2);margin:0">Mantén el presupuesto en <strong>${fmt(lastEv.presupuesto)}/día</strong> y optimiza el embudo (bajar CPL, subir % agenda o % cierre).</p>`}
     </div>`;
   }
 
