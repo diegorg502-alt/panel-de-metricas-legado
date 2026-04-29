@@ -42,7 +42,7 @@ aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border
 .nav-g{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);padding:12px 8px 4px}
 .nav-i{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text2);transition:all .12s;margin-bottom:1px;user-select:none}
 .nav-i:hover{background:var(--bg3);color:var(--text)}
-.nav-i.active{background:var(--brand);color:#fff;font-weight:600}
+.nav-i.active{background:#262626;color:#fff;font-weight:600}
 .nav-i svg{opacity:.5;flex-shrink:0}
 .nav-i.active svg{opacity:1}
 .nav-gh{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text2);transition:all .12s;margin-bottom:1px;user-select:none}
@@ -163,14 +163,11 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
 #loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
 .spinner{width:32px;height:32px;border:3px solid var(--bg3);border-top-color:var(--text);border-radius:50%;animation:spin .8s linear infinite}
 /* Branding v2 — solo activo para clientes con clase brand-v2 en <body> */
-body.brand-v2 aside{background:#F8F9FC}
-body.brand-v2 .field input:focus,body.brand-v2 input:focus,body.brand-v2 .ce:focus,body.brand-v2 .fi:focus,body.brand-v2 select:focus{border-color:var(--brand);outline:none;box-shadow:0 0 0 3px rgba(0,8,81,.08)}
+body.brand-v2 aside{background:#FAFAFA}
 body.brand-v2 .card{transition:box-shadow .18s ease,transform .18s ease}
-body.brand-v2 .card:hover{box-shadow:0 4px 14px rgba(0,8,81,.07),0 0 0 1px rgba(0,8,81,.08);transform:translateY(-1px)}
+body.brand-v2 .card:hover{box-shadow:0 4px 14px rgba(0,0,0,.05),0 0 0 1px rgba(0,0,0,.07);transform:translateY(-1px)}
 body.brand-v2 tbody tr{transition:background-color .12s ease}
-body.brand-v2 tbody tr:hover{background:rgba(0,8,81,.025)}
-body.brand-v2 .nav-i:hover{background:var(--brand-l);color:var(--brand)}
-body.brand-v2 .chip:hover{border-color:var(--brand);color:var(--brand)}
+body.brand-v2 tbody tr:hover{background:rgba(0,0,0,.025)}
 details.acordeon>summary::-webkit-details-marker{display:none}
 details.acordeon>summary{list-style:none}
 details.acordeon[open]>summary>.acordeon-arr{transform:rotate(180deg)}
@@ -398,7 +395,6 @@ details.acordeon>summary:hover{background:var(--bg3)!important}
       <div class="sb-foot">
         <div class="sb-sync"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Conectando...</span></div>
         <div class="token-mini" id="token-countdown-box" title="Token de Meta — se renueva manualmente cada ~60 días">
-          <span>🔑</span>
           <span style="flex:1">Token Meta · <span class="token-days" id="token-days-num">—</span> <span id="token-days-sub">días</span></span>
           <span id="token-bar" style="display:none"></span>
         </div>
