@@ -89,7 +89,7 @@ aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border
 .mv.blue{color:var(--blue)}.mv.green{color:var(--green)}.mv.amber{color:var(--amber)}.mv.red{color:var(--red)}.mv.purple{color:var(--purple)}
 .tw{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;padding:11px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);border-bottom:1.5px solid var(--border2);white-space:nowrap;background:#fff;vertical-align:bottom}
+th{text-align:left;padding:11px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);border-bottom:1.5px solid var(--border2);white-space:nowrap;background:#fff;vertical-align:bottom;position:sticky;top:0;z-index:2}
 td{padding:10px 12px;border-top:1px solid var(--border);color:var(--text);vertical-align:middle}
 tbody tr:first-child td{border-top:none}
 tbody tr{transition:background .12s}
@@ -145,7 +145,7 @@ tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;fo
 /* Sticky first column in cuotas table */
 .cuotas-scroll{overflow-x:auto;max-height:70vh}
 .cuotas-table th.sticky-col,.cuotas-table td.sticky-col{position:sticky;left:0;z-index:2;background:var(--bg);box-shadow:2px 0 0 var(--border)}
-.cuotas-table thead th.sticky-col{background:var(--bg2);z-index:3}
+.cuotas-table thead th.sticky-col{background:var(--bg2);z-index:4}
 .cuotas-table tfoot td.sticky-col{background:var(--bg3);z-index:2}
 .cuotas-table tbody tr:hover td.sticky-col{background:var(--bg2)}
 .kpi-m{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:10px 12px}
