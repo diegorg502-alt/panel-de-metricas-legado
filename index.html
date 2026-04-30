@@ -484,7 +484,7 @@ let HAS_UTMS=false; // true = show UTMs section
 let HAS_PLANES=false; // true = show plan selector in llamadas
 let HAS_TICKET_MENSUAL=false; // true = show Ticket medio con plan ANUAL dividido /12 (solo Zerochats por ahora)
 let HAS_ESCALADO=false; // true = show Estrategia de Escalado section
-let MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:''};
+let MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:'',utm_source:'',utm_medium:'',utm_campaign:''};
 // Rango de fechas para los KPIs por mes. {from,to} en formato 'YYYY-MM-DD'. Vacío = mes completo.
 let MES_RANGE={from:'',to:''};
 let SHOW_ALERTAS=true; // false = hide alerts section
@@ -1073,19 +1073,31 @@ function renderDashboard(){
 function ticketMensualizado(r){const f=Number(r.facturacion||0);return r.plan==='ANUAL'?f/12:f;}
 // Devuelve las llamadas del mes mk, o las del rango MES_RANGE si está activo (cruza meses).
 function getMesRows(mk){
+  let base;
   if(MES_RANGE.from||MES_RANGE.to){
-    const all=[];
+    base=[];
     for(const k in (S.llamadas||{})){
       for(const r of (S.llamadas[k]||[])){
         if(!r.fecha) continue;
         if(MES_RANGE.from && r.fecha < MES_RANGE.from) continue;
         if(MES_RANGE.to && r.fecha > MES_RANGE.to) continue;
-        all.push(r);
+        base.push(r);
       }
     }
-    return all;
+  } else {
+    base=S.llamadas[mk]||[];
   }
-  return S.llamadas[mk]||[];
+  // Si hay filtros UTM activos, los aplicamos aquí para que los KPIs se recalculen.
+  if(typeof isUtmFilterActive==='function' && isUtmFilterActive()){
+    return base.filter(r=>{
+      const u=r._utms||{};
+      if(MES_FILTERS.utm_source&&(u.source||'')!==MES_FILTERS.utm_source)return false;
+      if(MES_FILTERS.utm_medium&&(u.medium||'')!==MES_FILTERS.utm_medium)return false;
+      if(MES_FILTERS.utm_campaign&&(u.campaign||'')!==MES_FILTERS.utm_campaign)return false;
+      return true;
+    });
+  }
+  return base;
 }
 // Igual con kpis_diarios. Cada entry tiene 'dia' (YYYY-MM-DD).
 function getMesKd(mk){
@@ -1252,6 +1264,7 @@ function renderMes(){
   });
 
   document.getElementById('content').innerHTML=`
+    ${isUtmFilterActive()?`<div style="background:var(--blue-l);border:1px solid #bfdbfe;color:var(--blue);padding:9px 14px;border-radius:8px;font-size:12px;margin-bottom:12px;line-height:1.5">⚠ Filtros UTM activos — KPIs de embudo, ventas y facturación filtran por las llamadas; los de inversión, leads y CPL muestran el total del periodo (Meta Ads no desagrega por UTM).</div>`:''}
     <div class="card" style="margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
         <div style="font-size:12px;font-weight:600;color:var(--text2)">KPIs totales — ${isRangeActive()?esc(rangeLabel()):MFULL[curMonth]+' '+curYear}</div>
@@ -1303,6 +1316,7 @@ function renderMes(){
         ${filterChip('asistencia','Asistencia',['','SI','NO','PENDIENTE'])}
         ${filterChip('estado','Estado',['',...ESTADOS])}
         ${HAS_PLANES?filterChip('plan','Plan',['','PRO','BUSINESS','ANUAL']):''}
+        ${(()=>{const allRows=Object.values(S.llamadas||{}).flat();const sources=getUtmValues(allRows,'source');const mediums=getUtmValues(allRows,'medium');const camps=getUtmValues(allRows,'campaign');return (sources.length>1?filterChip('utm_source','UTM Source',sources):'')+(mediums.length>1?filterChip('utm_medium','UTM Medium',mediums):'')+(camps.length>1?filterChip('utm_campaign','UTM Campaign',camps):'');})()}
         <div style="flex:1"></div>
         <span id="fcount" style="font-size:11px;color:var(--text3)"></span>
         <div class="chip chip-reset" onclick="resetMesFilters()">Limpiar</div>
@@ -1340,7 +1354,7 @@ function filterChip(field,label,opts){
   const displayText=active?`${label}: ${v}`:label;
   return `<label class="chip ${active?'active':''}"><span>${esc(displayText)}</span>${active?`<span class="x" onclick="event.stopPropagation();event.preventDefault();setMesFilter('${field}','')">×</span>`:''}<select class="chip-native" onchange="setMesFilter('${field}',this.value)">${opts.map(o=>`<option value="${esc(o)}"${v===o?' selected':''}>${o===''?'Todos':esc(o)}</option>`).join('')}</select></label>`;
 }
-function setMesFilter(field,value){MES_FILTERS[field]=value;renderLlamadasRows(mKey(curMonth));}
+function setMesFilter(field,value){MES_FILTERS[field]=value;renderMes();}
 function applyMesRange(){
   const f=document.getElementById('mes-range-from').value;
   const t=document.getElementById('mes-range-to').value;
@@ -1350,14 +1364,25 @@ function applyMesRange(){
   renderMes();
 }
 function clearMesRange(){MES_RANGE={from:'',to:''};renderMes();}
-function resetMesFilters(){MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:''};renderMes();}
+function resetMesFilters(){MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:'',utm_source:'',utm_medium:'',utm_campaign:''};renderMes();}
 function mesFilterMatch(r){
   if(MES_FILTERS.embudo&&r.embudo!==MES_FILTERS.embudo)return false;
   if(MES_FILTERS.closer&&r.closer!==MES_FILTERS.closer)return false;
   if(MES_FILTERS.asistencia&&r.asistencia!==MES_FILTERS.asistencia)return false;
   if(MES_FILTERS.estado&&r.estado!==MES_FILTERS.estado)return false;
   if(MES_FILTERS.plan&&r.plan!==MES_FILTERS.plan)return false;
+  const u=r._utms||{};
+  if(MES_FILTERS.utm_source&&(u.source||'')!==MES_FILTERS.utm_source)return false;
+  if(MES_FILTERS.utm_medium&&(u.medium||'')!==MES_FILTERS.utm_medium)return false;
+  if(MES_FILTERS.utm_campaign&&(u.campaign||'')!==MES_FILTERS.utm_campaign)return false;
   return true;
+}
+function isUtmFilterActive(){return !!(MES_FILTERS.utm_source||MES_FILTERS.utm_medium||MES_FILTERS.utm_campaign);}
+// Recolecta valores únicos no vacíos de un campo UTM en las llamadas dadas.
+function getUtmValues(rows,field){
+  const set=new Set();
+  for(const r of rows){const v=(r._utms||{})[field];if(v)set.add(String(v));}
+  return ['',...Array.from(set).sort()];
 }
 function renderLlamadasRows(mk){
   const rows=S.llamadas[mk]||[];const tbody=document.getElementById('lb');if(!tbody)return;
@@ -2310,6 +2335,16 @@ function openFicha(mk,i){
         <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Closer</span><span style="font-weight:600">${r.closer||'-'}</span></div>
       </div>
     </div>
+    ${(()=>{const u=r._utms||{};const has=Object.values(u).some(v=>!!v);return has?`<div style="margin-bottom:18px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);margin-bottom:6px">UTMs / Atribución</div>
+      <div style="display:grid;gap:6px;font-size:13px">
+        ${u.source?`<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text2)">Source</span><span style="font-weight:600;text-align:right;word-break:break-all">${esc(u.source)}</span></div>`:''}
+        ${u.medium?`<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text2)">Medium</span><span style="font-weight:600;text-align:right;word-break:break-all">${esc(u.medium)}</span></div>`:''}
+        ${u.campaign?`<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text2)">Campaign</span><span style="font-weight:600;text-align:right;word-break:break-all">${esc(u.campaign)}</span></div>`:''}
+        ${u.content?`<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text2)">Content</span><span style="font-weight:600;text-align:right;word-break:break-all">${esc(u.content)}</span></div>`:''}
+        ${u.term?`<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text2)">Term</span><span style="font-weight:600;text-align:right;word-break:break-all">${esc(u.term)}</span></div>`:''}
+      </div>
+    </div>`:''})()}
     <div style="margin-bottom:18px">
       <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Notas adicionales</div>
       <textarea id="fc-notas" class="ce" style="width:100%;box-sizing:border-box;min-height:80px;resize:vertical;font-size:13px;line-height:1.5" placeholder="Notas, respuestas del formulario, observaciones...">${esc(c.notas||r.comentarios||'')}</textarea>
