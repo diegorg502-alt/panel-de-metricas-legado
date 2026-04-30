@@ -473,6 +473,8 @@ let HAS_PLANES=false; // true = show plan selector in llamadas
 let HAS_TICKET_MENSUAL=false; // true = show Ticket medio con plan ANUAL dividido /12 (solo Zerochats por ahora)
 let HAS_ESCALADO=false; // true = show Estrategia de Escalado section
 let MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:''};
+// Rango de fechas para los KPIs por mes. {from,to} en formato 'YYYY-MM-DD'. Vacío = mes completo.
+let MES_RANGE={from:'',to:''};
 let SHOW_ALERTAS=true; // false = hide alerts section
 let SHOW_IA=true; // false = hide IA chat section
 let SHOW_ADS_GANADORES=true; // false = hide winning ads section
@@ -977,6 +979,9 @@ function buildSidebar(){
 }
 function toggleG(id){document.getElementById(`nhdr-${id}`).classList.toggle('open');document.getElementById(`nsub-${id}`).classList.toggle('open');}
 function goTo(page,month,lanzId){
+  // Al cambiar de mes/página resetear el rango personalizado de KPIs por mes
+  if(month!==undefined && month!==curMonth) MES_RANGE={from:'',to:''};
+  if(page!=='mes' && curPage==='mes') MES_RANGE={from:'',to:''};
   if(month!==undefined)curMonth=month;if(lanzId!==undefined)curLanzamiento=lanzId;curPage=page;
   document.querySelectorAll('.nav-i').forEach(el=>el.classList.remove('active'));
   const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance',lanzamientos:'ni-lanzamientos',utms:'ni-utms',escalado:'ni-escalado'};
@@ -1054,12 +1059,54 @@ function renderDashboard(){
 
 // ── MES ───────────────────────────────────────────────────
 function ticketMensualizado(r){const f=Number(r.facturacion||0);return r.plan==='ANUAL'?f/12:f;}
+// Devuelve las llamadas del mes mk, o las del rango MES_RANGE si está activo (cruza meses).
+function getMesRows(mk){
+  if(MES_RANGE.from||MES_RANGE.to){
+    const all=[];
+    for(const k in (S.llamadas||{})){
+      for(const r of (S.llamadas[k]||[])){
+        if(!r.fecha) continue;
+        if(MES_RANGE.from && r.fecha < MES_RANGE.from) continue;
+        if(MES_RANGE.to && r.fecha > MES_RANGE.to) continue;
+        all.push(r);
+      }
+    }
+    return all;
+  }
+  return S.llamadas[mk]||[];
+}
+// Igual con kpis_diarios. Cada entry tiene 'dia' (YYYY-MM-DD).
+function getMesKd(mk){
+  if(MES_RANGE.from||MES_RANGE.to){
+    const all=[];
+    for(const k in (S.kpis_diarios||{})){
+      for(const r of (S.kpis_diarios[k]||[])){
+        const d=r.dia||r.fecha;
+        if(!d) continue;
+        if(MES_RANGE.from && d < MES_RANGE.from) continue;
+        if(MES_RANGE.to && d > MES_RANGE.to) continue;
+        all.push(r);
+      }
+    }
+    return all;
+  }
+  return S.kpis_diarios[mk]||[];
+}
+function isRangeActive(){return !!(MES_RANGE.from||MES_RANGE.to);}
+function rangeLabel(){
+  const f=v=>{const d=new Date(v);return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;};
+  if(MES_RANGE.from && MES_RANGE.to) return `${f(MES_RANGE.from)} → ${f(MES_RANGE.to)}`;
+  if(MES_RANGE.from) return `desde ${f(MES_RANGE.from)}`;
+  if(MES_RANGE.to)   return `hasta ${f(MES_RANGE.to)}`;
+  return '';
+}
+
 function kpisCanal(mk, canal){
-  const rows=S.llamadas[mk]||[];
+  const rows=getMesRows(mk);
   const cl=rows.filter(r=>r.embudo===canal);
   const cv=cl.filter(r=>r.estado==='Venta');
   const realizadas=cl.filter(r=>r.asistencia==='SI').length;
-  const kd=S.kpis_diarios[mk]||[];
+  const kd=getMesKd(mk);
   const inv=kd.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);
   const leads=kd.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
   const fact=cv.reduce((s,r)=>s+Number(r.facturacion||0),0);
@@ -1113,10 +1160,10 @@ function toggleAcordeon(id){
 
 function renderMes(){
   const mk=mKey(curMonth);if(!S.llamadas[mk])S.llamadas[mk]=[];
-  const rows=S.llamadas[mk];
+  const rows=getMesRows(mk);
   const ventas=rows.filter(r=>r.estado==='Venta');
   const realizadas=rows.filter(r=>r.asistencia==='SI').length;
-  const kd=S.kpis_diarios[mk]||[];
+  const kd=getMesKd(mk);
   const inv=kd.reduce((s,k)=>s+Number(k.inversion||0),0);
   const leads=kd.reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
   const fact=ventas.reduce((s,r)=>s+Number(r.facturacion||0),0);
@@ -1194,7 +1241,17 @@ function renderMes(){
 
   document.getElementById('content').innerHTML=`
     <div class="card" style="margin-bottom:14px">
-      <div style="font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text2)">KPIs totales — ${MFULL[curMonth]} ${curYear}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--text2)">KPIs totales — ${isRangeActive()?esc(rangeLabel()):MFULL[curMonth]+' '+curYear}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Rango personalizado</span>
+          <input type="date" class="fi" id="mes-range-from" value="${MES_RANGE.from||''}" style="padding:5px 8px;font-size:12px;width:auto">
+          <span style="color:var(--text3);font-size:12px">→</span>
+          <input type="date" class="fi" id="mes-range-to" value="${MES_RANGE.to||''}" style="padding:5px 8px;font-size:12px;width:auto">
+          <button class="btn btn-p btn-xs" onclick="applyMesRange()">Aplicar</button>
+          ${isRangeActive()?`<button class="btn btn-xs" onclick="clearMesRange()">× Limpiar</button>`:''}
+        </div>
+      </div>
       ${kpiGroups([
         {title:'Tráfico',dot:'#3b82f6',items:[
           ['Inversión',fmt(inv),'blue'],
@@ -1226,7 +1283,7 @@ function renderMes(){
       <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--text2)">KPIs por canal</div>
       ${acordeonesHTML}
     </div>
-    <div class="card" style="padding:0;overflow:hidden;margin-bottom:32px">
+    ${isRangeActive()?`<div class="card" style="margin-bottom:32px;padding:18px"><div style="font-size:13px;color:var(--text2);line-height:1.6">Mostrando KPIs del rango <strong>${esc(rangeLabel())}</strong>. La tabla de llamadas se oculta porque la edición trabaja por mes — pulsa "× Limpiar" arriba para volver al modo mensual y editar.</div></div>`:`<div class="card" style="padding:0;overflow:hidden;margin-bottom:32px">
       <div class="filters-bar">
         <span class="flabel">Filtros</span>
         ${filterChip('embudo','Embudo',['',...CANALES])}
@@ -1261,9 +1318,9 @@ function renderMes(){
         </tr></thead>
         <tbody id="lb"></tbody>
       </table></div>
-    </div>
+    </div>`}
     `;
-  renderLlamadasRows(mk);
+  if(!isRangeActive()) renderLlamadasRows(mk);
 }
 function filterChip(field,label,opts){
   const v=MES_FILTERS[field]||'';
@@ -1272,6 +1329,15 @@ function filterChip(field,label,opts){
   return `<label class="chip ${active?'active':''}"><span>${esc(displayText)}</span>${active?`<span class="x" onclick="event.stopPropagation();event.preventDefault();setMesFilter('${field}','')">×</span>`:''}<select class="chip-native" onchange="setMesFilter('${field}',this.value)">${opts.map(o=>`<option value="${esc(o)}"${v===o?' selected':''}>${o===''?'Todos':esc(o)}</option>`).join('')}</select></label>`;
 }
 function setMesFilter(field,value){MES_FILTERS[field]=value;renderLlamadasRows(mKey(curMonth));}
+function applyMesRange(){
+  const f=document.getElementById('mes-range-from').value;
+  const t=document.getElementById('mes-range-to').value;
+  if(!f && !t){alert('Indica al menos una fecha');return;}
+  if(f && t && f>t){alert('La fecha "desde" no puede ser posterior a "hasta"');return;}
+  MES_RANGE.from=f||'';MES_RANGE.to=t||'';
+  renderMes();
+}
+function clearMesRange(){MES_RANGE={from:'',to:''};renderMes();}
 function resetMesFilters(){MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:''};renderMes();}
 function mesFilterMatch(r){
   if(MES_FILTERS.embudo&&r.embudo!==MES_FILTERS.embudo)return false;
