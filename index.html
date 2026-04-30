@@ -1450,17 +1450,17 @@ function upLEstado(mk,i,val){
   S.llamadas[mk][i].estado=val;
   if(val==='Venta') syncCuota(mk,i);
   save();
-  // Re-renderiza preservando el scroll: tanto el de la pagina como el de la tabla.
+  // Re-renderiza preservando el scroll vertical y horizontal de la pagina y de la tabla.
   const cont=document.querySelector('.content');
   const tw=document.querySelector('#content .tw');
-  const sy=cont?cont.scrollTop:0;
-  const tsy=tw?tw.scrollTop:0;
+  const sy=cont?cont.scrollTop:0,sx=cont?cont.scrollLeft:0;
+  const tsy=tw?tw.scrollTop:0,tsx=tw?tw.scrollLeft:0;
   renderMes();
   requestAnimationFrame(()=>{
     const c2=document.querySelector('.content');
     const t2=document.querySelector('#content .tw');
-    if(c2)c2.scrollTop=sy;
-    if(t2)t2.scrollTop=tsy;
+    if(c2){c2.scrollTop=sy;c2.scrollLeft=sx;}
+    if(t2){t2.scrollTop=tsy;t2.scrollLeft=tsx;}
   });
 }
 function delL(mk,i){
