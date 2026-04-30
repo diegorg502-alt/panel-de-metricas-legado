@@ -1376,6 +1376,8 @@ function upL(mk,i,f,v){
   S.llamadas[mk][i][f]=v;
   if(f==='nombre'||f==='fecha'||f==='embudo') syncCuota(mk,i);
   save();
+  // Repinta la fila para que se apliquen los colores asignados al embudo.
+  if(f==='embudo') renderLlamadasRows(mk);
 }
 function upLNum(mk,i,f,v){
   S.llamadas[mk][i][f]=parseNum(v);
@@ -1399,6 +1401,8 @@ function upLPlan(mk,i,plan){
 function upLSemanas(mk,i,val){
   S.llamadas[mk][i].semanas=parseInt(val)||0;
   syncCuota(mk,i);save();
+  // Repinta la fila para reflejar el color del plan de semanas.
+  renderLlamadasRows(mk);
 }
 function upLEntrenador(mk,i,val){
   S.llamadas[mk][i].entrenador=val;
