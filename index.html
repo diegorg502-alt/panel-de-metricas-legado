@@ -1450,9 +1450,18 @@ function upLEstado(mk,i,val){
   S.llamadas[mk][i].estado=val;
   if(val==='Venta') syncCuota(mk,i);
   save();
-  const tr=document.getElementById(`lr-${i}`);
-  if(tr)tr.style.background=val==='Venta'?'#f0fdf4':val==='Perdido'?'#fef2f2':val==='Reserva'?'#eff6ff':'';
+  // Re-renderiza preservando el scroll: tanto el de la pagina como el de la tabla.
+  const cont=document.querySelector('.content');
+  const tw=document.querySelector('#content .tw');
+  const sy=cont?cont.scrollTop:0;
+  const tsy=tw?tw.scrollTop:0;
   renderMes();
+  requestAnimationFrame(()=>{
+    const c2=document.querySelector('.content');
+    const t2=document.querySelector('#content .tw');
+    if(c2)c2.scrollTop=sy;
+    if(t2)t2.scrollTop=tsy;
+  });
 }
 function delL(mk,i){
   const r=S.llamadas[mk][i];
