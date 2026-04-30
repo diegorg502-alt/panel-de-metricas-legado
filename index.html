@@ -484,7 +484,7 @@ let HAS_UTMS=false; // true = show UTMs section
 let HAS_PLANES=false; // true = show plan selector in llamadas
 let HAS_TICKET_MENSUAL=false; // true = show Ticket medio con plan ANUAL dividido /12 (solo Zerochats por ahora)
 let HAS_ESCALADO=false; // true = show Estrategia de Escalado section
-let MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:'',utm_source:'',utm_medium:'',utm_campaign:''};
+let MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:'',utm_source:'',utm_medium:'',utm_campaign:'',utm_content:'',utm_term:''};
 // Rango de fechas para los KPIs por mes. {from,to} en formato 'YYYY-MM-DD'. Vacío = mes completo.
 let MES_RANGE={from:'',to:''};
 let SHOW_ALERTAS=true; // false = hide alerts section
@@ -1094,6 +1094,8 @@ function getMesRows(mk){
       if(MES_FILTERS.utm_source&&(u.source||'')!==MES_FILTERS.utm_source)return false;
       if(MES_FILTERS.utm_medium&&(u.medium||'')!==MES_FILTERS.utm_medium)return false;
       if(MES_FILTERS.utm_campaign&&(u.campaign||'')!==MES_FILTERS.utm_campaign)return false;
+      if(MES_FILTERS.utm_content&&(u.content||'')!==MES_FILTERS.utm_content)return false;
+      if(MES_FILTERS.utm_term&&(u.term||'')!==MES_FILTERS.utm_term)return false;
       return true;
     });
   }
@@ -1316,7 +1318,7 @@ function renderMes(){
         ${filterChip('asistencia','Asistencia',['','SI','NO','PENDIENTE'])}
         ${filterChip('estado','Estado',['',...ESTADOS])}
         ${HAS_PLANES?filterChip('plan','Plan',['','PRO','BUSINESS','ANUAL']):''}
-        ${(()=>{const allRows=Object.values(S.llamadas||{}).flat();const sources=getUtmValues(allRows,'source');const mediums=getUtmValues(allRows,'medium');const camps=getUtmValues(allRows,'campaign');return (sources.length>1?filterChip('utm_source','UTM Source',sources):'')+(mediums.length>1?filterChip('utm_medium','UTM Medium',mediums):'')+(camps.length>1?filterChip('utm_campaign','UTM Campaign',camps):'');})()}
+        ${(()=>{const allRows=Object.values(S.llamadas||{}).flat();const fields=[['utm_source','UTM Source','source'],['utm_medium','UTM Medium','medium'],['utm_campaign','UTM Campaign','campaign'],['utm_content','UTM Content','content'],['utm_term','UTM Term','term']];return fields.map(([f,label,key])=>filterChip(f,label,getUtmValues(allRows,key))).join('');})()}
         <div style="flex:1"></div>
         <span id="fcount" style="font-size:11px;color:var(--text3)"></span>
         <div class="chip chip-reset" onclick="resetMesFilters()">Limpiar</div>
@@ -1364,7 +1366,7 @@ function applyMesRange(){
   renderMes();
 }
 function clearMesRange(){MES_RANGE={from:'',to:''};renderMes();}
-function resetMesFilters(){MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:'',utm_source:'',utm_medium:'',utm_campaign:''};renderMes();}
+function resetMesFilters(){MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:'',utm_source:'',utm_medium:'',utm_campaign:'',utm_content:'',utm_term:''};renderMes();}
 function mesFilterMatch(r){
   if(MES_FILTERS.embudo&&r.embudo!==MES_FILTERS.embudo)return false;
   if(MES_FILTERS.closer&&r.closer!==MES_FILTERS.closer)return false;
@@ -1375,9 +1377,11 @@ function mesFilterMatch(r){
   if(MES_FILTERS.utm_source&&(u.source||'')!==MES_FILTERS.utm_source)return false;
   if(MES_FILTERS.utm_medium&&(u.medium||'')!==MES_FILTERS.utm_medium)return false;
   if(MES_FILTERS.utm_campaign&&(u.campaign||'')!==MES_FILTERS.utm_campaign)return false;
+  if(MES_FILTERS.utm_content&&(u.content||'')!==MES_FILTERS.utm_content)return false;
+  if(MES_FILTERS.utm_term&&(u.term||'')!==MES_FILTERS.utm_term)return false;
   return true;
 }
-function isUtmFilterActive(){return !!(MES_FILTERS.utm_source||MES_FILTERS.utm_medium||MES_FILTERS.utm_campaign);}
+function isUtmFilterActive(){return !!(MES_FILTERS.utm_source||MES_FILTERS.utm_medium||MES_FILTERS.utm_campaign||MES_FILTERS.utm_content||MES_FILTERS.utm_term);}
 // Recolecta valores únicos no vacíos de un campo UTM en las llamadas dadas.
 function getUtmValues(rows,field){
   const set=new Set();
@@ -2335,16 +2339,16 @@ function openFicha(mk,i){
         <div style="display:flex;justify-content:space-between"><span style="color:var(--text2)">Closer</span><span style="font-weight:600">${r.closer||'-'}</span></div>
       </div>
     </div>
-    ${(()=>{const u=r._utms||{};const has=Object.values(u).some(v=>!!v);return has?`<div style="margin-bottom:18px">
+    ${(()=>{const u=r._utms||{};const row=(label,val)=>`<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text2)">${label}</span><span style="font-weight:600;text-align:right;word-break:break-all;color:${val?'var(--text)':'var(--text3)'}">${val?esc(val):'—'}</span></div>`;return `<div style="margin-bottom:18px">
       <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);margin-bottom:6px">UTMs / Atribución</div>
       <div style="display:grid;gap:6px;font-size:13px">
-        ${u.source?`<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text2)">Source</span><span style="font-weight:600;text-align:right;word-break:break-all">${esc(u.source)}</span></div>`:''}
-        ${u.medium?`<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text2)">Medium</span><span style="font-weight:600;text-align:right;word-break:break-all">${esc(u.medium)}</span></div>`:''}
-        ${u.campaign?`<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text2)">Campaign</span><span style="font-weight:600;text-align:right;word-break:break-all">${esc(u.campaign)}</span></div>`:''}
-        ${u.content?`<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text2)">Content</span><span style="font-weight:600;text-align:right;word-break:break-all">${esc(u.content)}</span></div>`:''}
-        ${u.term?`<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text2)">Term</span><span style="font-weight:600;text-align:right;word-break:break-all">${esc(u.term)}</span></div>`:''}
+        ${row('Source',u.source)}
+        ${row('Medium',u.medium)}
+        ${row('Campaign',u.campaign)}
+        ${row('Content',u.content)}
+        ${row('Term',u.term)}
       </div>
-    </div>`:''})()}
+    </div>`;})()}
     <div style="margin-bottom:18px">
       <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Notas adicionales</div>
       <textarea id="fc-notas" class="ce" style="width:100%;box-sizing:border-box;min-height:80px;resize:vertical;font-size:13px;line-height:1.5" placeholder="Notas, respuestas del formulario, observaciones...">${esc(c.notas||r.comentarios||'')}</textarea>
