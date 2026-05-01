@@ -1970,6 +1970,9 @@ function upObj(mk,canal,key,val){ensureObj(mk,canal);S.objetivos[mk][canal][key]
 let cuotaSearch='';
 let cuotaMonthFilter='all';
 let cuotaEstadoFilter='all'; // 'all' | 'activo' | 'perdido'
+let cuotaPlanFilter='all';   // 'all' | 'PRO' | 'BUSINESS' | 'ANUAL' | 'sin'
+let cuotaFechaDesde='';      // YYYY-MM-DD
+let cuotaFechaHasta='';      // YYYY-MM-DD
 function renderCuotas(){
   const allVentas=Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))).map(([,v])=>v).flat().filter(l=>l.estado==='Venta');
     const totalFact=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear).reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const cp=getPagos(c);return s+MONTHS.reduce((ms,m)=>{const rv=rs.reduce((x,r)=>x+Number(getPagos(r)[`${curYear}-${m}`]||0),0);return ms+(cp[`${curYear}-${m}`]||0)+rv;},0);},0);
@@ -2040,6 +2043,16 @@ function renderCuotas(){
             <option value="activo"${cuotaEstadoFilter==='activo'?' selected':''}>Solo activos</option>
             <option value="perdido"${cuotaEstadoFilter==='perdido'?' selected':''}>Solo perdidos</option>
           </select>
+          <select id="cuota-plan-filter" onchange="cuotaPlanFilter=this.value;renderCuotasFiltered()" style="padding:5px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text)">
+            <option value="all"${cuotaPlanFilter==='all'?' selected':''}>Todos los planes</option>
+            <option value="PRO"${cuotaPlanFilter==='PRO'?' selected':''}>PRO</option>
+            <option value="BUSINESS"${cuotaPlanFilter==='BUSINESS'?' selected':''}>BUSINESS</option>
+            <option value="ANUAL"${cuotaPlanFilter==='ANUAL'?' selected':''}>ANUAL</option>
+            <option value="sin"${cuotaPlanFilter==='sin'?' selected':''}>Sin plan</option>
+          </select>
+          <input id="cuota-fecha-desde" type="date" value="${cuotaFechaDesde}" onchange="cuotaFechaDesde=this.value;renderCuotasFiltered()" title="Inicio desde" style="padding:4px 8px;border:1px solid var(--border2);border-radius:7px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text)">
+          <input id="cuota-fecha-hasta" type="date" value="${cuotaFechaHasta}" onchange="cuotaFechaHasta=this.value;renderCuotasFiltered()" title="Inicio hasta" style="padding:4px 8px;border:1px solid var(--border2);border-radius:7px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text)">
+          ${(cuotaPlanFilter!=='all'||cuotaEstadoFilter!=='all'||cuotaMonthFilter!=='all'||cuotaFechaDesde||cuotaFechaHasta||cuotaSearch)?`<button onclick="cuotaPlanFilter='all';cuotaEstadoFilter='all';cuotaMonthFilter='all';cuotaFechaDesde='';cuotaFechaHasta='';cuotaSearch='';renderCuotas()" style="padding:5px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;font-family:var(--font);background:var(--bg2);color:var(--text2);cursor:pointer">Limpiar</button>`:''}
           <select id="cuota-month-filter" onchange="cuotaMonthFilter=this.value;renderCuotasFiltered()" style="padding:5px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text)">
             <option value="all"${cuotaMonthFilter==='all'?' selected':''}>Todos los meses</option>
             ${MONTHS.map((m,i)=>`<option value="${i}"${String(cuotaMonthFilter)===String(i)?' selected':''}>${MFULL[i]}</option>`).join('')}
@@ -2066,6 +2079,12 @@ function renderCuotasFiltered(){
   // Filter by estado
   if(cuotaEstadoFilter==='activo') filtered=filtered.filter(c=>!c.perdido);
   else if(cuotaEstadoFilter==='perdido') filtered=filtered.filter(c=>!!c.perdido);
+  // Filter by plan
+  if(cuotaPlanFilter==='sin') filtered=filtered.filter(c=>!c.plan);
+  else if(cuotaPlanFilter!=='all') filtered=filtered.filter(c=>c.plan===cuotaPlanFilter);
+  // Filter by fecha de inicio (rango)
+  if(cuotaFechaDesde) filtered=filtered.filter(c=>c.fechaInicio>=cuotaFechaDesde);
+  if(cuotaFechaHasta) filtered=filtered.filter(c=>c.fechaInicio<=cuotaFechaHasta);
   // Filter by month (only clients who have payment in that month)
   if(cuotaMonthFilter!=='all'){
     const mIdx=Number(cuotaMonthFilter);
@@ -2092,8 +2111,7 @@ function renderCuotasFiltered(){
     const origIdx=S.cuotas.indexOf(c);
     const rowStyle=c.perdido?'background:#fef2f2;opacity:.75':'';
     const planBadge=c.plan?`<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--blue-l);color:var(--blue)">${c.plan}</span>`:`<span style="font-size:11px;color:var(--text3)">-</span>`;
-    const estBadge=c.fecha_estimada?` <span title="Fecha de inicio aproximada (importada desde GHL). Edítala si conoces la real." style="font-size:9px;padding:1px 6px;border-radius:10px;background:#fef3c7;color:#92400e;font-weight:700;cursor:help">≈ EST</span>`:'';
-    const nameCell=c.perdido?`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-weight:600;text-decoration:line-through">${esc(c.nombre)}</span><span style="font-size:9px;padding:1px 6px;border-radius:10px;background:#fee2e2;color:#c81e1e;font-weight:700">PERDIDO ${c.fechaPerdido||''}</span>${estBadge}</div>`:`<div style="display:flex;align-items:center;gap:6px"><input class="ce" value="${esc(c.nombre)}" oninput="upCuota(${origIdx},'nombre',this.value)" style="font-weight:600;min-width:120px">${estBadge}</div>`;
+    const nameCell=c.perdido?`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-weight:600;text-decoration:line-through">${esc(c.nombre)}</span><span style="font-size:9px;padding:1px 6px;border-radius:10px;background:#fee2e2;color:#c81e1e;font-weight:700">PERDIDO ${c.fechaPerdido||''}</span></div>`:`<input class="ce" value="${esc(c.nombre)}" oninput="upCuota(${origIdx},'nombre',this.value)" style="font-weight:600;min-width:120px">`;
 
     return`<tr style="${rowStyle}"><td class="sticky-col">${nameCell}</td>
       <td>${planBadge}</td>
