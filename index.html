@@ -1130,7 +1130,7 @@ function renderDashboard(){
       <div class="metric"><div class="ml">Ventas cerradas</div><div class="mv green">${ventas.length}</div></div>
       <div class="metric"><div class="ml">Reservas</div><div class="mv blue">${reservas.length}</div></div>
       <div class="metric"><div class="ml">Activos hoy</div><div class="mv">${activos}</div></div>
-      <div class="metric"><div class="ml">Próx. vencimiento</div><div class="mv ${proximos?'red':''}">${proximos}</div></div>
+      ${HAS_TICKET_MENSUAL?'':`<div class="metric"><div class="ml">Próx. vencimiento</div><div class="mv ${proximos?'red':''}">${proximos}</div></div>`}
       <div class="metric"><div class="ml">Media bajas/mes</div><div class="mv ${getMediaBajasMensual()>2?'amber':''}">${getMediaBajasMensual()}</div></div>
       <div class="metric"><div class="ml">${HAS_TICKET_MENSUAL?'Media renovaciones/mes':'Renovaciones'}</div><div class="mv purple">${HAS_TICKET_MENSUAL?getMediaRenovacionesMensual():S.renovaciones.length}</div></div>
       <div class="metric"><div class="ml">LTV medio</div><div class="mv">${fmt(ltv_med)}</div></div>
