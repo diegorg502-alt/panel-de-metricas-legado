@@ -834,6 +834,22 @@ function getBajasMes(year, monthIdx) {
 }
 
 function getRenovacionesMes(year, monthIdx) {
+  // Modo Zerochats (auto_renew): renovación = cliente PRO/BUSINESS con pago en ese mes
+  // que NO sea alta nueva (fechaInicio anterior a ese mes)
+  if (typeof HAS_TICKET_MENSUAL !== 'undefined' && HAS_TICKET_MENSUAL) {
+    const key = `${year}-${MONTHS[monthIdx]}`;
+    return S.cuotas.filter(c => {
+      if (!['PRO', 'BUSINESS'].includes(c.plan)) return false;
+      const pagos = (c.pagos && typeof c.pagos === 'object' && !Array.isArray(c.pagos)) ? c.pagos : {};
+      if (!Number(pagos[key] || 0)) return false;
+      // Excluir altas nuevas: si fechaInicio cae en este mes/año, es alta no renovación
+      if (c.fechaInicio) {
+        const f = new Date(c.fechaInicio);
+        if (f.getFullYear() === year && f.getMonth() === monthIdx) return false;
+      }
+      return true;
+    });
+  }
   return S.renovaciones.filter(r => {
     const f = new Date(r.fechaInicio);
     return f.getFullYear() === year && f.getMonth() === monthIdx;
