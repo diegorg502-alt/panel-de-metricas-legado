@@ -1128,7 +1128,7 @@ function renderDashboard(){
       <div class="metric"><div class="ml">Caja cobrada</div><div class="mv green">${fmt(totalCaja)}</div></div>
       <div class="metric"><div class="ml">${HAS_TICKET_MENSUAL?'Caja por cobrar':'Bola de nieve'}</div><div class="mv amber">${fmt(cajaPorCobrar)}</div></div>
       <div class="metric"><div class="ml">Ventas cerradas</div><div class="mv green">${ventas.length}</div></div>
-      <div class="metric"><div class="ml">Reservas</div><div class="mv blue">${reservas.length}</div></div>
+      ${HAS_TICKET_MENSUAL?'':`<div class="metric"><div class="ml">Reservas</div><div class="mv blue">${reservas.length}</div></div>`}
       <div class="metric"><div class="ml">Activos hoy</div><div class="mv">${activos}</div></div>
       ${HAS_TICKET_MENSUAL?'':`<div class="metric"><div class="ml">Próx. vencimiento</div><div class="mv ${proximos?'red':''}">${proximos}</div></div>`}
       <div class="metric"><div class="ml">Media bajas/mes</div><div class="mv ${getMediaBajasMensual()>2?'amber':''}">${getMediaBajasMensual()}</div></div>
