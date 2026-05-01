@@ -917,19 +917,41 @@ function getLTV(c){
   const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);
   return Number(c.ticket||0)+rs.reduce((s,r)=>s+Number(r.ticket||0),0);
 }
-// Caja cobrada de una cuota: suma de pagos (opcional filtrar por año)
-function getCuotaCajaCobrada(c,year){
+// Facturación de una cuota: suma de TODOS los pagos del año (incluye futuros del mismo año).
+function getCuotaFacturacion(c,year){
   const pagos=getPagos(c);
   return Object.entries(pagos).reduce((s,[k,v])=>(year&&!String(k).startsWith(`${year}-`))?s:s+Number(v||0),0);
 }
-// Caja por cobrar: solo aplica a ANUAL no perdidos cuyo ticket > suma pagos (anual dividido en cuotas)
-function getCuotaCajaPorCobrar(c){
-  if(c.plan!=='ANUAL'||c.perdido) return 0;
-  const tot=Object.values(getPagos(c)).reduce((s,v)=>s+Number(v||0),0);
-  return Math.max(0,Number(c.ticket||0)-tot);
+// Caja cobrada: pagos hasta el mes actual (incluido). Pagos de años pasados también se consideran cobrados.
+function getCuotaCajaCobrada(c,year){
+  const pagos=getPagos(c);
+  const now=new Date();
+  const yToday=now.getFullYear();
+  const mToday=now.getMonth();
+  return Object.entries(pagos).reduce((s,[k,v])=>{
+    if(year && !String(k).startsWith(`${year}-`)) return s;
+    const [yStr,mStr]=String(k).split('-');
+    const yK=parseInt(yStr,10);
+    const mK=MONTHS.indexOf(mStr);
+    if(yK<yToday) return s+Number(v||0);
+    if(yK===yToday && mK<=mToday) return s+Number(v||0);
+    return s;
+  },0);
 }
-function getCuotaFacturacion(c,year){
-  return getCuotaCajaCobrada(c,year)+getCuotaCajaPorCobrar(c);
+// Caja por cobrar: pagos registrados en meses FUTUROS del año actual (todavía no llegados).
+function getCuotaCajaPorCobrar(c,year){
+  const pagos=getPagos(c);
+  const now=new Date();
+  const yToday=now.getFullYear();
+  const mToday=now.getMonth();
+  return Object.entries(pagos).reduce((s,[k,v])=>{
+    if(year && !String(k).startsWith(`${year}-`)) return s;
+    const [yStr,mStr]=String(k).split('-');
+    const yK=parseInt(yStr,10);
+    const mK=MONTHS.indexOf(mStr);
+    if(yK===yToday && mK>mToday) return s+Number(v||0);
+    return s;
+  },0);
 }
 function parseNum(v){return parseFloat(String(v).replace(',','.'))||0;}
 function pct(a,b){return b?Math.round(a/b*100):0}
@@ -1059,9 +1081,9 @@ function renderDashboard(){
   let totalFact, totalCaja, cajaPorCobrar;
   if(HAS_TICKET_MENSUAL){
     // Modelo Zerochats (auto_renew): ver renderCuotas
+    totalFact=S.cuotas.reduce((s,c)=>s+getCuotaFacturacion(c,curYear),0);
     totalCaja=S.cuotas.reduce((s,c)=>s+getCuotaCajaCobrada(c,curYear),0);
-    cajaPorCobrar=S.cuotas.reduce((s,c)=>s+getCuotaCajaPorCobrar(c),0);
-    totalFact=totalCaja+cajaPorCobrar;
+    cajaPorCobrar=S.cuotas.reduce((s,c)=>s+getCuotaCajaPorCobrar(c,curYear),0);
   } else {
     totalFact=ventas.reduce((s,l)=>s+Number(l.facturacion||0),0);
     totalCaja=ventas.reduce((s,l)=>s+Number(l.caja||0),0);
@@ -2005,12 +2027,12 @@ function renderCuotas(){
   let totalFact, totalCaja, cajaPendiente;
   if(HAS_TICKET_MENSUAL){
     // Modelo Zerochats (auto_renew):
-    // - Caja cobrada = suma de TODOS los pagos del año actual (lo que ya está cobrado)
-    // - Caja por cobrar = suma de (ticket - cobrado_total) para los planes ANUAL no perdidos (anuales divididos)
-    // - Facturación = caja cobrada + caja por cobrar
+    // - Facturación total = suma de TODOS los pagos del año (incluye registrados en meses futuros)
+    // - Caja cobrada = pagos hasta el mes actual (incluido)
+    // - Caja por cobrar = pagos registrados en meses futuros del año (cuando llegan pasan a cobradas)
+    totalFact=S.cuotas.reduce((s,c)=>s+getCuotaFacturacion(c,curYear),0);
     totalCaja=S.cuotas.reduce((s,c)=>s+getCuotaCajaCobrada(c,curYear),0);
-    cajaPendiente=S.cuotas.reduce((s,c)=>s+getCuotaCajaPorCobrar(c),0);
-    totalFact=totalCaja+cajaPendiente;
+    cajaPendiente=S.cuotas.reduce((s,c)=>s+getCuotaCajaPorCobrar(c,curYear),0);
   } else {
     // Modelo legacy: facturación = todos los pagos comprometidos (incluye meses futuros calculados)
     const allVentas=Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))).map(([,v])=>v).flat().filter(l=>l.estado==='Venta');
