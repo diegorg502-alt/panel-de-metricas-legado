@@ -884,8 +884,10 @@ function seed(){}
 function fmt(n,dec=0){return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:dec}).format(n||0)}
 
 function getPagos(c){
-  // Cuotas auto-renew (sync GHL): SIEMPRE usar pagos persistentes (no calcular al vuelo)
-  if(c.source==='ghl'){
+  // Modo Zerochats (HAS_TICKET_MENSUAL) o sync GHL: SIEMPRE usar pagos persistentes.
+  // Si c.pagos está vacío, no hay nada cobrado — Diego rellena manual cuando cobra
+  // (caso plan ANUAL legacy con ticket grande pero sin registrar pagos aún).
+  if(c.source==='ghl' || (typeof HAS_TICKET_MENSUAL!=='undefined' && HAS_TICKET_MENSUAL)){
     return (c.pagos && typeof c.pagos==='object' && !Array.isArray(c.pagos)) ? c.pagos : {};
   }
   // Cuotas legacy con pagos persistentes guardados: usar tal cual
