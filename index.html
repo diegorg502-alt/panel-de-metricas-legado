@@ -993,8 +993,29 @@ function canalStats(canal,mk){
   const realizadas=cl.filter(l=>l.asistencia==='SI').length;
   const inv=kAll.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);
   const leads=kAll.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
-  const fact=cv.reduce((s,l)=>s+Number(l.facturacion||0),0);
-  const caja=cv.reduce((s,l)=>s+Number(l.caja||0),0);
+  let fact=cv.reduce((s,l)=>s+Number(l.facturacion||0),0);
+  let caja=cv.reduce((s,l)=>s+Number(l.caja||0),0);
+  // Modo Zerochats: añadir las renovaciones (pagos persistentes en c.pagos) a fact y caja
+  // del canal correspondiente. Cada cliente con plan PRO/BUSINESS aporta sus pagos del año/mes.
+  if(typeof HAS_TICKET_MENSUAL!=='undefined' && HAS_TICKET_MENSUAL){
+    const cuotasCanal=S.cuotas.filter(c=>c.embudo===canal);
+    let renovs=0;
+    for(const c of cuotasCanal){
+      const pagos=(c.pagos&&typeof c.pagos==='object'&&!Array.isArray(c.pagos))?c.pagos:{};
+      if(mk){
+        // mk = 'YYYY-MM' → clave 'YYYY-MMM'
+        const [y,m]=mk.split('-');
+        const key=`${y}-${MONTHS[parseInt(m,10)-1]}`;
+        renovs+=Number(pagos[key]||0);
+      } else {
+        for(const [k,v] of Object.entries(pagos)){
+          if(String(k).startsWith(`${curYear}-`)) renovs+=Number(v||0);
+        }
+      }
+    }
+    fact+=renovs;
+    caja+=renovs;
+  }
   const llamadasAgend=cl.length;
   return{canal,inv,leads,cpl:leads&&inv?inv/leads:null,llamadasAgend,costeLlamada:llamadasAgend&&inv?inv/llamadasAgend:null,
     pctAgend:leads?llamadasAgend/leads:null,realizadas,pctAsist:llamadasAgend?realizadas/llamadasAgend:null,
@@ -1111,7 +1132,7 @@ function renderDashboard(){
       <div class="metric"><div class="ml">Activos hoy</div><div class="mv">${activos}</div></div>
       <div class="metric"><div class="ml">Próx. vencimiento</div><div class="mv ${proximos?'red':''}">${proximos}</div></div>
       <div class="metric"><div class="ml">Media bajas/mes</div><div class="mv ${getMediaBajasMensual()>2?'amber':''}">${getMediaBajasMensual()}</div></div>
-      <div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${S.renovaciones.length}</div></div>
+      <div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${HAS_TICKET_MENSUAL?MONTHS.reduce((s,_,i)=>s+getRenovacionesMes(curYear,i).length,0):S.renovaciones.length}</div></div>
       <div class="metric"><div class="ml">LTV medio</div><div class="mv">${fmt(ltv_med)}</div></div>
       ${HAS_TICKET_MENSUAL?`<div class="metric"><div class="ml">Ticket medio</div><div class="mv purple">${fmt(ticketMedioAnual,0)}</div></div>`:''}
       <div class="metric"><div class="ml">% Cierre global</div><div class="mv">${pct(ventas.length,allL.length)}%</div></div>
