@@ -1132,7 +1132,7 @@ function renderDashboard(){
       <div class="metric"><div class="ml">Activos hoy</div><div class="mv">${activos}</div></div>
       <div class="metric"><div class="ml">Próx. vencimiento</div><div class="mv ${proximos?'red':''}">${proximos}</div></div>
       <div class="metric"><div class="ml">Media bajas/mes</div><div class="mv ${getMediaBajasMensual()>2?'amber':''}">${getMediaBajasMensual()}</div></div>
-      <div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${HAS_TICKET_MENSUAL?MONTHS.reduce((s,_,i)=>s+getRenovacionesMes(curYear,i).length,0):S.renovaciones.length}</div></div>
+      <div class="metric"><div class="ml">${HAS_TICKET_MENSUAL?'Media renovaciones/mes':'Renovaciones'}</div><div class="mv purple">${HAS_TICKET_MENSUAL?getMediaRenovacionesMensual():S.renovaciones.length}</div></div>
       <div class="metric"><div class="ml">LTV medio</div><div class="mv">${fmt(ltv_med)}</div></div>
       ${HAS_TICKET_MENSUAL?`<div class="metric"><div class="ml">Ticket medio</div><div class="mv purple">${fmt(ticketMedioAnual,0)}</div></div>`:''}
       <div class="metric"><div class="ml">% Cierre global</div><div class="mv">${pct(ventas.length,allL.length)}%</div></div>
