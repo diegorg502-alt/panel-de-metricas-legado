@@ -142,11 +142,13 @@ input[type=number].ce{-moz-appearance:textfield}
 .ad-card{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start}
 .ad-num{background:var(--amber-l);color:var(--amber);font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;margin-top:2px}
 tfoot td{font-weight:600;font-size:12px;background:var(--bg3);padding:8px 9px;font-variant-numeric:tabular-nums;border-top:1px solid var(--border2)}
-/* Sticky first column in cuotas table */
-.cuotas-scroll{overflow-x:auto;max-height:70vh}
+/* Sticky first column + sticky header + sticky footer in cuotas table */
+.cuotas-scroll{overflow:auto;max-height:70vh}
 .cuotas-table th.sticky-col,.cuotas-table td.sticky-col{position:sticky;left:0;z-index:2;background:var(--bg);box-shadow:2px 0 0 var(--border)}
-.cuotas-table thead th.sticky-col{background:var(--bg2);z-index:4}
-.cuotas-table tfoot td.sticky-col{background:var(--bg3);z-index:2}
+.cuotas-table thead th{position:sticky;top:0;z-index:4;background:var(--bg2);box-shadow:0 1px 0 var(--border)}
+.cuotas-table thead th.sticky-col{z-index:6}
+.cuotas-table tfoot td{position:sticky;bottom:0;z-index:3;background:var(--bg3);box-shadow:0 -1px 0 var(--border);font-weight:700}
+.cuotas-table tfoot td.sticky-col{z-index:5;background:var(--bg3)}
 .cuotas-table tbody tr:hover td.sticky-col{background:var(--bg2)}
 .kpi-m{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:10px 12px}
 .kpi-m .ml{font-size:9px;margin-bottom:4px}
@@ -913,6 +915,20 @@ function getLTV(c){
   const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);
   return Number(c.ticket||0)+rs.reduce((s,r)=>s+Number(r.ticket||0),0);
 }
+// Caja cobrada de una cuota: suma de pagos (opcional filtrar por año)
+function getCuotaCajaCobrada(c,year){
+  const pagos=getPagos(c);
+  return Object.entries(pagos).reduce((s,[k,v])=>(year&&!String(k).startsWith(`${year}-`))?s:s+Number(v||0),0);
+}
+// Caja por cobrar: solo aplica a ANUAL no perdidos cuyo ticket > suma pagos (anual dividido en cuotas)
+function getCuotaCajaPorCobrar(c){
+  if(c.plan!=='ANUAL'||c.perdido) return 0;
+  const tot=Object.values(getPagos(c)).reduce((s,v)=>s+Number(v||0),0);
+  return Math.max(0,Number(c.ticket||0)-tot);
+}
+function getCuotaFacturacion(c,year){
+  return getCuotaCajaCobrada(c,year)+getCuotaCajaPorCobrar(c);
+}
 function parseNum(v){return parseFloat(String(v).replace(',','.'))||0;}
 function pct(a,b){return b?Math.round(a/b*100):0}
 function edate(d,m){const dt=new Date(d);dt.setMonth(dt.getMonth()+m);return dt.toISOString().split('T')[0]}
@@ -1038,8 +1054,17 @@ function renderDashboard(){
   const lanzKeys=(S.lanzamientos||[]).map(l=>`lanz_${l.id}`);
   const allL=Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))||lanzKeys.includes(k)).map(([,v])=>v).flat();
   const ventas=allL.filter(l=>l.estado==='Venta');const reservas=allL.filter(l=>l.estado==='Reserva');
-  const totalFact=ventas.reduce((s,l)=>s+Number(l.facturacion||0),0);
-  const totalCaja=ventas.reduce((s,l)=>s+Number(l.caja||0),0);
+  let totalFact, totalCaja, cajaPorCobrar;
+  if(HAS_TICKET_MENSUAL){
+    // Modelo Zerochats (auto_renew): ver renderCuotas
+    totalCaja=S.cuotas.reduce((s,c)=>s+getCuotaCajaCobrada(c,curYear),0);
+    cajaPorCobrar=S.cuotas.reduce((s,c)=>s+getCuotaCajaPorCobrar(c),0);
+    totalFact=totalCaja+cajaPorCobrar;
+  } else {
+    totalFact=ventas.reduce((s,l)=>s+Number(l.facturacion||0),0);
+    totalCaja=ventas.reduce((s,l)=>s+Number(l.caja||0),0);
+    cajaPorCobrar=Math.max(0,totalFact-totalCaja);
+  }
   const activos=S.cuotas.filter(isActive).length;
   const proximos=S.cuotas.filter(c=>{const d=daysDiff(getVenc(c));return d>=0&&d<30;}).length;
   const ltv_med=S.cuotas.length?Math.round(S.cuotas.reduce((s,c)=>s+getLTV(c),0)/S.cuotas.length):0;
@@ -1054,7 +1079,7 @@ function renderDashboard(){
     <div class="mg">
       <div class="metric"><div class="ml">Facturación total</div><div class="mv blue">${fmt(totalFact)}</div></div>
       <div class="metric"><div class="ml">Caja cobrada</div><div class="mv green">${fmt(totalCaja)}</div></div>
-      <div class="metric"><div class="ml">Bola de nieve</div><div class="mv amber">${fmt(totalFact-totalCaja)}</div></div>
+      <div class="metric"><div class="ml">${HAS_TICKET_MENSUAL?'Caja por cobrar':'Bola de nieve'}</div><div class="mv amber">${fmt(cajaPorCobrar)}</div></div>
       <div class="metric"><div class="ml">Ventas cerradas</div><div class="mv green">${ventas.length}</div></div>
       <div class="metric"><div class="ml">Reservas</div><div class="mv blue">${reservas.length}</div></div>
       <div class="metric"><div class="ml">Activos hoy</div><div class="mv">${activos}</div></div>
@@ -1974,19 +1999,31 @@ let cuotaPlanFilter='all';   // 'all' | 'PRO' | 'BUSINESS' | 'ANUAL' | 'sin'
 let cuotaFechaDesde='';      // YYYY-MM-DD
 let cuotaFechaHasta='';      // YYYY-MM-DD
 function renderCuotas(){
-  const allVentas=Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))).map(([,v])=>v).flat().filter(l=>l.estado==='Venta');
-    const totalFact=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear).reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const cp=getPagos(c);return s+MONTHS.reduce((ms,m)=>{const rv=rs.reduce((x,r)=>x+Number(getPagos(r)[`${curYear}-${m}`]||0),0);return ms+(cp[`${curYear}-${m}`]||0)+rv;},0);},0);
-  const totalCaja=allVentas.reduce((s,l)=>s+Number(l.caja||0),0);
   const todayM=todayMonth();
-  const cajaPendiente=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear).reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const cp=getPagos(c);return s+MONTHS.reduce((ms,m,mi)=>{const rv=rs.reduce((x,r)=>x+Number(getPagos(r)[`${curYear}-${m}`]||0),0);return mi>=todayM?ms+(cp[`${curYear}-${m}`]||0)+rv:ms;},0);},0);
+  let totalFact, totalCaja, cajaPendiente;
+  if(HAS_TICKET_MENSUAL){
+    // Modelo Zerochats (auto_renew):
+    // - Caja cobrada = suma de TODOS los pagos del año actual (lo que ya está cobrado)
+    // - Caja por cobrar = suma de (ticket - cobrado_total) para los planes ANUAL no perdidos (anuales divididos)
+    // - Facturación = caja cobrada + caja por cobrar
+    totalCaja=S.cuotas.reduce((s,c)=>s+getCuotaCajaCobrada(c,curYear),0);
+    cajaPendiente=S.cuotas.reduce((s,c)=>s+getCuotaCajaPorCobrar(c),0);
+    totalFact=totalCaja+cajaPendiente;
+  } else {
+    // Modelo legacy: facturación = todos los pagos comprometidos (incluye meses futuros calculados)
+    const allVentas=Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))).map(([,v])=>v).flat().filter(l=>l.estado==='Venta');
+    totalFact=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear).reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const cp=getPagos(c);return s+MONTHS.reduce((ms,m)=>{const rv=rs.reduce((x,r)=>x+Number(getPagos(r)[`${curYear}-${m}`]||0),0);return ms+(cp[`${curYear}-${m}`]||0)+rv;},0);},0);
+    totalCaja=allVentas.reduce((s,l)=>s+Number(l.caja||0),0);
+    cajaPendiente=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear).reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const cp=getPagos(c);return s+MONTHS.reduce((ms,m,mi)=>{const rv=rs.reduce((x,r)=>x+Number(getPagos(r)[`${curYear}-${m}`]||0),0);return mi>=todayM?ms+(cp[`${curYear}-${m}`]||0)+rv:ms;},0);},0);
+  }
   const filtered=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear&&(!cuotaSearch||c.nombre.toLowerCase().includes(cuotaSearch.toLowerCase())));
   document.getElementById('content').innerHTML=`
     ${!isEntrenador?`<div class="mg">
-      <div class="metric"><div class="ml">Facturación comprometida</div><div class="mv blue">${fmt(totalFact)}</div></div>
+      <div class="metric"><div class="ml">${HAS_TICKET_MENSUAL?'Facturación total':'Facturación comprometida'}</div><div class="mv blue">${fmt(totalFact)}</div></div>
       <div class="metric"><div class="ml">Caja cobrada</div><div class="mv green">${fmt(totalCaja)}</div></div>
       <div class="metric"><div class="ml">Caja por cobrar</div><div class="mv amber">${fmt(cajaPendiente)}</div></div>
       <div class="metric"><div class="ml">Clientes activos</div><div class="mv">${S.cuotas.filter(isActive).length}</div></div>
-      <div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${S.renovaciones.length}</div></div>
+      ${HAS_TICKET_MENSUAL?'':`<div class="metric"><div class="ml">Renovaciones</div><div class="mv purple">${S.renovaciones.length}</div></div>`}
     </div>
     ${(()=>{
       const mediaBajas = getMediaBajasMensual();
