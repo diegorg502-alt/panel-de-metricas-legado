@@ -963,8 +963,16 @@ function alertInfo(v){const d=daysDiff(v);if(d<0)return{label:'Vencido',cls:'b-r
 function getVenc(c){const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);if(rs.length){const last=rs.sort((a,b)=>new Date(b.fechaInicio)-new Date(a.fechaInicio))[0];const lastMeses=Number(last.mesesServicio)||Number(last.nCuotas)||1;return edate(last.fechaInicio,lastMeses);}const meses=Number(c.mesesServicio)||1;return edate(c.fechaInicio,meses);}
 function isActive(c){
   if(c.perdido)return false;
-  // Auto-renew plans (PRO/BUSINESS) are always active unless perdido
+  // PRO/BUSINESS recurrentes: activo mientras no esté perdido
   if(['PRO','BUSINESS'].includes(c.plan))return new Date(c.fechaInicio)<=new Date();
+  // ANUAL: activo durante 12 meses desde fechaInicio (pago único cubre 1 año)
+  if(c.plan==='ANUAL'){
+    const t=new Date();
+    const start=new Date(c.fechaInicio);
+    const venc=edate(c.fechaInicio,12);
+    return start<=t && new Date(venc)>=t;
+  }
+  // Resto (legacy): usar mesesServicio
   const v=getVenc(c),t=new Date();return new Date(c.fechaInicio)<=t&&new Date(v)>=t;
 }
 function getAlertInfo(c){
