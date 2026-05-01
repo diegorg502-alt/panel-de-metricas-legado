@@ -1,19 +1,26 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// Runs on day 1 of each month. For each client with auto_renew=true,
-// processes active clients (PRO/BUSINESS monthly plans) and adds a renewal entry.
-// Clients marked as "Perdido" are skipped.
+// Cron diario. Para cada cliente con auto_renew=true, recorre sus suscriptores
+// (S.cuotas con plan PRO/BUSINESS no perdidos) y, si el mes actual aún no
+// está pagado, registra el pago directamente en cuota.pagos[YYYY-MMM].
+// NO se inyecta nada en S.llamadas[mk] — los KPIs del mes solo reflejan altas reales.
 
 const PLAN_AMOUNTS: Record<string, number> = { PRO: 247, BUSINESS: 397 };
 const MONTHS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 
-function getCurrentMonthKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+function getPagoKey(d: Date): string {
+  return `${d.getFullYear()}-${MONTHS[d.getMonth()]}`;
 }
 
-function getToday(): string {
-  return new Date().toISOString().split('T')[0];
+function monthsBetween(from: Date, to: Date): { y: number; m: number }[] {
+  const out: { y: number; m: number }[] = [];
+  const cur = new Date(from.getFullYear(), from.getMonth(), 1);
+  const end = new Date(to.getFullYear(), to.getMonth(), 1);
+  while (cur <= end) {
+    out.push({ y: cur.getFullYear(), m: cur.getMonth() });
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  return out;
 }
 
 Deno.serve(async () => {
@@ -23,7 +30,6 @@ Deno.serve(async () => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Get all clients with auto_renew enabled
     const { data: clients } = await sb
       .from('crm_clients')
       .select('*')
@@ -35,68 +41,58 @@ Deno.serve(async () => {
       });
     }
 
-    const results = [];
-    const today = getToday();
-    const mk = getCurrentMonthKey();
+    const today = new Date();
+    const results: any[] = [];
 
     for (const client of clients) {
       const { data: cd } = await sb.from('crm_data').select('data').eq('id', client.record_id).single();
       const S = cd?.data || {};
-      if (!S.llamadas) S.llamadas = {};
-      if (!S.llamadas[mk]) S.llamadas[mk] = [];
       if (!S.cuotas) S.cuotas = [];
 
-      let renewedCount = 0;
+      let pagosAdded = 0;
+      let activeSubscribers = 0;
 
-      // Find all active monthly subscribers (plan PRO or BUSINESS, not marked Perdido)
-      const activeClients = S.cuotas.filter((c: any) => {
-        if (!c.plan || !['PRO', 'BUSINESS'].includes(c.plan)) return false;
-        if (c.estado === 'Perdido' || c.perdido) return false;
-        return true;
-      });
+      for (const cuota of S.cuotas) {
+        if (!cuota.plan || !['PRO', 'BUSINESS'].includes(cuota.plan)) continue;
+        if (cuota.perdido || cuota.estado === 'Perdido') continue;
+        activeSubscribers++;
 
-      for (const cuota of activeClients) {
-        // Check if this month already has a renewal entry for this client
-        const alreadyRenewed = S.llamadas[mk].some(
-          (l: any) => l.nombre === cuota.nombre && l.source === 'auto-renew'
-        );
-        if (alreadyRenewed) continue;
+        if (!cuota.pagos || typeof cuota.pagos !== 'object' || Array.isArray(cuota.pagos)) {
+          cuota.pagos = {};
+        }
 
-        const amount = PLAN_AMOUNTS[cuota.plan] || cuota.ticket || 0;
+        const amount = PLAN_AMOUNTS[cuota.plan] || Number(cuota.ticket) || 0;
+        if (!amount) continue;
 
-        S.llamadas[mk].push({
-          nombre: cuota.nombre,
-          fecha: today,
-          telefono: cuota.telefono || '',
-          embudo: cuota.embudo || '',
-          closer: cuota.closer || 'Jordi',
-          asistencia: 'SI',
-          incidencia: '',
-          estado: 'Venta',
-          facturacion: amount,
-          caja: amount,
-          nCuotas: 1,
-          mesesServicio: 1,
-          comentarios: `Renovación automática ${cuota.plan}`,
-          plan: cuota.plan,
-          source: 'auto-renew',
-          year: new Date().getFullYear()
-        });
-        renewedCount++;
+        // Fecha tope para registrar pagos: hoy o fechaPerdido (lo que ocurra antes)
+        const startDate = new Date(cuota.fechaInicio);
+        const endDate = cuota.fechaPerdido ? new Date(cuota.fechaPerdido) : today;
+        if (isNaN(startDate.getTime())) continue;
+        if (endDate < startDate) continue;
+
+        // Asegura que cada mes desde el inicio hasta hoy tenga su pago.
+        // Esto cubre tanto la primera ejecución (backfill) como mensual.
+        for (const { y, m } of monthsBetween(startDate, endDate)) {
+          const key = `${y}-${MONTHS[m]}`;
+          if (!cuota.pagos[key]) {
+            cuota.pagos[key] = amount;
+            pagosAdded++;
+          }
+        }
       }
 
-      if (renewedCount > 0) {
+      if (pagosAdded > 0) {
         await sb.from('crm_data').upsert({ id: client.record_id, data: S });
       }
 
       results.push({
         client: client.record_id,
-        renewed: renewedCount,
-        active_subscribers: activeClients.length
+        active_subscribers: activeSubscribers,
+        pagos_added: pagosAdded
       });
     }
 
-    return new Response(JSON.stringify({ success: true, results, date: today }), {
+    return new Response(JSON.stringify({ success: true, results, date: today.toISOString().split('T')[0] }), {
       status: 200, headers: { 'Content-Type': 'application/json' }
     });
 

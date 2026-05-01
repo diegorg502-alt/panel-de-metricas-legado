@@ -882,7 +882,15 @@ function seed(){}
 function fmt(n,dec=0){return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:dec}).format(n||0)}
 
 function getPagos(c){
-  // Compute pagos on the fly from ticket, nCuotas, fechaInicio
+  // Cuotas auto-renew (sync GHL): SIEMPRE usar pagos persistentes (no calcular al vuelo)
+  if(c.source==='ghl'){
+    return (c.pagos && typeof c.pagos==='object' && !Array.isArray(c.pagos)) ? c.pagos : {};
+  }
+  // Cuotas legacy con pagos persistentes guardados: usar tal cual
+  if(c.pagos && typeof c.pagos==='object' && !Array.isArray(c.pagos) && Object.keys(c.pagos).length>0){
+    return c.pagos;
+  }
+  // Cuotas tradicionales: calcular al vuelo desde ticket / nCuotas / fechaInicio
   if(!c.ticket||!c.nCuotas||!c.fechaInicio) return {};
   const pv=Math.round(Number(c.ticket)/Number(c.nCuotas)*100)/100;
   const startY=new Date(c.fechaInicio).getFullYear();
@@ -895,6 +903,15 @@ function getPagos(c){
     pagos[`${y}-${MONTHS[m]}`]=pv;
   }
   return pagos;
+}
+function getLTV(c){
+  // Para cuotas auto-renew (PRO/BUSINESS/ANUAL): suma de pagos persistentes
+  if(['PRO','BUSINESS','ANUAL'].includes(c.plan)){
+    return Object.values(c.pagos||{}).reduce((s,v)=>s+Number(v||0),0);
+  }
+  // Cuotas tradicionales: ticket inicial + ticket de renovaciones
+  const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);
+  return Number(c.ticket||0)+rs.reduce((s,r)=>s+Number(r.ticket||0),0);
 }
 function parseNum(v){return parseFloat(String(v).replace(',','.'))||0;}
 function pct(a,b){return b?Math.round(a/b*100):0}
@@ -1025,7 +1042,7 @@ function renderDashboard(){
   const totalCaja=ventas.reduce((s,l)=>s+Number(l.caja||0),0);
   const activos=S.cuotas.filter(isActive).length;
   const proximos=S.cuotas.filter(c=>{const d=daysDiff(getVenc(c));return d>=0&&d<30;}).length;
-  const ltv_med=S.cuotas.length?Math.round(S.cuotas.reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);return s+Number(c.ticket||0)+rs.reduce((x,r)=>x+Number(r.ticket||0),0);},0)/S.cuotas.length):0;
+  const ltv_med=S.cuotas.length?Math.round(S.cuotas.reduce((s,c)=>s+getLTV(c),0)/S.cuotas.length):0;
   const ticketMedioAnual=ventas.length?ventas.reduce((s,l)=>s+ticketMensualizado(l),0)/ventas.length:0;
   if(!S.contactados)S.contactados=[];
   const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple','VSL ADS':'b-purple','ADS':'b-purple',QUIZ:'b-amber',WORKSHOP:'b-blue',LANZAMIENTO:'b-amber',GOOGLE:'b-red','ORGÁNICO':'b-green',ORGANICO:'b-green',REFERIDOS:'b-gray'};
@@ -1952,6 +1969,7 @@ function upObj(mk,canal,key,val){ensureObj(mk,canal);S.objetivos[mk][canal][key]
 // ── CUOTAS ────────────────────────────────────────────────
 let cuotaSearch='';
 let cuotaMonthFilter='all';
+let cuotaEstadoFilter='all'; // 'all' | 'activo' | 'perdido'
 function renderCuotas(){
   const allVentas=Object.entries(S.llamadas).filter(([k])=>k.startsWith(String(curYear))).map(([,v])=>v).flat().filter(l=>l.estado==='Venta');
     const totalFact=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear).reduce((s,c)=>{const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const cp=getPagos(c);return s+MONTHS.reduce((ms,m)=>{const rv=rs.reduce((x,r)=>x+Number(getPagos(r)[`${curYear}-${m}`]||0),0);return ms+(cp[`${curYear}-${m}`]||0)+rv;},0);},0);
@@ -2017,6 +2035,11 @@ function renderCuotas(){
       <div style="padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <div style="font-size:13px;font-weight:600">Detalle por cliente <span style="font-size:11px;color:var(--text3);font-weight:400">(${filtered.length} de ${S.cuotas.length})</span></div>
         <div style="display:flex;gap:8px;align-items:center">
+          <select id="cuota-estado-filter" onchange="cuotaEstadoFilter=this.value;renderCuotasFiltered()" style="padding:5px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text)">
+            <option value="all"${cuotaEstadoFilter==='all'?' selected':''}>Todos los estados</option>
+            <option value="activo"${cuotaEstadoFilter==='activo'?' selected':''}>Solo activos</option>
+            <option value="perdido"${cuotaEstadoFilter==='perdido'?' selected':''}>Solo perdidos</option>
+          </select>
           <select id="cuota-month-filter" onchange="cuotaMonthFilter=this.value;renderCuotasFiltered()" style="padding:5px 10px;border:1px solid var(--border2);border-radius:7px;font-size:12px;font-family:var(--font);background:var(--bg);color:var(--text)">
             <option value="all"${cuotaMonthFilter==='all'?' selected':''}>Todos los meses</option>
             ${MONTHS.map((m,i)=>`<option value="${i}"${String(cuotaMonthFilter)===String(i)?' selected':''}>${MFULL[i]}</option>`).join('')}
@@ -2040,6 +2063,9 @@ function renderCuotasFiltered(){
   const todayM=todayMonth();
   // Filter by year and search
   let filtered=S.cuotas.filter(c=>new Date(c.fechaInicio).getFullYear()===curYear&&(!cuotaSearch||c.nombre.toLowerCase().includes(cuotaSearch.toLowerCase())));
+  // Filter by estado
+  if(cuotaEstadoFilter==='activo') filtered=filtered.filter(c=>!c.perdido);
+  else if(cuotaEstadoFilter==='perdido') filtered=filtered.filter(c=>!!c.perdido);
   // Filter by month (only clients who have payment in that month)
   if(cuotaMonthFilter!=='all'){
     const mIdx=Number(cuotaMonthFilter);
@@ -2056,7 +2082,8 @@ function renderCuotasFiltered(){
   const tbody=document.getElementById('cuotas-tbody');
   if(!tbody){renderCuotas();return;}
   tbody.innerHTML=filtered.map((c,ci)=>{
-    const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);const ltv=Number(c.ticket||0)+rs.reduce((s,r)=>s+Number(r.ticket||0),0);
+    const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);
+    const ltv=getLTV(c);
     const isAnual=c.plan==='ANUAL'||Number(c.ticket||0)>=1500;
     const isRecurring=['PRO','BUSINESS'].includes(c.plan);
     const venc=isRecurring?'':getVenc(c);
@@ -2065,7 +2092,8 @@ function renderCuotasFiltered(){
     const origIdx=S.cuotas.indexOf(c);
     const rowStyle=c.perdido?'background:#fef2f2;opacity:.75':'';
     const planBadge=c.plan?`<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--blue-l);color:var(--blue)">${c.plan}</span>`:`<span style="font-size:11px;color:var(--text3)">-</span>`;
-    const nameCell=c.perdido?`<div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;text-decoration:line-through">${esc(c.nombre)}</span><span style="font-size:9px;padding:1px 6px;border-radius:10px;background:#fee2e2;color:#c81e1e;font-weight:700">PERDIDO ${c.fechaPerdido||''}</span></div>`:`<input class="ce" value="${esc(c.nombre)}" oninput="upCuota(${origIdx},'nombre',this.value)" style="font-weight:600;min-width:120px">`;
+    const estBadge=c.fecha_estimada?` <span title="Fecha de inicio aproximada (importada desde GHL). Edítala si conoces la real." style="font-size:9px;padding:1px 6px;border-radius:10px;background:#fef3c7;color:#92400e;font-weight:700;cursor:help">≈ EST</span>`:'';
+    const nameCell=c.perdido?`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-weight:600;text-decoration:line-through">${esc(c.nombre)}</span><span style="font-size:9px;padding:1px 6px;border-radius:10px;background:#fee2e2;color:#c81e1e;font-weight:700">PERDIDO ${c.fechaPerdido||''}</span>${estBadge}</div>`:`<div style="display:flex;align-items:center;gap:6px"><input class="ce" value="${esc(c.nombre)}" oninput="upCuota(${origIdx},'nombre',this.value)" style="font-weight:600;min-width:120px">${estBadge}</div>`;
 
     return`<tr style="${rowStyle}"><td class="sticky-col">${nameCell}</td>
       <td>${planBadge}</td>
@@ -2077,10 +2105,11 @@ function renderCuotasFiltered(){
         const key=`${curYear}-${m}`;const cp=getPagos(c);const orig=Number(cp[key]||0);const rv=rs.reduce((s,r)=>s+Number(getPagos(r)[key]||0),0);const total=orig+rv;
         const isPast=curYear<new Date().getFullYear()||(curYear===new Date().getFullYear()&&mi<todayM);
         const isCur=curYear===new Date().getFullYear()&&mi===todayM;
-        // For ANUAL, only show payment in start month, dash elsewhere
-        if(isAnual){
+        const hasPersistentPagos=c.pagos&&typeof c.pagos==='object'&&!Array.isArray(c.pagos)&&Object.keys(c.pagos).length>0;
+        // ANUAL legacy (ticket grande sin pagos persistentes): mostrar en mes inicial
+        if(isAnual && !hasPersistentPagos){
           const startMonth=new Date(c.fechaInicio).getMonth();
-          if(mi===startMonth) return`<td style="text-align:center;${isPast?'opacity:.5':isCur?'background:#fff9e6':''}"><span class="cpaid">${fmt(c.ticket)}</span></td>`;
+          if(mi===startMonth && Number(c.ticket||0)>0) return`<td style="text-align:center;${isPast?'opacity:.5':isCur?'background:#fff9e6':''}"><span class="cpaid">${fmt(c.ticket)}</span></td>`;
           return`<td style="text-align:center;color:var(--text3)">—</td>`;
         }
         return`<td style="text-align:center;${isPast?'opacity:.5':isCur?'background:#fff9e6':''}">${total>0?`<span class="cpaid">${fmt(total)}</span>`:`<span class="cpen">—</span>`}</td>`;
@@ -2100,7 +2129,10 @@ function renderCuotasFiltered(){
         const t=filtered.reduce((s,c)=>{
           const isA=c.plan==='ANUAL'||Number(c.ticket||0)>=1500;
           const cp=getPagos(c);
-          const orig=isA?(new Date(c.fechaInicio).getMonth()===mi?Number(c.ticket||0):0):Number(cp[key]||0);
+          const hasPersistentPagos=c.pagos&&typeof c.pagos==='object'&&!Array.isArray(c.pagos)&&Object.keys(c.pagos).length>0;
+          const orig=(isA && !hasPersistentPagos)
+            ?(new Date(c.fechaInicio).getMonth()===mi?Number(c.ticket||0):0)
+            :Number(cp[key]||0);
           const rv=S.renovaciones.filter(r=>r.nombre===c.nombre).reduce((x,r)=>x+Number(getPagos(r)[key]||0),0);
           return s+orig+rv;
         },0);
