@@ -88,6 +88,12 @@ aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border
 .mv{font-size:22px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .mv.blue{color:var(--blue)}.mv.green{color:var(--green)}.mv.amber{color:var(--amber)}.mv.red{color:var(--red)}.mv.purple{color:var(--purple)}
 .tw{overflow:auto;max-height:70vh}
+/* Sticky primera columna (Nombre) en KPIs por mes y lanzamientos */
+.tw table.sticky-name th:first-child,
+.tw table.sticky-name td:first-child{position:sticky;left:0;z-index:2;background:var(--bg);box-shadow:2px 0 0 var(--border)}
+.tw table.sticky-name thead th:first-child{z-index:5;background:var(--bg2)}
+.tw table.sticky-name tbody tr:hover td:first-child{background:var(--bg2)}
+.tw table.sticky-name tfoot td:first-child{z-index:3;background:var(--bg3)}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;padding:11px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);border-bottom:1.5px solid var(--border2);white-space:nowrap;background:#fff;vertical-align:bottom;position:sticky;top:0;z-index:2}
 td{padding:10px 12px;border-top:1px solid var(--border);color:var(--text);vertical-align:middle}
@@ -1420,7 +1426,7 @@ function renderMes(){
         <span id="fcount" style="font-size:11px;color:var(--text3)"></span>
         <div class="chip chip-reset" onclick="resetMesFilters()">Limpiar</div>
       </div>
-      <div class="tw"><table id="lt">
+      <div class="tw"><table id="lt" class="sticky-name">
         <thead><tr>
           <th style="min-width:160px">Nombre</th>
           <th style="min-width:120px">Fecha</th>
@@ -3135,7 +3141,7 @@ function renderLanzamientoDetail(){
     </div>
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:32px">
       <div style="padding:14px 20px 0"><div class="card-title" style="margin-bottom:0">Llamadas del lanzamiento</div></div>
-      <div class="tw"><table id="lt">
+      <div class="tw"><table id="lt" class="sticky-name">
         <thead><tr><th style="min-width:160px">Nombre</th><th style="min-width:120px">Fecha</th><th style="min-width:120px">Teléfono</th><th style="min-width:110px">Embudo</th><th style="min-width:90px">Closer</th>${SETTERS.length?'<th style="min-width:100px">Setter</th>':''}<th style="min-width:100px">Asistencia</th><th style="min-width:90px">Incidencia</th><th style="min-width:120px">Estado</th><th style="min-width:110px">Facturación</th><th style="min-width:90px">Caja</th><th style="min-width:90px">Cuotas</th><th style="min-width:120px">Meses servicio</th><th style="min-width:180px">Comentarios</th><th></th></tr></thead>
         <tbody id="lb"></tbody>
       </table></div>
