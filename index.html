@@ -438,7 +438,7 @@ const MONTHS=['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV',
 const MFULL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const ESTADOS=['Venta','Reserva','En seguimiento','Perdido'];
 const INCIDENCIAS=['Reagenda','No se presenta','No cualifica previo a la llamada','No confirma asistencia a llamada'];
-const SEMANAS_OPTIONS=[{label:'12 semanas',value:12,dias:84},{label:'24 semanas',value:24,dias:168},{label:'48 semanas',value:48,dias:336}];
+const SEMANAS_OPTIONS=[{label:'12 semanas',value:12,dias:84,meses:3},{label:'24 semanas',value:24,dias:168,meses:6},{label:'52 semanas',value:52,dias:364,meses:12}];
 // Paleta unificada de colores por embudo/plan/semanas (aplica a todos los clientes)
 const EMBUDO_COLORS={
   SOCIAL:      {bg:'#ede9fe',fg:'#6d28d9',bd:'#ddd6fe'},
@@ -1443,7 +1443,7 @@ function renderMes(){
           <th style="min-width:110px">Facturación</th>
           <th style="min-width:90px">Caja</th>
           <th style="min-width:90px">Cuotas</th>
-          ${HAS_PLANES?'':'<th style="min-width:120px">Meses servicio</th>'}
+          ${(HAS_PLANES||SEMANAS_MODO)?'':'<th style="min-width:120px">Meses servicio</th>'}
           <th style="min-width:180px">Comentarios</th>
           <th></th>
         </tr></thead>
@@ -1511,7 +1511,7 @@ function renderLlamadasRows(mk){
     <td><input class="ce" type="number" inputmode="numeric" value="${r.facturacion||''}" oninput="upLNum('${mk}',${i},'facturacion',this.value)" placeholder="0" style="text-align:right"></td>
     <td><input class="ce" type="number" inputmode="numeric" value="${r.caja||''}" oninput="upLNum('${mk}',${i},'caja',this.value)" placeholder="0" style="text-align:right"></td>
     <td><select class="ce" onchange="upLNum('${mk}',${i},'nCuotas',this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${Number(r.nCuotas)===n?' selected':''}>${n===1?'1 (único)':n}</option>`).join('')}</select></td>
-    ${HAS_PLANES?'':`<td><select class="ce" onchange="upLNum('${mk}',${i},'mesesServicio',this.value)" style="min-width:110px">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${Number(r.mesesServicio)===n?' selected':''}>${n} mes${n>1?'es':''}</option>`).join('')}</select></td>`}
+    ${(HAS_PLANES||SEMANAS_MODO)?'':`<td><select class="ce" onchange="upLNum('${mk}',${i},'mesesServicio',this.value)" style="min-width:110px">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${Number(r.mesesServicio)===n?' selected':''}>${n} mes${n>1?'es':''}</option>`).join('')}</select></td>`}
     <td><input class="ce" value="${esc(r.comentarios)}" oninput="upL('${mk}',${i},'comentarios',this.value)" placeholder="Notas..." style="min-width:260px"></td>
     <td><button class="btn btn-red btn-xs" onclick="delL('${mk}',${i})">✕</button></td>
   </tr>`).join('');
@@ -1543,7 +1543,14 @@ function upLPlan(mk,i,plan){
   save();syncCuota(mk,i);renderLlamadasRows(mk);
 }
 function upLSemanas(mk,i,val){
-  S.llamadas[mk][i].semanas=parseInt(val)||0;
+  const semanas=parseInt(val)||0;
+  S.llamadas[mk][i].semanas=semanas;
+  // Convertir semanas → meses para que cuota.mesesServicio se actualice.
+  // 12 sem = 3 meses, 24 = 6, 52 = 12 (round(semanas/4) o lookup en SEMANAS_OPTIONS)
+  if(semanas>0){
+    const opt=SEMANAS_OPTIONS.find(o=>o.value===semanas);
+    S.llamadas[mk][i].mesesServicio=opt?opt.meses:Math.max(1,Math.round(semanas/4));
+  }
   syncCuota(mk,i);save();
   // Repinta la fila para reflejar el color del plan de semanas.
   renderLlamadasRows(mk);
@@ -2767,8 +2774,13 @@ async function iaSend() {
       body: JSON.stringify({ system: systemPrompt, messages })
     });
 
+    if (!res.ok) {
+      const text = await res.text().catch(()=>'');
+      console.error('AI chat HTTP error:', res.status, text);
+      throw new Error(`HTTP ${res.status}${text?': '+text.slice(0,200):''}`);
+    }
     const data = await res.json();
-    const reply = data.content?.[0]?.text || 'No se pudo obtener respuesta.';
+    const reply = data.content?.[0]?.text || data.error?.message || 'No se pudo obtener respuesta.';
     iaChatHistory.push({ role: 'assistant', content: reply });
 
     const inputTokens = data.usage?.input_tokens || 0;
@@ -2776,7 +2788,8 @@ async function iaSend() {
     addIAUsage(inputTokens, outputTokens);
 
   } catch(e) {
-    iaChatHistory.push({ role: 'assistant', content: 'Error al conectar con la IA. Inténtalo de nuevo.' });
+    console.error('AI chat error:', e);
+    iaChatHistory.push({ role: 'assistant', content: `Error al conectar con la IA: ${e.message||e}. Inténtalo de nuevo.` });
   }
 
   if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; }
