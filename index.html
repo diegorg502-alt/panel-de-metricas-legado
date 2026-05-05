@@ -1556,6 +1556,16 @@ function upLEntrenador(mk,i,val){
   if(cuota) cuota.entrenador=val;
   save();
 }
+// Si nCuotas no está explícito y caja>0 y caja<facturacion, derivar de fact/caja.
+// Ej: facturación 1500 + caja 250 → 6 cuotas mensuales.
+function inferirNCuotas(r){
+  const explicit=Number(r.nCuotas);
+  if(explicit && explicit>1) return explicit;
+  const fact=Number(r.facturacion)||0;
+  const caja=Number(r.caja)||0;
+  if(caja>0 && caja<fact) return Math.max(1, Math.round(fact/caja));
+  return explicit||1;
+}
 function syncCuota(mk,i){
   // Sync llamada data to cuota — called whenever estado=Venta or facturacion/nCuotas changes
   const r=S.llamadas[mk][i];
@@ -1563,7 +1573,8 @@ function syncCuota(mk,i){
   const key=(r.nombre||'').toUpperCase().trim();
   if(!key) return;
   const fechaI=r.fecha||mKey(curMonth)+'-01';
-  const q=Number(r.nCuotas)||1;
+  const q=inferirNCuotas(r);
+  const meses=Number(r.mesesServicio)||q||1;
   const existing=S.cuotas.find(c=>c.nombre===key);
   if(existing){
     existing.ticket=r.facturacion||0;
@@ -1572,10 +1583,28 @@ function syncCuota(mk,i){
     existing.embudo=r.embudo||existing.embudo;
     existing.entrenador=r.entrenador||existing.entrenador;
     // Always update mesesServicio — this drives getVenc()
-    existing.mesesServicio=Number(r.mesesServicio)||Number(r.nCuotas)||1;
+    existing.mesesServicio=meses;
   } else {
-    S.cuotas.push({nombre:key,fechaInicio:fechaI,ticket:r.facturacion||0,nCuotas:q,mesesServicio:Number(r.mesesServicio)||Number(q)||1,pagos:{},embudo:r.embudo||'YOUTUBE',entrenador:r.entrenador||''});
+    S.cuotas.push({nombre:key,fechaInicio:fechaI,ticket:r.facturacion||0,nCuotas:q,mesesServicio:meses,pagos:{},embudo:r.embudo||'YOUTUBE',entrenador:r.entrenador||''});
   }
+}
+// Sync masivo: recorre TODAS las ventas en S.llamadas y sincroniza con S.cuotas.
+// Útil tras bulk imports. Idempotente (no duplica cuotas existentes).
+function syncTodasLlamadasACuotas(){
+  let creadas=0, actualizadas=0;
+  if(!S.cuotas) S.cuotas=[];
+  Object.entries(S.llamadas||{}).forEach(([mk, llamadas])=>{
+    if(!Array.isArray(llamadas)) return;
+    llamadas.forEach((r, i)=>{
+      if(r.estado!=='Venta') return;
+      const key=(r.nombre||'').toUpperCase().trim();
+      if(!key) return;
+      const before=S.cuotas.find(c=>c.nombre===key);
+      syncCuota(mk, i);
+      if(before) actualizadas++; else creadas++;
+    });
+  });
+  return {creadas, actualizadas};
 }
 
 function upLEstado(mk,i,val){
