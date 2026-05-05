@@ -2110,6 +2110,12 @@ let cuotaPlanFilter='all';   // 'all' | 'PRO' | 'BUSINESS' | 'ANUAL' | 'sin'
 let cuotaFechaDesde='';      // YYYY-MM-DD
 let cuotaFechaHasta='';      // YYYY-MM-DD
 function renderCuotas(){
+  // Auto-sync: cualquier venta en S.llamadas que no esté en S.cuotas se crea automáticamente.
+  // Skip Zerochats (HAS_TICKET_MENSUAL) porque tiene su propio modelo persistente.
+  if(!HAS_TICKET_MENSUAL){
+    const r=syncTodasLlamadasACuotas();
+    if(r && (r.creadas>0 || r.actualizadas>0)) save();
+  }
   const todayM=todayMonth();
   let totalFact, totalCaja, cajaPendiente;
   if(HAS_TICKET_MENSUAL){
