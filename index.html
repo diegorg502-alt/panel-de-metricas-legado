@@ -1434,7 +1434,6 @@ function renderMes(){
           <th style="min-width:110px">Embudo</th>
           <th style="min-width:90px">Closer</th>
           ${SETTERS.length?'<th style="min-width:100px">Setter</th>':''}
-          ${SEMANAS_MODO?'<th style="min-width:140px">Semanas</th>':''}
           <th style="min-width:100px">Asistencia</th>
           <th style="min-width:90px">Incidencia</th>
           <th style="min-width:120px">Estado</th>
@@ -1443,6 +1442,7 @@ function renderMes(){
           <th style="min-width:110px">Facturación</th>
           <th style="min-width:90px">Caja</th>
           <th style="min-width:90px">Cuotas</th>
+          ${SEMANAS_MODO?'<th style="min-width:140px">Semanas</th>':''}
           ${(HAS_PLANES||SEMANAS_MODO)?'':'<th style="min-width:120px">Meses servicio</th>'}
           <th style="min-width:180px">Comentarios</th>
           <th></th>
@@ -1502,7 +1502,6 @@ function renderLlamadasRows(mk){
     <td style="${colorStyle(EMBUDO_COLORS,r.embudo)}"><select class="ce" onchange="upL('${mk}',${i},'embudo',this.value)" style="min-width:100px;background:transparent;${r.embudo?'font-weight:600':''}"><option value="">-</option>${CANALES.map(c=>`<option value="${c}"${r.embudo===c?' selected':''}>${c}</option>`).join('')}</select></td>
     <td><select class="ce" onchange="upL('${mk}',${i},'closer',this.value)" style="min-width:80px"><option value="">-</option>${CLOSERS.map(c=>`<option value="${c}"${r.closer===c?' selected':''}}>${c}</option>`).join('')}</select></td>
     ${SETTERS.length?`<td><input class="ce" value="${esc(r.setter||'')}" oninput="upL('${mk}',${i},'setter',this.value)" placeholder="Setter" style="min-width:90px"></td>`:''}
-    ${SEMANAS_MODO?`<td style="${colorStyle(SEMANAS_COLORS,Number(r.semanas))}"><select class="ce" onchange="upLSemanas('${mk}',${i},this.value)" style="min-width:130px;background:transparent;${r.semanas?'font-weight:600':''}"><option value="">-</option>${SEMANAS_OPTIONS.map(s=>`<option value="${s.value}"${Number(r.semanas)===s.value?' selected':''}}>${s.label}</option>`).join('')}</select></td>`:''}
     <td style="${colorStyle(ASISTENCIA_COLORS,r.asistencia)}"><select class="ce" onchange="upL('${mk}',${i},'asistencia',this.value)" style="min-width:95px;background:transparent;${r.asistencia?'font-weight:600':''}"><option value="">-</option>${['SI','NO','PENDIENTE'].map(v=>`<option value="${v}"${r.asistencia===v?' selected':''}>${v}</option>`).join('')}</select></td>
     <td><select class="ce" onchange="upL('${mk}',${i},'incidencia',this.value)" style="min-width:120px"><option value="">-</option>${INCIDENCIAS.map(v=>`<option value="${esc(v)}"${r.incidencia===v?' selected':''}>${esc(v)}</option>`).join('')}</select></td>
     <td style="${colorStyle(ESTADO_COLORS,r.estado)}"><select class="ce" onchange="upLEstado('${mk}',${i},this.value)" style="min-width:110px;background:transparent;${r.estado?'font-weight:600':''}"><option value="">-</option>${ESTADOS.map(v=>`<option value="${v}"${r.estado===v?' selected':''}>${v}</option>`).join('')}</select></td>
@@ -1511,6 +1510,7 @@ function renderLlamadasRows(mk){
     <td><input class="ce" type="number" inputmode="numeric" value="${r.facturacion||''}" oninput="upLNum('${mk}',${i},'facturacion',this.value)" placeholder="0" style="text-align:right"></td>
     <td><input class="ce" type="number" inputmode="numeric" value="${r.caja||''}" oninput="upLNum('${mk}',${i},'caja',this.value)" placeholder="0" style="text-align:right"></td>
     <td><select class="ce" onchange="upLNum('${mk}',${i},'nCuotas',this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${Number(r.nCuotas)===n?' selected':''}>${n===1?'1 (único)':n}</option>`).join('')}</select></td>
+    ${SEMANAS_MODO?`<td style="${colorStyle(SEMANAS_COLORS,Number(r.semanas))}"><select class="ce" onchange="upLSemanas('${mk}',${i},this.value)" style="min-width:130px;background:transparent;${r.semanas?'font-weight:600':''}"><option value="">-</option>${SEMANAS_OPTIONS.map(s=>`<option value="${s.value}"${Number(r.semanas)===s.value?' selected':''}}>${s.label}</option>`).join('')}</select></td>`:''}
     ${(HAS_PLANES||SEMANAS_MODO)?'':`<td><select class="ce" onchange="upLNum('${mk}',${i},'mesesServicio',this.value)" style="min-width:110px">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}"${Number(r.mesesServicio)===n?' selected':''}>${n} mes${n>1?'es':''}</option>`).join('')}</select></td>`}
     <td><input class="ce" value="${esc(r.comentarios)}" oninput="upL('${mk}',${i},'comentarios',this.value)" placeholder="Notas..." style="min-width:260px"></td>
     <td><button class="btn btn-red btn-xs" onclick="delL('${mk}',${i})">✕</button></td>
@@ -1523,12 +1523,25 @@ function upL(mk,i,f,v){
   // Repinta la fila para que se apliquen los colores asignados al embudo / asistencia.
   if(f==='embudo'||f==='asistencia') renderLlamadasRows(mk);
 }
+// Mapa de facturación → semanas (solo si SEMANAS_MODO=true).
+// Acumulable: añade más entradas cuando aparezcan nuevos precios.
+const FACTURACION_TO_SEMANAS = { 499: 12, 849: 24, 1497: 52 };
 function upLNum(mk,i,f,v){
   S.llamadas[mk][i][f]=parseNum(v);
+  // Si SEMANAS_MODO y cambió facturación a un valor conocido, autoasignar semanas y mesesServicio
+  if(f==='facturacion' && SEMANAS_MODO){
+    const fact=Number(S.llamadas[mk][i].facturacion)||0;
+    const sem=FACTURACION_TO_SEMANAS[fact];
+    if(sem){
+      S.llamadas[mk][i].semanas=sem;
+      const opt=SEMANAS_OPTIONS.find(o=>o.value===sem);
+      if(opt) S.llamadas[mk][i].mesesServicio=opt.meses;
+    }
+  }
   if(f==='facturacion'||f==='nCuotas'||f==='mesesServicio') syncCuota(mk,i);
   save();
-  // Always re-render mes to reflect updated vencimiento badges
-  if(f==='mesesServicio') renderLlamadasRows(mk);
+  // Always re-render mes to reflect updated vencimiento badges + semanas autoasignadas
+  if(f==='mesesServicio'||f==='facturacion') renderLlamadasRows(mk);
 }
 function upLPlan(mk,i,plan){
   const row=S.llamadas[mk][i];
