@@ -88,6 +88,18 @@ aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border
 .mv{font-size:22px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .mv.blue{color:var(--blue)}.mv.green{color:var(--green)}.mv.amber{color:var(--amber)}.mv.red{color:var(--red)}.mv.purple{color:var(--purple)}
 .tw{overflow:auto;max-height:70vh}
+/* Modo administrador: solo lectura — bloquear inputs y ocultar botones de escritura */
+body.is-admin .ce,
+body.is-admin input.fi,
+body.is-admin select.fi,
+body.is-admin textarea.fi{pointer-events:none;background:#fafafa !important;cursor:not-allowed}
+body.is-admin .btn-red,
+body.is-admin .btn-p,
+body.is-admin button[onclick*="add"],
+body.is-admin button[onclick*="del"],
+body.is-admin button[onclick*="open"]{display:none !important}
+body.is-admin .admin-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:700;letter-spacing:.05em;margin-left:6px}
+body:not(.is-admin) .admin-badge{display:none}
 /* Sticky primera columna (Nombre) en KPIs por mes y lanzamientos */
 .tw table.sticky-name th:first-child,
 .tw table.sticky-name td:first-child{position:sticky;left:0;z-index:2;background:var(--bg);box-shadow:2px 0 0 var(--border)}
@@ -332,8 +344,9 @@ details.acordeon>summary:hover{background:var(--bg3)!important}
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </div>
       <div class="sb-brand">
-        <span class="sb-kicker">Agencia Legado</span>
+        <span class="sb-kicker" id="sb-kicker">Agencia Legado</span>
         <span class="sb-client" id="sb-brand-text">Bruno Gómez</span>
+        <select id="admin-client-selector" onchange="switchClient(this.value)" style="display:none;margin-top:6px;width:100%;padding:6px 8px;border:1px solid var(--border2);border-radius:7px;font-family:var(--font);font-size:12px;font-weight:600;background:var(--bg);color:var(--text);cursor:pointer"></select>
       </div>
     <div style="padding:6px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:11px;color:var(--text3)">Año activo</span>
@@ -504,6 +517,9 @@ let curLanzamiento=''; // current selected launch id
 let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[],escalado:{config:null,evaluaciones:[]}};
 let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null;
 let isEntrenador=false;
+let IS_ADMIN=false;
+let ALL_CLIENTS=[];
+let realtimeChannel=null;
 let curYear=new Date().getFullYear();
 
 // ── AUTH ──────────────────────────────────────────────────
@@ -547,12 +563,40 @@ async function doLogout(){
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')doLogin();});
 
 // ── SUPABASE DATA ─────────────────────────────────────────
+async function isAdminUser(email){
+  if(!email) return false;
+  try{
+    const{data}=await sb.from('crm_admins').select('email').eq('email',email).maybeSingle();
+    return !!data;
+  }catch(e){ return false; }
+}
+
 async function showApp(){
   document.getElementById('shell').style.display='block';
   curYear=new Date().getFullYear();
   const ys=document.getElementById('year-sel');if(ys)ys.value=curYear;
   setSyncStatus('saving','Cargando configuración...');
-  await loadClientConfig(currentUser?.email||'');
+  // Detectar admin
+  IS_ADMIN = await isAdminUser(currentUser?.email||'');
+  if(IS_ADMIN){
+    document.body.classList.add('is-admin');
+    // Cargar lista de todos los clientes para el dropdown
+    const{data:allCl}=await sb.from('crm_clients').select('record_id, email, nombre').order('nombre');
+    ALL_CLIENTS = allCl||[];
+    // Email del cliente a cargar: el último seleccionado o el primero
+    const lastSel = localStorage.getItem('admin_last_client') || (ALL_CLIENTS[0] && ALL_CLIENTS[0].email) || '';
+    await loadClientConfig(lastSel);
+    // Mostrar dropdown
+    const sel=document.getElementById('admin-client-selector');
+    if(sel){
+      sel.style.display='block';
+      sel.innerHTML=ALL_CLIENTS.map(c=>`<option value="${esc(c.email)}"${c.email===lastSel?' selected':''}>${esc(c.nombre)}</option>`).join('');
+    }
+    const kicker=document.getElementById('sb-kicker');
+    if(kicker)kicker.innerHTML='Agencia Legado <span class="admin-badge">ADMIN · SOLO LECTURA</span>';
+  } else {
+    await loadClientConfig(currentUser?.email||'');
+  }
   isEntrenador = currentUser?.email===ENTRENADOR_EMAIL;
   document.getElementById('sb-user').textContent=isEntrenador?'Entrenador':(currentUser?.email||'');
   setSyncStatus('saving','Cargando datos...');
@@ -561,8 +605,16 @@ async function showApp(){
   updateIAUsageBar();
   if(isEntrenador) goTo('cuotas');
   else goTo('dashboard');
-  // Realtime — detecta cambios del webhook GHL automáticamente
-  sb.channel('crm_realtime').on('postgres_changes',{event:'UPDATE',schema:'public',table:'crm_data',filter:`id=eq.${RECORD_ID}`},async(payload)=>{
+  subscribeRealtime();
+}
+
+function subscribeRealtime(){
+  // Cancelar canal previo si existe (al cambiar de cliente como admin)
+  if(realtimeChannel){
+    try{ sb.removeChannel(realtimeChannel); }catch(e){}
+    realtimeChannel=null;
+  }
+  realtimeChannel = sb.channel('crm_realtime_'+RECORD_ID).on('postgres_changes',{event:'UPDATE',schema:'public',table:'crm_data',filter:`id=eq.${RECORD_ID}`},async(payload)=>{
     if(payload.new?.data&&!saveTimer){
       S={...S,...payload.new.data};
       localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
@@ -570,6 +622,21 @@ async function showApp(){
       setSyncStatus('ok','Nuevos datos recibidos ✓');
     }
   }).subscribe();
+}
+
+async function switchClient(targetEmail){
+  if(!IS_ADMIN || !targetEmail) return;
+  setSyncStatus('saving','Cambiando de cliente...');
+  // Limpiar state
+  S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[],escalado:{config:null,evaluaciones:[]}};
+  await loadClientConfig(targetEmail);
+  await loadData();
+  localStorage.setItem('admin_last_client', targetEmail);
+  buildSidebar();
+  updateIAUsageBar();
+  goTo('dashboard');
+  subscribeRealtime();
+  setSyncStatus('ok','Cliente cargado ✓');
 }
 
 async function reloadFromSupabase(){
@@ -607,6 +674,11 @@ async function loadData(){
 }
 
 async function sbSave(){
+  // Modo administrador: solo lectura, no se persiste nada en Supabase
+  if(IS_ADMIN){
+    setSyncStatus('ok','Solo lectura (admin) — sin guardar');
+    return;
+  }
   setSyncStatus('saving','Guardando...');
   try{
     localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
