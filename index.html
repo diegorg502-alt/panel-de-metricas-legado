@@ -674,8 +674,8 @@ async function loadData(){
 }
 
 async function sbSave(){
-  // Modo administrador: solo lectura, no se persiste nada en Supabase
-  if(IS_ADMIN){
+  // Modo administrador: solo se permite guardar desde la página de KPIs por mes
+  if(IS_ADMIN && curPage!=='mes'){
     setSyncStatus('ok','Solo lectura (admin) — sin guardar');
     return;
   }
@@ -1162,6 +1162,11 @@ function goTo(page,month,lanzId){
   if(month!==undefined && month!==curMonth) MES_RANGE={from:'',to:''};
   if(page!=='mes' && curPage==='mes') MES_RANGE={from:'',to:''};
   if(month!==undefined)curMonth=month;if(lanzId!==undefined)curLanzamiento=lanzId;curPage=page;
+  // Modo admin: bloquear edición fuera de KPIs por mes (página mes sí editable)
+  if(IS_ADMIN){
+    if(page==='mes') document.body.classList.remove('is-admin');
+    else document.body.classList.add('is-admin');
+  }
   document.querySelectorAll('.nav-i').forEach(el=>el.classList.remove('active'));
   const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance',lanzamientos:'ni-lanzamientos',utms:'ni-utms',escalado:'ni-escalado'};
   if(ids[page])document.getElementById(ids[page])?.classList.add('active');
