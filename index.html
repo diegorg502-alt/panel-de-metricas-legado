@@ -1832,16 +1832,16 @@ function renderKpisD(){
     const labelCost='CPL';
 
     return`<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
-      <div style="padding:14px 18px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="this.parentElement.querySelector('.kpid-canal-body').classList.toggle('open');this.querySelector('.nav-arr').classList.toggle('open')">
+      <div style="padding:14px 18px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="toggleKpidCanal(this)">
         <div style="display:flex;align-items:center;gap:10px">
           <span class="badge b-blue" style="font-size:12px">${canal}</span>
           <span style="font-size:12px;color:var(--text2)">Inversión: <b style="color:var(--blue)">${fmt(inv,2)}</b></span>
           <span style="font-size:12px;color:var(--text2)">${labelResult}: <b>${leads}</b></span>
           <span style="font-size:12px;color:var(--text2)">${labelCost}: <b style="color:var(--amber)">${cpl?fmt(cpl,2):'-'}</b></span>
         </div>
-        <svg class="nav-arr open" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><polyline points="2,4 6,8 10,4"/></svg>
+        <svg class="nav-arr" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12" style="transition:transform .2s;transform:rotate(180deg)"><polyline points="2,4 6,8 10,4"/></svg>
       </div>
-      <div class="kpid-canal-body open" style="display:none">
+      <div class="kpid-canal-body" style="display:block">
         <div class="tw"><table>
           <thead><tr><th style="width:80px;text-align:center">Día</th><th style="width:140px;text-align:right">Inversión (€)</th><th style="width:120px;text-align:right">${labelResult}</th><th style="width:100px;text-align:right">${labelCost}</th><th style="width:60px"></th></tr></thead>
           <tbody id="kpid-body-${canal}"></tbody>
@@ -1924,8 +1924,17 @@ function renderKpisD(){
       </tr>`;
     }).join('');
   });
-  // Toggle open by default
-  document.querySelectorAll('.kpid-canal-body').forEach(el=>el.style.display='block');
+  // Los acordeones arrancan abiertos por defecto (display:block en el HTML).
+  // No tocamos el inline style aquí — eso rompía toggleKpidCanal.
+}
+// Toggle del acordeón ADS / canal en KPIs diarios. Alterna inline display.
+function toggleKpidCanal(headerEl){
+  const body = headerEl.parentElement.querySelector('.kpid-canal-body');
+  if(!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  const arr = headerEl.querySelector('.nav-arr');
+  if(arr) arr.style.transform = isOpen ? '' : 'rotate(180deg)';
 }
 function renderKpiDRows(mk){
   const rows=S.kpis_diarios[mk]||[];const tbody=document.getElementById('kpid-body');if(!tbody)return;
