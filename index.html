@@ -1082,7 +1082,7 @@ function canalStats(canal,mk){
   const cl=lAll.filter(l=>l.embudo===canal);const cv=cl.filter(l=>l.estado==='Venta');
   const realizadas=cl.filter(l=>l.asistencia==='SI').length;
   const inv=kAll.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);
-  const leads=kAll.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
+  const leads=kAll.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0),0);
   let fact=cv.reduce((s,l)=>s+Number(l.facturacion||0),0);
   let caja=cv.reduce((s,l)=>s+Number(l.caja||0),0);
   // Modo Zerochats: añadir las renovaciones (pagos persistentes en c.pagos) a fact y caja
@@ -1315,7 +1315,7 @@ function kpisCanal(mk, canal){
   const realizadas=cl.filter(r=>r.asistencia==='SI').length;
   const kd=getMesKd(mk);
   const inv=kd.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);
-  const leads=kd.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
+  const leads=kd.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0),0);
   const fact=cv.reduce((s,r)=>s+Number(r.facturacion||0),0);
   const caja=cv.reduce((s,r)=>s+Number(r.caja||0),0);
   const llamadas=cl.length;
@@ -1380,7 +1380,7 @@ function renderMes(){
   const realizadas=rows.filter(r=>r.asistencia==='SI').length;
   const kd=getMesKd(mk);
   const inv=kd.reduce((s,k)=>s+Number(k.inversion||0),0);
-  const leads=kd.reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
+  const leads=kd.reduce((s,k)=>s+Number(k.leads||0),0);
   const fact=ventas.reduce((s,r)=>s+Number(r.facturacion||0),0);
   const caja=ventas.reduce((s,r)=>s+Number(r.caja||0),0);
   const llamadasTotal=rows.length;
@@ -1759,7 +1759,7 @@ function renderKpisD(){
   const mk=mKey(curMonth);if(!S.kpis_diarios[mk])S.kpis_diarios[mk]=[];if(!S.ads[mk])S.ads[mk]=[];
   const rows=S.kpis_diarios[mk];
   const totalInv=rows.reduce((s,r)=>s+Number(r.inversion||0),0);
-  const totalLeads=rows.reduce((s,r)=>s+Number(r.leads||0)+Number(r.seguidores||0),0);
+  const totalLeads=rows.reduce((s,r)=>s+Number(r.leads||0),0);
   const totalCpl=totalLeads&&totalInv?totalInv/totalLeads:null;
 
   // Group by canal
@@ -1769,11 +1769,10 @@ function renderKpisD(){
   const canalSections=canalesActivos.map(canal=>{
     const cr=rows.filter(r=>r.canal===canal);
     const inv=cr.reduce((s,r)=>s+Number(r.inversion||0),0);
-    const leads=cr.reduce((s,r)=>s+Number(r.leads||0)+Number(r.seguidores||0),0);
+    const leads=cr.reduce((s,r)=>s+Number(r.leads||0),0);
     const cpl=leads&&inv?inv/leads:null;
-    const isSocial=cr.some(r=>r.seguidores!==undefined&&!r.leads);
-    const labelResult=isSocial?'Seguidores':'Resultados';
-    const labelCost=isSocial?'Coste/Seguidor':'CPL';
+    const labelResult='Resultados';
+    const labelCost='CPL';
 
     return`<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
       <div style="padding:14px 18px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="this.parentElement.querySelector('.kpid-canal-body').classList.toggle('open');this.querySelector('.nav-arr').classList.toggle('open')">
@@ -1826,7 +1825,7 @@ function renderKpisD(){
   document.getElementById('content').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
       <div class="metric"><div class="ml">Inversión total</div><div class="mv blue" id="kpid-sum-inv">${fmt(totalInv,2)}</div></div>
-      <div class="metric"><div class="ml">Leads / Seguidores</div><div class="mv" id="kpid-sum-leads">${totalLeads}</div></div>
+      <div class="metric"><div class="ml">Leads totales</div><div class="mv" id="kpid-sum-leads">${totalLeads}</div></div>
       <div class="metric"><div class="ml">CPL total</div><div class="mv amber" id="kpid-sum-cpl">${totalCpl?fmt(totalCpl,2):'-'}</div></div>
     </div>
     ${canalSections}
@@ -1844,21 +1843,18 @@ function renderKpisD(){
     const cr=rows.map((r,i)=>({...r,_idx:i})).filter(r=>r.canal===canal);
     tbody.innerHTML=cr.map(r=>{
       const i=r._idx;
-      const leadsVal=r.leads||r.seguidores||0;
+      const leadsVal=Number(r.leads||0);
       const cpl=leadsVal&&r.inversion?(r.inversion/leadsVal).toFixed(2):'-';
       const isMeta=r.source==='meta';
       // Always show only day number if date is full ISO format
       const diaStr=r.dia?(String(r.dia).includes('-')?String(r.dia).split('-')[2]:String(r.dia)):'';
       if(isMeta){
-        const isSocial=!r.leads&&(r.seguidores!==undefined||leadsVal===0);
-        const segVal=r.seguidores||0;
-        const displayLeads=r.leads||0;
-        const metaCpl=isSocial?(segVal>0?fmt(r.inversion/segVal,2):'-'):(cpl!=='-'?cpl:'-');
+        // Meta = clientes potenciales. Siempre mostrar leads (número), nunca seguidores.
         return`<tr style="background:rgba(24,119,242,0.04)">
           <td style="text-align:center;font-weight:600;color:var(--text2)">${diaStr}</td>
           <td style="text-align:right;font-weight:600">${fmt(r.inversion||0,2)}</td>
-          <td style="text-align:right">${isSocial?`<input class="ce" type="number" inputmode="numeric" value="${segVal||''}" oninput="upMetaSeg('${mk}',${i},this.value)" placeholder="Seguidores" style="text-align:right;background:rgba(24,119,242,0.06)">`:`<span style="font-weight:600">${displayLeads}</span>`}</td>
-          <td style="text-align:right;font-weight:600;color:var(--amber)">${metaCpl}</td>
+          <td style="text-align:right"><span style="font-weight:600">${leadsVal}</span></td>
+          <td style="text-align:right;font-weight:600;color:var(--amber)">${cpl!=='-'?cpl:'-'}</td>
           <td><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:#e7f3ff;color:#1877f2;font-weight:700">META</span></td>
         </tr>`;
       }
@@ -1877,22 +1873,18 @@ function renderKpisD(){
 function renderKpiDRows(mk){
   const rows=S.kpis_diarios[mk]||[];const tbody=document.getElementById('kpid-body');if(!tbody)return;
   tbody.innerHTML=rows.map((r,i)=>{
-    const leadsVal=r.leads||r.seguidores||0;
+    const leadsVal=Number(r.leads||0);
     const cpl=leadsVal&&r.inversion?(r.inversion/leadsVal).toFixed(2):'-';
     const isMeta=r.source==='meta';
     const diaStr=isMeta?(r.fecha?r.fecha.split('-')[2]:r.dia?(r.dia.includes('-')?r.dia.split('-')[2]:r.dia):''):(r.dia||'');
     if(isMeta){
-      // Meta-imported row: inversión read-only, seguidores editable for social campaigns
-      const isSocial=!r.leads&&(r.seguidores!==undefined||leadsVal===0);
-      const segVal=r.seguidores||0;
-      const displayLeads=r.leads||0;
-      const metaCpl=isSocial?(segVal>0?fmt(r.inversion/segVal,2)+'€':'-'):(cpl!=='-'?cpl+'€':'-');
+      // Meta = clientes potenciales. Siempre leads (número), nunca seguidores.
       return`<tr style="background:rgba(24,119,242,0.04)">
         <td style="text-align:center;font-weight:600;color:var(--text2)">${diaStr}</td>
         <td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e7f3ff;color:#1877f2">${r.canal}</span></td>
         <td style="text-align:right;font-weight:600">${fmt(r.inversion||0,2)}</td>
-        <td>${isSocial?`<input class="ce" type="number" inputmode="numeric" value="${segVal||''}" oninput="upMetaSeg('${mk}',${i},this.value)" placeholder="Seguidores" style="text-align:right;background:rgba(24,119,242,0.06)">`:`<span style="font-weight:600">${displayLeads}</span>`}</td>
-        <td style="font-size:12px;font-weight:600;color:var(--amber);text-align:right">${metaCpl}</td>
+        <td><span style="font-weight:600">${leadsVal}</span></td>
+        <td style="font-size:12px;font-weight:600;color:var(--amber);text-align:right">${cpl!=='-'?cpl+'€':'-'}</td>
         <td><span style="font-size:10px;padding:2px 6px;border-radius:10px;background:#e7f3ff;color:#1877f2;font-weight:700">META</span></td>
       </tr>`;
     }
@@ -3222,7 +3214,7 @@ function renderLanzamientos(){
     const realizadas=rows.filter(r=>r.asistencia==='SI').length;
     const kd=S.kpis_diarios[mk]||[];
     const inv=kd.reduce((s,k)=>s+Number(k.inversion||0),0);
-    const leads=kd.reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
+    const leads=kd.reduce((s,k)=>s+Number(k.leads||0),0);
     html+=`<div class="card" style="cursor:pointer" onclick="goTo('lanzamiento_detail',null,'${l.id}')">
       <div class="card-title"><span>${l.nombre}</span><span class="badge b-blue">${l.fecha||'Sin fecha'}</span></div>
       <div class="mg">
@@ -3255,7 +3247,7 @@ function renderLanzamientoDetail(){
   const realizadas=rows.filter(r=>r.asistencia==='SI').length;
   const llamadasTotal=rows.length;
   const inv=kd.reduce((s,k)=>s+Number(k.inversion||0),0);
-  const leads=kd.reduce((s,k)=>s+Number(k.leads||0)+Number(k.seguidores||0),0);
+  const leads=kd.reduce((s,k)=>s+Number(k.leads||0),0);
   const cpl=leads&&inv?inv/leads:null;
   const pctAgend=leads?llamadasTotal/leads:null;
   const pctAsist=llamadasTotal?realizadas/llamadasTotal:null;
