@@ -509,7 +509,7 @@ let SHOW_ADS_GANADORES=true; // false = hide winning ads section
 let curLanzamiento=''; // current selected launch id
 
 let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[],escalado:{config:null,evaluaciones:[]}};
-let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null,lastOwnSaveTs=0;
+let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null,lastOwnSaveTs=0,pendingExternalUpdate=null;
 let isEntrenador=false;
 let IS_ADMIN=false;
 let ALL_CLIENTS=[];
@@ -565,7 +565,28 @@ async function isAdminUser(email){
   }catch(e){ return false; }
 }
 
+// Aplica updates externos pendientes cuando el usuario sale del input.
+// Se registra una sola vez al cargar la app.
+let _focusoutHooked=false;
+function installFocusoutHook(){
+  if(_focusoutHooked)return;_focusoutHooked=true;
+  document.addEventListener('focusout',()=>{
+    setTimeout(()=>{
+      const ae=document.activeElement;
+      const tag=ae&&ae.tagName;
+      const stillTyping = tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || ae?.isContentEditable;
+      if(stillTyping || !pendingExternalUpdate)return;
+      S={...S,...pendingExternalUpdate};
+      localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
+      pendingExternalUpdate=null;
+      goTo(curPage,curMonth);
+      setSyncStatus('ok','Cambios remotos aplicados ✓');
+    },80);
+  });
+}
+
 async function showApp(){
+  installFocusoutHook();
   document.getElementById('shell').style.display='block';
   curYear=new Date().getFullYear();
   const ys=document.getElementById('year-sel');if(ys)ys.value=curYear;
@@ -619,12 +640,15 @@ function subscribeRealtime(){
     const ae=document.activeElement;
     const tag=ae&&ae.tagName;
     const isTyping = tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || ae?.isContentEditable;
-    S={...S,...payload.new.data};
-    localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
     if(isTyping){
-      setSyncStatus('ok','Datos remotos en pausa (editando)');
+      // Mientras editas, NO mergeamos S ni re-renderizamos. Guardamos el update
+      // pendiente para aplicarlo cuando el usuario salga del input.
+      pendingExternalUpdate = payload.new.data;
+      setSyncStatus('ok','Cambios remotos en espera');
       return;
     }
+    S={...S,...payload.new.data};
+    localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
     goTo(curPage,curMonth);
     setSyncStatus('ok','Nuevos datos recibidos ✓');
   }).subscribe();
@@ -692,6 +716,10 @@ async function sbSave(){
     setSyncStatus('ok','Guardado ✓');
   }catch(e){
     setSyncStatus('err','Error — guardado local');
+  }finally{
+    // Limpiar saveTimer para que el listener realtime acepte de nuevo updates externos.
+    // Si seguimos sin nullearlo, queda truthy permanente y bloquea cualquier sync.
+    saveTimer=null;
   }
 }
 
@@ -1896,9 +1924,13 @@ function renderKpiDRows(mk){
       <td><button class="btn btn-red btn-xs" onclick="delKD('${mk}',${i})">✕</button></td>
     </tr>`;}).join('');
 }
-function upKD(mk,i,f,v){S.kpis_diarios[mk][i][f]=v;save();renderKpisD();}
+// upKD: cambia campos no-numéricos (canal, día). NO re-renderiza para preservar
+// el focus al escribir. Si cambia el canal y eso debe reagrupar, el usuario
+// verá el cambio al navegar. Para totales/CPL ya basta updateKpiTotalsOnly.
+function upKD(mk,i,f,v){S.kpis_diarios[mk][i][f]=v;save();updateKpiTotalsOnly(mk);}
 function upKDText(mk,i,f,v){S.kpis_diarios[mk][i][f]=v;save();}
-function upMetaSeg(mk,i,v){S.kpis_diarios[mk][i].seguidores=parseNum(v);save();renderKpisD();}
+// Legacy: ya no se llama desde el UI nuevo (filas META muestran span de leads).
+function upMetaSeg(mk,i,v){S.kpis_diarios[mk][i].seguidores=parseNum(v);save();updateKpiTotalsOnly(mk);}
 function upKDNum(mk,i,f,v){
   S.kpis_diarios[mk][i][f]=parseNum(v);
   save();
@@ -1947,7 +1979,8 @@ function updateKpiTotalsOnly(mk){
 function delKD(mk,i){S.kpis_diarios[mk].splice(i,1);save();renderKpisD();}
 function addKpiRow(mk){if(!S.kpis_diarios[mk])S.kpis_diarios[mk]=[];S.kpis_diarios[mk].push({dia:'',canal:'YOUTUBE',inversion:0,leads:0});save();renderKpisD();setTimeout(()=>{const b=document.getElementById('kpid-body');if(b){const last=b.querySelector('tr:last-child');if(last){const inp=last.querySelector('input');if(inp)inp.focus();}}},80);}
 function upAd(mk,i,f,v){if(!S.ads[mk])S.ads[mk]=[];S.ads[mk][i][f]=v;save();}
-function upAdNum(mk,i,f,v){if(!S.ads[mk])S.ads[mk]=[];S.ads[mk][i][f]=parseNum(v);save();renderKpisD();}
+// upAdNum: edita inversión/leads/cpl de un Ad sin re-renderizar (preserva focus).
+function upAdNum(mk,i,f,v){if(!S.ads[mk])S.ads[mk]=[];S.ads[mk][i][f]=parseNum(v);save();}
 function delAd(mk,i){S.ads[mk].splice(i,1);save();renderKpisD();}
 function addAd(mk){if(!S.ads[mk])S.ads[mk]=[];S.ads[mk].push({nombre:'',url:'',canal:'YOUTUBE',inversion:0,leads:0});save();renderKpisD();}
 
@@ -3346,9 +3379,11 @@ function renderLanzLlamadaRows(mk){
 
 // Lanzamiento data handlers
 function upLanz(mk,i,f,v){S.llamadas[mk][i][f]=v;save();}
-function upLanzNum(mk,i,f,v){S.llamadas[mk][i][f]=parseNum(v);save();if(f==='facturacion')renderLanzamientoDetail();}
+// upLanzNum: NO re-renderiza para preservar focus al escribir.
+function upLanzNum(mk,i,f,v){S.llamadas[mk][i][f]=parseNum(v);save();}
 function upLanzKD(mk,i,f,v){S.kpis_diarios[mk][i][f]=v;save();}
-function upLanzKDNum(mk,i,f,v){S.kpis_diarios[mk][i][f]=parseNum(v);save();renderLanzKpiRows(mk);}
+// upLanzKDNum: NO re-renderiza para preservar focus al escribir.
+function upLanzKDNum(mk,i,f,v){S.kpis_diarios[mk][i][f]=parseNum(v);save();}
 function delLanzRow(mk,i){S.llamadas[mk].splice(i,1);save();renderLanzamientoDetail();}
 function delLanzKD(mk,i){S.kpis_diarios[mk].splice(i,1);save();renderLanzamientoDetail();}
 function addLanzRow(lanzId){
@@ -3602,7 +3637,8 @@ function renderBalance(){
           <div class="ml" style="color:var(--amber)">% Impuestos</div>
           <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
             <input type="number" value="${impPct}" min="0" max="100"
-              oninput="S.balance.impuestos_pct=parseFloat(this.value)||0;save();renderBalance()"
+              oninput="S.balance.impuestos_pct=parseFloat(this.value)||0;save()"
+              onchange="renderBalance()"
               style="width:64px;padding:6px 8px;border:1px solid #fcd34d;border-radius:7px;font-size:18px;font-weight:700;text-align:center;background:white;color:var(--amber)">
             <span style="font-size:18px;font-weight:700;color:var(--amber)">%</span>
           </div>
