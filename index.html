@@ -631,9 +631,13 @@ function subscribeRealtime(){
   }
   realtimeChannel = sb.channel('crm_realtime_'+RECORD_ID).on('postgres_changes',{event:'UPDATE',schema:'public',table:'crm_data',filter:`id=eq.${RECORD_ID}`},async(payload)=>{
     if(!payload.new?.data || saveTimer) return;
-    // Ignorar el eco de nuestras propias escrituras (ventana 3s).
-    // updated_at viene como ISO string desde Postgres.
     const incomingTs = payload.new.updated_at ? new Date(payload.new.updated_at).getTime() : 0;
+    // Avanzamos lastLoadedTs SIEMPRE que recibamos un evento — incluso de
+    // nuestro propio echo. Así, en multi-tab, un browser que no es el que
+    // escribió mantiene su lastLoadedTs sincronizado con remote y el guard
+    // en sbSave no aborta erróneamente.
+    if(payload.new.updated_at) lastLoadedTs = payload.new.updated_at;
+    // Ignorar el eco de nuestras propias escrituras (ventana 3s).
     if(incomingTs && Math.abs(incomingTs - lastOwnSaveTs) < 3000) return;
     // Si el usuario está editando un input/select/textarea, NO re-renderizar
     // (perdería el cursor). Aplicamos el cambio en memoria y dejamos el DOM intacto.
@@ -712,23 +716,28 @@ async function sbSave(){
   try{
     // ── Optimistic concurrency check ─────────────────────────
     // Antes de upsertear, verificamos que Supabase no tenga una versión más
-    // nueva que la que cargamos. Si la tiene, ABORTAMOS el save y recargamos.
-    // Esto evita que un browser stale (otra pestaña/dispositivo con datos
-    // antiguos en S) machaque silenciosamente lo que está en Supabase.
+    // nueva que la que cargamos. Si la tiene Y el usuario NO está tecleando,
+    // ABORTAMOS el save y recargamos. Si está tecleando, dejamos pasar el
+    // save (mejor perder concurrencia que matar su cursor) — el realtime
+    // listener aplicará los cambios remotos al hacer focusout.
     if(lastLoadedTs){
       try{
         const{data:cur}=await sb.from('crm_data').select('updated_at').eq('id',RECORD_ID).single();
         if(cur?.updated_at){
           const remoteTs=new Date(cur.updated_at).getTime();
           const localTs=new Date(lastLoadedTs).getTime();
-          // Tolerancia 1s para no penalizar nuestros propios echoes
           if(remoteTs - localTs > 1000){
-            setSyncStatus('err','Datos remotos más nuevos — recargando...');
-            console.warn('[sbSave] aborted: remote',cur.updated_at,'> local',lastLoadedTs);
-            // Recargar desde Supabase. Si el usuario está editando, el realtime
-            // listener ya defiere el merge hasta que pierda focus.
-            await reloadFromSupabase();
-            return;
+            const ae=document.activeElement;
+            const tag=ae&&ae.tagName;
+            const isTyping = tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || ae?.isContentEditable;
+            if(isTyping){
+              console.warn('[sbSave] remote más nuevo pero el usuario está tecleando — proseguimos save sin reload');
+            } else {
+              setSyncStatus('err','Datos remotos más nuevos — recargando...');
+              console.warn('[sbSave] aborted: remote',cur.updated_at,'> local',lastLoadedTs);
+              await reloadFromSupabase();
+              return;
+            }
           }
         }
       }catch(checkErr){ /* si la check falla, continuamos: mejor perder concurrencia que no guardar */ }
@@ -1663,7 +1672,8 @@ function upL(mk,i,f,v){
   S.llamadas[mk][i][f]=v;
   if(f==='nombre'||f==='fecha'||f==='embudo') syncCuota(mk,i);
   save();
-  // Repinta la fila para que se apliquen los colores asignados al embudo / asistencia.
+  // embudo/asistencia se cambian con <select onchange>, dispara solo al elegir.
+  // Re-render no afecta focus de inputs porque ya se cerró el dropdown.
   if(f==='embudo'||f==='asistencia') renderLlamadasRows(mk);
 }
 // Mapa de facturación → semanas (solo si SEMANAS_MODO=true).
@@ -1683,8 +1693,10 @@ function upLNum(mk,i,f,v){
   }
   if(f==='facturacion'||f==='nCuotas'||f==='mesesServicio') syncCuota(mk,i);
   save();
-  // Always re-render mes to reflect updated vencimiento badges + semanas autoasignadas
-  if(f==='mesesServicio'||f==='facturacion') renderLlamadasRows(mk);
+  // mesesServicio cambia con <select onchange> (no input) → no afecta focus al re-render.
+  // facturación es un input numérico — NO re-renderizamos para no matar el cursor.
+  // El render se actualiza al navegar de página o al pasar a otra fila.
+  if(f==='mesesServicio') renderLlamadasRows(mk);
 }
 function upLPlan(mk,i,plan){
   const row=S.llamadas[mk][i];
@@ -1832,16 +1844,16 @@ function renderKpisD(){
     const labelCost='CPL';
 
     return`<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
-      <div style="padding:14px 18px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="this.parentElement.querySelector('.kpid-canal-body').classList.toggle('open');this.querySelector('.nav-arr').classList.toggle('open')">
+      <div style="padding:14px 18px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="toggleKpidCanal(this)">
         <div style="display:flex;align-items:center;gap:10px">
           <span class="badge b-blue" style="font-size:12px">${canal}</span>
           <span style="font-size:12px;color:var(--text2)">Inversión: <b style="color:var(--blue)">${fmt(inv,2)}</b></span>
           <span style="font-size:12px;color:var(--text2)">${labelResult}: <b>${leads}</b></span>
           <span style="font-size:12px;color:var(--text2)">${labelCost}: <b style="color:var(--amber)">${cpl?fmt(cpl,2):'-'}</b></span>
         </div>
-        <svg class="nav-arr open" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12"><polyline points="2,4 6,8 10,4"/></svg>
+        <svg class="nav-arr" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12" style="transition:transform .2s;transform:rotate(180deg)"><polyline points="2,4 6,8 10,4"/></svg>
       </div>
-      <div class="kpid-canal-body open" style="display:none">
+      <div class="kpid-canal-body" style="display:block">
         <div class="tw"><table>
           <thead><tr><th style="width:80px;text-align:center">Día</th><th style="width:140px;text-align:right">Inversión (€)</th><th style="width:120px;text-align:right">${labelResult}</th><th style="width:100px;text-align:right">${labelCost}</th><th style="width:60px"></th></tr></thead>
           <tbody id="kpid-body-${canal}"></tbody>
@@ -1924,8 +1936,17 @@ function renderKpisD(){
       </tr>`;
     }).join('');
   });
-  // Toggle open by default
-  document.querySelectorAll('.kpid-canal-body').forEach(el=>el.style.display='block');
+  // Los acordeones arrancan abiertos por defecto (display:block en el HTML).
+  // No tocamos el inline style aquí — eso rompía toggleKpidCanal.
+}
+// Toggle del acordeón ADS / canal en KPIs diarios. Alterna inline display.
+function toggleKpidCanal(headerEl){
+  const body = headerEl.parentElement.querySelector('.kpid-canal-body');
+  if(!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  const arr = headerEl.querySelector('.nav-arr');
+  if(arr) arr.style.transform = isOpen ? '' : 'rotate(180deg)';
 }
 function renderKpiDRows(mk){
   const rows=S.kpis_diarios[mk]||[];const tbody=document.getElementById('kpid-body');if(!tbody)return;
@@ -2233,11 +2254,13 @@ function calcVentas(mk,canal){
   return realizadas*pctC;
 }
 
+// upObjCalc: actualiza un objetivo. NO re-renderiza para preservar focus.
+// El render se aplica cuando el usuario navega o hace blur (los totales se
+// recalcularán al volver a esta vista).
 function upObjCalc(mk,canal,key,val){
   ensureObj(mk,canal);
   S.objetivos[mk][canal][key]=parseFloat(val)||0;
   save();
-  renderObjetivos();
 }
 function upObj(mk,canal,key,val){ensureObj(mk,canal);S.objetivos[mk][canal][key]=parseFloat(val)||0;save();}
 
