@@ -89,15 +89,7 @@ aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border
 .mv.blue{color:var(--blue)}.mv.green{color:var(--green)}.mv.amber{color:var(--amber)}.mv.red{color:var(--red)}.mv.purple{color:var(--purple)}
 .tw{overflow:auto;max-height:70vh}
 /* Modo administrador: solo lectura — bloquear inputs y ocultar botones de escritura */
-body.is-admin .ce,
-body.is-admin input.fi,
-body.is-admin select.fi,
-body.is-admin textarea.fi{pointer-events:none;background:#fafafa !important;cursor:not-allowed}
-body.is-admin .btn-red,
-body.is-admin .btn-p,
-body.is-admin button[onclick*="add"],
-body.is-admin button[onclick*="del"],
-body.is-admin button[onclick*="open"]{display:none !important}
+/* Admin: edita igual que un cliente. Solo el badge marca el modo. */
 body.is-admin .admin-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:700;letter-spacing:.05em;margin-left:6px}
 body:not(.is-admin) .admin-badge{display:none}
 /* Sticky primera columna (Nombre) en KPIs por mes y lanzamientos */
@@ -517,7 +509,7 @@ let SHOW_ADS_GANADORES=true; // false = hide winning ads section
 let curLanzamiento=''; // current selected launch id
 
 let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[],escalado:{config:null,evaluaciones:[]}};
-let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null;
+let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null,lastOwnSaveTs=0;
 let isEntrenador=false;
 let IS_ADMIN=false;
 let ALL_CLIENTS=[];
@@ -595,7 +587,7 @@ async function showApp(){
       sel.innerHTML=ALL_CLIENTS.map(c=>`<option value="${esc(c.email)}"${c.email===lastSel?' selected':''}>${esc(c.nombre)}</option>`).join('');
     }
     const kicker=document.getElementById('sb-kicker');
-    if(kicker)kicker.innerHTML='Agencia Legado <span class="admin-badge">ADMIN · SOLO LECTURA</span>';
+    if(kicker)kicker.innerHTML='Agencia Legado <span class="admin-badge">ADMIN</span>';
   } else {
     await loadClientConfig(currentUser?.email||'');
   }
@@ -617,12 +609,24 @@ function subscribeRealtime(){
     realtimeChannel=null;
   }
   realtimeChannel = sb.channel('crm_realtime_'+RECORD_ID).on('postgres_changes',{event:'UPDATE',schema:'public',table:'crm_data',filter:`id=eq.${RECORD_ID}`},async(payload)=>{
-    if(payload.new?.data&&!saveTimer){
-      S={...S,...payload.new.data};
-      localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
-      goTo(curPage,curMonth);
-      setSyncStatus('ok','Nuevos datos recibidos ✓');
+    if(!payload.new?.data || saveTimer) return;
+    // Ignorar el eco de nuestras propias escrituras (ventana 3s).
+    // updated_at viene como ISO string desde Postgres.
+    const incomingTs = payload.new.updated_at ? new Date(payload.new.updated_at).getTime() : 0;
+    if(incomingTs && Math.abs(incomingTs - lastOwnSaveTs) < 3000) return;
+    // Si el usuario está editando un input/select/textarea, NO re-renderizar
+    // (perdería el cursor). Aplicamos el cambio en memoria y dejamos el DOM intacto.
+    const ae=document.activeElement;
+    const tag=ae&&ae.tagName;
+    const isTyping = tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || ae?.isContentEditable;
+    S={...S,...payload.new.data};
+    localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
+    if(isTyping){
+      setSyncStatus('ok','Datos remotos en pausa (editando)');
+      return;
     }
+    goTo(curPage,curMonth);
+    setSyncStatus('ok','Nuevos datos recibidos ✓');
   }).subscribe();
 }
 
@@ -676,17 +680,14 @@ async function loadData(){
 }
 
 async function sbSave(){
-  // Modo administrador: solo se permite guardar desde la página de KPIs por mes
-  if(IS_ADMIN && curPage!=='mes'){
-    setSyncStatus('ok','Solo lectura (admin) — sin guardar');
-    return;
-  }
   setSyncStatus('saving','Guardando...');
   try{
     localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
     // Save backup of previous version before overwriting
     await saveBackup();
-    const{error}=await sb.from('crm_data').upsert({id:RECORD_ID,data:S,updated_at:new Date().toISOString()},{onConflict:'id'});
+    const ts=new Date().toISOString();
+    lastOwnSaveTs=new Date(ts).getTime();
+    const{error}=await sb.from('crm_data').upsert({id:RECORD_ID,data:S,updated_at:ts},{onConflict:'id'});
     if(error) throw error;
     setSyncStatus('ok','Guardado ✓');
   }catch(e){
@@ -1164,11 +1165,8 @@ function goTo(page,month,lanzId){
   if(month!==undefined && month!==curMonth) MES_RANGE={from:'',to:''};
   if(page!=='mes' && curPage==='mes') MES_RANGE={from:'',to:''};
   if(month!==undefined)curMonth=month;if(lanzId!==undefined)curLanzamiento=lanzId;curPage=page;
-  // Modo admin: bloquear edición fuera de KPIs por mes (página mes sí editable)
-  if(IS_ADMIN){
-    if(page==='mes') document.body.classList.remove('is-admin');
-    else document.body.classList.add('is-admin');
-  }
+  // Modo admin: edición habilitada en todas las páginas. La clase is-admin solo
+  // sirve para mostrar el badge "ADMIN" en el sidebar. Se mantiene desde showApp.
   document.querySelectorAll('.nav-i').forEach(el=>el.classList.remove('active'));
   const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance',lanzamientos:'ni-lanzamientos',utms:'ni-utms',escalado:'ni-escalado'};
   if(ids[page])document.getElementById(ids[page])?.classList.add('active');
