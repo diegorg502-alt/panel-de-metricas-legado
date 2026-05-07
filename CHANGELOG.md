@@ -1,0 +1,94 @@
+# Changelog — Panel de Métricas Agencia Legado
+
+Registro vivo de cambios. Cada entrada incluye **fecha**, **PR/commit**, **archivos afectados**, **qué se cambió** y **por qué**.
+Empezamos a partir del 2026-05-07 — cambios anteriores ver `git log`.
+
+---
+
+## 2026-05-07
+
+### PR #28 — Fix acordeon ADS en KPIs diarios
+- **Archivo**: `index.html` (renderKpisD + nueva función `toggleKpidCanal`)
+- **Qué**: la flechita ▼ del bloque ADS en la página KPIs diarios no cerraba/abría el acordeón.
+- **Causa**: el handler antiguo solo alternaba la clase `.open`, pero un bucle al final de `renderKpisD` forzaba `el.style.display='block'` en TODOS los `.kpid-canal-body`. El inline style ganaba al CSS.
+- **Solución**: nueva función `toggleKpidCanal(headerEl)` que alterna directamente `body.style.display` entre `'none'` y `'block'` y rota el chevron 180°. Eliminado el bucle que sobreescribía el inline style.
+
+### Migration `crm_data_anti_rollback_trigger`
+- **Tabla**: `crm_data` (Postgres)
+- **Qué**: trigger BEFORE UPDATE que rechaza cualquier escritura cuyo `updated_at` sea anterior al actual (con tolerancia 1s).
+- **Por qué**: capa defensiva server-side. Si en algún momento un cliente envía un timestamp retrocedente, el servidor lo bloquea con error.
+
+### PR #27 — Optimistic concurrency guard
+- **Archivo**: `index.html` (loadData + sbSave)
+- **Qué**: antes de cada `sbSave` el browser hace `select updated_at` en Supabase. Si remote > local + 1s, ABORTA el save y dispara `reloadFromSupabase()`. Tras un save exitoso, `lastLoadedTs` avanza al timestamp recién escrito.
+- **Por qué**: incidente reproducido — el localStorage `crm_bruno_bk` se mantenía entre pestañas. Si una pestaña tenía datos viejos cacheados, cualquier acción que llamara `save()` upserteaba ese caché stale, machacando los datos buenos. Concretamente: el backfill colocó 558,93€/8 leads en Zerochats mayo, y minutos después una pestaña stale lo sobreescribió a 195€/5.
+
+### PR #26 — Fix definitivo focus al escribir
+- **Archivos**: `index.html` (sbSave, realtime listener, focusout handler, varias funciones up*)
+- **Qué**:
+  1. `sbSave()` limpia `saveTimer` en `finally` → updates externos vuelven a llegar tras un guardado.
+  2. Funciones `up*` (`upKD`, `upMetaSeg`, `upAdNum`, `upLanzNum`, `upLanzKDNum` y % impuestos) dejan de re-renderizar; solo `save()` + actualizaciones puntuales por DOM-id (`updateKpiTotalsOnly`).
+  3. Realtime listener: si el usuario está editando, no mergea `S`; guarda el payload en `pendingExternalUpdate` y lo aplica al `focusout`.
+- **Por qué**: cada keystroke en varios inputs disparaba `save()` + `renderX()` → re-render completo → cursor perdido. Y el listener realtime también re-renderizaba con el eco de nuestras propias escrituras.
+
+### PR #25 — Quitar UI Seguidores en KPIs diarios
+- **Archivos**: `index.html`
+- **Qué**: las filas META en KPIs diarios siempre muestran número de leads (incluso 0). Antes, una fila con `leads=0` se renderizaba como `<input type="number" placeholder="Seguidores">`. Las agregaciones de leads en dashboard / KPIs por mes / lanzamientos dejan de sumar `seguidores`. Tarjeta superior pasa de "Leads / Seguidores" a "Leads totales". Cabeceras de canal usan siempre "Resultados" / "CPL".
+- **Por qué**: Meta = clientes potenciales, todas las campañas que NO son Social Funnel deben contar como leads. La UI confundía "leads=0 hoy" con "campaña social".
+
+### PR #24 — Cuotas editables Zerochats + Excluir Social Funnel + Acordeones funcionales + Admin edición total
+- **Archivos**: `index.html`, `supabase/functions/sync-meta-ads/index.ts`
+- **Qué**:
+  1. **Cuotas Zerochats/GHL editables**: las celdas mensuales de la tabla de cuotas pasan de `<span>` solo-lectura a `<input>` editables. Persisten en `c.pagos[YYYY-MMM]` mediante nueva función `upCuotaPago(i,key,v)`.
+  2. **Excluir Social Funnel del cálculo de inversión Meta Ads**: en `applyDayInsights` y `applyTopAds`, las campañas detectadas como social funnel (nombre con `seguidores`, `followers` o `social funnel`) se descartan. No aportan inversión, ni leads, ni canal.
+  3. **Acordeones funcionales**: `acordeon()` pasa de `<details>/<summary>` con `display:flex` a `<div>` + `onclick="toggleAcordeon(...)"`. El `display:flex` en `<summary>` rompía el toggle nativo de `<details>` en Chrome/WebKit.
+  4. **Admin con edición total**: eliminado el bloque CSS `body.is-admin .ce { pointer-events:none }` y la lógica que añadía/quitaba la clase. Admin edita igual que cualquier cliente; solo se mantiene el badge "ADMIN" en sidebar.
+
+### Migration: `crm_clients.meta_campaign_filter` para Zerochats → NULL
+- **Tabla**: `crm_clients`
+- **Qué**: `update crm_clients set meta_campaign_filter = null where record_id = 'zerochats_2026';`
+- **Por qué**: el filtro `["Clientes potenciales - 02-03-2026"]` solo arrastraba 1 de las 4 campañas activas de Zerochats. Sin filtro, el sync-meta-ads procesa TODAS las campañas y descarta automáticamente las Social Funnel.
+
+### Edge function `sync-meta-ads` v36 — desplegada
+- **Archivo**: `supabase/functions/sync-meta-ads/index.ts`
+- **Qué**: campañas Social Funnel quedan completamente fuera del agregado de inversión y de Top Ads. Antes la versión vieja las marcaba pero las dejaba pasar.
+- **Por qué**: requisito de Diego para que la inversión total NO incluya el gasto de campañas de seguidores.
+
+### Operaciones de datos
+- **Backups creados**:
+  - id 47 (Zerochats pre-cleanup)
+  - ids 50–55 (Bruno, Lucas, María, Quique, Pablo, Paul pre-cleanup)
+  - id 56 (Zerochats antes de la 2ª restauración)
+- **Limpieza de entradas meta huérfanas** en `crm_data → kpis_diarios → 2026-04 / 2026-05`: una por cliente, preservando entradas manuales.
+- **Backfill aplicado** vía `sync-meta-ads` para los 7 clientes con Meta Ads, fechas Abr 1 → hoy. Resultado:
+  | Cliente | Abril | Mayo |
+  |---|---|---|
+  | Bruno Gómez | 0€ / 0 | 0€ / 0 |
+  | Lucas Rodriguez | 400,23€ / 37 leads | 0€ / 0 |
+  | María Ortega | 497,28€ / 104 leads | 0€ / 0 |
+  | Pablo Cristóbal | 569,16€ / 85 leads | 307,58€ / 25 leads |
+  | Paul Lázaro | 1.515,37€ / 254 leads | 297,18€ / 32 leads |
+  | Quique Brisach | 2.278,64€ / 219 leads | 2.235,70€ / 137 leads |
+  | Zerochats | 1.769,07€ / 60 leads | 572,50€ / 10 leads |
+
+---
+
+## Convenciones para próximos cambios
+
+1. **Siempre** crear PR (no commit directo a main).
+2. Incluir test plan en el PR body.
+3. Antes de cualquier `UPDATE crm_data` masivo:
+   - Backup explícito: `insert into crm_backups (client_id, data) select id, data from crm_data where id = '<X>'`
+   - Per-client: un UPDATE por cliente, NO masivos con subqueries de crm_data.
+   - Verificación de conteos justo después.
+4. Después del merge, actualizar este CHANGELOG con la entrada nueva.
+5. Si se cambia algo en la edge function `sync-meta-ads`, `sync-ghl-zerochats` u otra: indicar versión post-deploy.
+
+## Cómo continuar en una nueva conversación
+
+Para que un Claude futuro entienda el estado del proyecto sin repetir contexto:
+1. Leer `CLAUDE.md` (raíz) — instrucciones generales del proyecto.
+2. Leer `DATA_PROTECTION_RULES.md` — reglas inviolables del CRM.
+3. Leer este `CHANGELOG.md` — qué se ha tocado y por qué.
+4. `git log --oneline -20` — últimos commits.
+5. Si la tarea afecta a `crm_data`, leer también el último incidente al final de `DATA_PROTECTION_RULES.md`.
