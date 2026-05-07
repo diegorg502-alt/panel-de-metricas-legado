@@ -89,15 +89,7 @@ aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border
 .mv.blue{color:var(--blue)}.mv.green{color:var(--green)}.mv.amber{color:var(--amber)}.mv.red{color:var(--red)}.mv.purple{color:var(--purple)}
 .tw{overflow:auto;max-height:70vh}
 /* Modo administrador: solo lectura — bloquear inputs y ocultar botones de escritura */
-body.is-admin .ce,
-body.is-admin input.fi,
-body.is-admin select.fi,
-body.is-admin textarea.fi{pointer-events:none;background:#fafafa !important;cursor:not-allowed}
-body.is-admin .btn-red,
-body.is-admin .btn-p,
-body.is-admin button[onclick*="add"],
-body.is-admin button[onclick*="del"],
-body.is-admin button[onclick*="open"]{display:none !important}
+/* Admin: edita igual que un cliente. Solo el badge marca el modo. */
 body.is-admin .admin-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:700;letter-spacing:.05em;margin-left:6px}
 body:not(.is-admin) .admin-badge{display:none}
 /* Sticky primera columna (Nombre) en KPIs por mes y lanzamientos */
@@ -190,6 +182,8 @@ details.acordeon>summary::-webkit-details-marker{display:none}
 details.acordeon>summary{list-style:none}
 details.acordeon[open]>summary>.acordeon-arr{transform:rotate(180deg)}
 details.acordeon>summary:hover{background:var(--bg3)!important}
+.acordeon.open>.acordeon-head>.acordeon-arr{transform:rotate(180deg)}
+.acordeon>.acordeon-head:hover{background:var(--bg3)!important}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── MOBILE RESPONSIVE ─────────────────────────────────── */
@@ -515,7 +509,7 @@ let SHOW_ADS_GANADORES=true; // false = hide winning ads section
 let curLanzamiento=''; // current selected launch id
 
 let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[],escalado:{config:null,evaluaciones:[]}};
-let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null;
+let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null,lastOwnSaveTs=0;
 let isEntrenador=false;
 let IS_ADMIN=false;
 let ALL_CLIENTS=[];
@@ -593,7 +587,7 @@ async function showApp(){
       sel.innerHTML=ALL_CLIENTS.map(c=>`<option value="${esc(c.email)}"${c.email===lastSel?' selected':''}>${esc(c.nombre)}</option>`).join('');
     }
     const kicker=document.getElementById('sb-kicker');
-    if(kicker)kicker.innerHTML='Agencia Legado <span class="admin-badge">ADMIN · SOLO LECTURA</span>';
+    if(kicker)kicker.innerHTML='Agencia Legado <span class="admin-badge">ADMIN</span>';
   } else {
     await loadClientConfig(currentUser?.email||'');
   }
@@ -615,12 +609,24 @@ function subscribeRealtime(){
     realtimeChannel=null;
   }
   realtimeChannel = sb.channel('crm_realtime_'+RECORD_ID).on('postgres_changes',{event:'UPDATE',schema:'public',table:'crm_data',filter:`id=eq.${RECORD_ID}`},async(payload)=>{
-    if(payload.new?.data&&!saveTimer){
-      S={...S,...payload.new.data};
-      localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
-      goTo(curPage,curMonth);
-      setSyncStatus('ok','Nuevos datos recibidos ✓');
+    if(!payload.new?.data || saveTimer) return;
+    // Ignorar el eco de nuestras propias escrituras (ventana 3s).
+    // updated_at viene como ISO string desde Postgres.
+    const incomingTs = payload.new.updated_at ? new Date(payload.new.updated_at).getTime() : 0;
+    if(incomingTs && Math.abs(incomingTs - lastOwnSaveTs) < 3000) return;
+    // Si el usuario está editando un input/select/textarea, NO re-renderizar
+    // (perdería el cursor). Aplicamos el cambio en memoria y dejamos el DOM intacto.
+    const ae=document.activeElement;
+    const tag=ae&&ae.tagName;
+    const isTyping = tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || ae?.isContentEditable;
+    S={...S,...payload.new.data};
+    localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
+    if(isTyping){
+      setSyncStatus('ok','Datos remotos en pausa (editando)');
+      return;
     }
+    goTo(curPage,curMonth);
+    setSyncStatus('ok','Nuevos datos recibidos ✓');
   }).subscribe();
 }
 
@@ -674,17 +680,14 @@ async function loadData(){
 }
 
 async function sbSave(){
-  // Modo administrador: solo se permite guardar desde la página de KPIs por mes
-  if(IS_ADMIN && curPage!=='mes'){
-    setSyncStatus('ok','Solo lectura (admin) — sin guardar');
-    return;
-  }
   setSyncStatus('saving','Guardando...');
   try{
     localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
     // Save backup of previous version before overwriting
     await saveBackup();
-    const{error}=await sb.from('crm_data').upsert({id:RECORD_ID,data:S,updated_at:new Date().toISOString()},{onConflict:'id'});
+    const ts=new Date().toISOString();
+    lastOwnSaveTs=new Date(ts).getTime();
+    const{error}=await sb.from('crm_data').upsert({id:RECORD_ID,data:S,updated_at:ts},{onConflict:'id'});
     if(error) throw error;
     setSyncStatus('ok','Guardado ✓');
   }catch(e){
@@ -1162,11 +1165,8 @@ function goTo(page,month,lanzId){
   if(month!==undefined && month!==curMonth) MES_RANGE={from:'',to:''};
   if(page!=='mes' && curPage==='mes') MES_RANGE={from:'',to:''};
   if(month!==undefined)curMonth=month;if(lanzId!==undefined)curLanzamiento=lanzId;curPage=page;
-  // Modo admin: bloquear edición fuera de KPIs por mes (página mes sí editable)
-  if(IS_ADMIN){
-    if(page==='mes') document.body.classList.remove('is-admin');
-    else document.body.classList.add('is-admin');
-  }
+  // Modo admin: edición habilitada en todas las páginas. La clase is-admin solo
+  // sirve para mostrar el badge "ADMIN" en el sidebar. Se mantiene desde showApp.
   document.querySelectorAll('.nav-i').forEach(el=>el.classList.remove('active'));
   const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance',lanzamientos:'ni-lanzamientos',utms:'ni-utms',escalado:'ni-escalado'};
   if(ids[page])document.getElementById(ids[page])?.classList.add('active');
@@ -1347,22 +1347,30 @@ function kpiGroups(groups){
 }
 
 function acordeon(id,title,badgeCls,content,open){
-  // Usa <details> nativo: abre/cierra de forma fiable, sin depender de IDs ni JS extra.
-  return`<details class="acordeon"${open?' open':''} style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;background:var(--bg)">
-    <summary style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:var(--bg);user-select:none;list-style:none">
+  // Toggle manual con div + onclick: 100% fiable en todos los navegadores.
+  // Antes usábamos <details>/<summary> con display:flex en summary, que rompía
+  // el toggle nativo en Chrome/WebKit en ciertos contextos. Esta versión funciona siempre.
+  const safeId=String(id).replace(/[^a-zA-Z0-9_-]/g,'_');
+  return`<div class="acordeon${open?' open':''}" data-id="${esc(id)}" id="acord-${safeId}" style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;background:var(--bg)">
+    <div class="acordeon-head" onclick="toggleAcordeon('${safeId}')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:var(--bg);user-select:none">
       <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600">
         <span class="badge ${badgeCls}">${esc(title)}</span>
       </div>
       <svg class="acordeon-arr" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 12 12" style="transition:transform .2s"><polyline points="2,4 6,8 10,4"/></svg>
-    </summary>
-    <div style="padding:14px 16px;background:var(--bg2);border-top:1px solid var(--border)">${content}</div>
-  </details>`;
+    </div>
+    <div class="acordeon-body" style="padding:14px 16px;background:var(--bg2);border-top:1px solid var(--border);${open?'':'display:none'}">${content}</div>
+  </div>`;
 }
 
-// Compat: por si alguna parte aún llama a toggleAcordeon, abre/cierra el <details> con ese id legible.
+// Abre/cierra un acordeón por su id sanitizado. Mantiene compat con llamadas previas.
 function toggleAcordeon(id){
-  const el=document.querySelector(`details[data-id="${id}"]`);
-  if(el)el.open=!el.open;
+  let el=document.getElementById('acord-'+id);
+  if(!el)el=document.querySelector(`.acordeon[data-id="${id}"]`)||document.querySelector(`details[data-id="${id}"]`);
+  if(!el)return;
+  if(el.tagName==='DETAILS'){el.open=!el.open;return;}
+  const isOpen=el.classList.toggle('open');
+  const body=el.querySelector('.acordeon-body');
+  if(body)body.style.display=isOpen?'block':'none';
 }
 
 function renderMes(){
@@ -2357,6 +2365,13 @@ function renderCuotasFiltered(){
         const isPast=curYear<new Date().getFullYear()||(curYear===new Date().getFullYear()&&mi<todayM);
         const isCur=curYear===new Date().getFullYear()&&mi===todayM;
         const hasPersistentPagos=c.pagos&&typeof c.pagos==='object'&&!Array.isArray(c.pagos)&&Object.keys(c.pagos).length>0;
+        // Modo Zerochats (HAS_TICKET_MENSUAL) o cuota con pagos persistentes (GHL/manual):
+        // celda editable que actualiza c.pagos[key] directamente.
+        // En vista admin (body.is-admin) el CSS deshabilita el input automáticamente.
+        if(HAS_TICKET_MENSUAL || c.source==='ghl' || hasPersistentPagos){
+          const colorStyle=orig>0?'color:var(--green);font-weight:600':'color:var(--text3)';
+          return`<td style="text-align:center;padding:0;${isPast?'opacity:.5':isCur?'background:#fff9e6':''}"><input class="ce" type="number" inputmode="decimal" step="0.01" value="${orig>0?orig:''}" placeholder="—" oninput="upCuotaPago(${origIdx},'${key}',this.value)" style="text-align:center;border:0;width:100%;background:transparent;padding:8px 4px;${colorStyle}"></td>`;
+        }
         // ANUAL legacy (ticket grande sin pagos persistentes): mostrar en mes inicial
         if(isAnual && !hasPersistentPagos){
           const startMonth=new Date(c.fechaInicio).getMonth();
@@ -2416,6 +2431,16 @@ function renderRenovFiltered(){
 
 function upCuota(i,f,v){S.cuotas[i][f]=v;save();}
 function upCuotaNum(i,f,v){S.cuotas[i][f]=parseNum(v);save();}
+// Edita el pago persistente de una cuota en un mes concreto (Zerochats / GHL / pagos persistentes).
+// Si v=0 o vacío, borra la entrada para no contaminar el JSON con ceros.
+function upCuotaPago(i,key,v){
+  const c=S.cuotas[i];if(!c)return;
+  if(!c.pagos||typeof c.pagos!=='object'||Array.isArray(c.pagos))c.pagos={};
+  const n=parseFloat(String(v).replace(',','.'))||0;
+  if(n>0)c.pagos[key]=Math.round(n*100)/100;
+  else delete c.pagos[key];
+  save();
+}
 function openAddCuota(){openModal(`<div class="mtitle">Añadir cliente a cuotas</div>
   <div class="fr2"><div class="fg"><label class="fl">Nombre</label><input class="fi" id="cn" placeholder="Nombre completo"></div>
   <div class="fg"><label class="fl">Fecha inicio</label><input class="fi" id="cf" type="date" value="${new Date().toISOString().split('T')[0]}"></div></div>

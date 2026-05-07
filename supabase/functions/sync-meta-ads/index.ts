@@ -103,34 +103,32 @@ function applyDayInsights(S: any, date: string, campData: any, clientCanales: st
   const mk = getMonthKey(date);
   if (!S.kpis_diarios[mk]) S.kpis_diarios[mk] = [];
 
-  const canalDaily: Record<string, { inversion: number; leads: number; isSocial: boolean }> = {};
+  const canalDaily: Record<string, { inversion: number; leads: number }> = {};
   const seenCampaigns: any[] = [];
   for (const c of (campData.data || [])) {
     const matched = matchesFilter(c.campaign_name, filters);
-    seenCampaigns.push({ name: c.campaign_name, spend: parseFloat(c.spend || '0'), matched });
-    if (!matched) continue;
-    const canal = detectCanal(c.campaign_name, clientCanales);
     const social = isSeguidoresCampaign(c.campaign_name);
-    if (!canalDaily[canal]) canalDaily[canal] = { inversion: 0, leads: 0, isSocial: social };
+    seenCampaigns.push({ name: c.campaign_name, spend: parseFloat(c.spend || '0'), matched, social, skipped: social });
+    if (!matched) continue;
+    // Social Funnel queda fuera del agregado: no aporta inversión, ni leads, ni canal.
+    // Los seguidores se introducen manualmente en kpis_diarios desde la UI.
+    if (social) continue;
+    const canal = detectCanal(c.campaign_name, clientCanales);
+    if (!canalDaily[canal]) canalDaily[canal] = { inversion: 0, leads: 0 };
     canalDaily[canal].inversion += parseFloat(c.spend || '0');
-    if (!social) canalDaily[canal].leads += getLeads(c.actions || []);
+    canalDaily[canal].leads += getLeads(c.actions || []);
   }
 
   const summary: any[] = [];
   for (const [canal, d] of Object.entries(canalDaily)) {
     if (d.inversion === 0 && d.leads === 0) continue;
-    const existing = S.kpis_diarios[mk].find(
-      (k: any) => k.dia === date && k.canal === canal && k.source === 'meta'
-    );
-    const entry: any = d.isSocial
-      ? { dia: date, canal, inversion: Math.round(d.inversion * 100) / 100, leads: 0, seguidores: existing?.seguidores || 0, source: 'meta' }
-      : { dia: date, canal, inversion: Math.round(d.inversion * 100) / 100, leads: d.leads, source: 'meta' };
+    const entry: any = { dia: date, canal, inversion: Math.round(d.inversion * 100) / 100, leads: d.leads, source: 'meta' };
     const idx = S.kpis_diarios[mk].findIndex(
       (k: any) => k.dia === date && k.canal === canal && k.source === 'meta'
     );
     if (idx >= 0) S.kpis_diarios[mk][idx] = entry;
     else S.kpis_diarios[mk].push(entry);
-    summary.push({ canal, inversion: entry.inversion, leads: entry.leads, tipo: d.isSocial ? 'social' : 'leads' });
+    summary.push({ canal, inversion: entry.inversion, leads: entry.leads, tipo: 'leads' });
   }
   return { summary, seenCampaigns };
 }
@@ -141,6 +139,8 @@ function applyTopAds(S: any, date: string, adData: any, clientCanales: string[],
   const adsByCanal: Record<string, any[]> = {};
   for (const ad of adData.data) {
     if (!matchesFilter(ad.campaign_name, filters)) continue;
+    // Social Funnel también se excluye de Top Ads: no es objetivo de leads, no compite por CPL.
+    if (isSeguidoresCampaign(ad.campaign_name)) continue;
     const canal = detectCanal(ad.campaign_name, clientCanales);
     if (!adsByCanal[canal]) adsByCanal[canal] = [];
     const spend = parseFloat(ad.spend || '0');
