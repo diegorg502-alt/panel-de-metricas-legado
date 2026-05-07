@@ -509,7 +509,7 @@ let SHOW_ADS_GANADORES=true; // false = hide winning ads section
 let curLanzamiento=''; // current selected launch id
 
 let S={llamadas:{},kpis_diarios:{},objetivos:{},cuotas:[],renovaciones:[],ads:{},contactados:[],clientes:{},balance:{gastos:[],impuestos_pct:25},lanzamientos:[],escalado:{config:null,evaluaciones:[]}};
-let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null,lastOwnSaveTs=0,pendingExternalUpdate=null;
+let curPage='dashboard',curMonth=2,saveTimer=null,currentUser=null,lastOwnSaveTs=0,pendingExternalUpdate=null,lastLoadedTs=null;
 let isEntrenador=false;
 let IS_ADMIN=false;
 let ALL_CLIENTS=[];
@@ -687,14 +687,18 @@ async function loadData(){
       // Supabase siempre tiene prioridad — actualiza también el localStorage
       S={...S,...data.data};
       localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
+      // Guardamos el updated_at para concurrencia óptima en sbSave.
+      lastLoadedTs = data.updated_at || null;
     } else {
       const bk=localStorage.getItem('crm_bruno_bk');
       if(bk) S={...S,...JSON.parse(bk)};
+      lastLoadedTs = null;
     }
     setSyncStatus('ok','Sincronizado ✓');
   }catch(e){
     const bk=localStorage.getItem('crm_bruno_bk');
     if(bk) S={...S,...JSON.parse(bk)};
+    lastLoadedTs = null;
     setSyncStatus('err','Backup local');
   }
   if(!S.ads)S.ads={};
@@ -706,6 +710,29 @@ async function loadData(){
 async function sbSave(){
   setSyncStatus('saving','Guardando...');
   try{
+    // ── Optimistic concurrency check ─────────────────────────
+    // Antes de upsertear, verificamos que Supabase no tenga una versión más
+    // nueva que la que cargamos. Si la tiene, ABORTAMOS el save y recargamos.
+    // Esto evita que un browser stale (otra pestaña/dispositivo con datos
+    // antiguos en S) machaque silenciosamente lo que está en Supabase.
+    if(lastLoadedTs){
+      try{
+        const{data:cur}=await sb.from('crm_data').select('updated_at').eq('id',RECORD_ID).single();
+        if(cur?.updated_at){
+          const remoteTs=new Date(cur.updated_at).getTime();
+          const localTs=new Date(lastLoadedTs).getTime();
+          // Tolerancia 1s para no penalizar nuestros propios echoes
+          if(remoteTs - localTs > 1000){
+            setSyncStatus('err','Datos remotos más nuevos — recargando...');
+            console.warn('[sbSave] aborted: remote',cur.updated_at,'> local',lastLoadedTs);
+            // Recargar desde Supabase. Si el usuario está editando, el realtime
+            // listener ya defiere el merge hasta que pierda focus.
+            await reloadFromSupabase();
+            return;
+          }
+        }
+      }catch(checkErr){ /* si la check falla, continuamos: mejor perder concurrencia que no guardar */ }
+    }
     localStorage.setItem('crm_bruno_bk',JSON.stringify(S));
     // Save backup of previous version before overwriting
     await saveBackup();
@@ -713,6 +740,8 @@ async function sbSave(){
     lastOwnSaveTs=new Date(ts).getTime();
     const{error}=await sb.from('crm_data').upsert({id:RECORD_ID,data:S,updated_at:ts},{onConflict:'id'});
     if(error) throw error;
+    // Avanzamos lastLoadedTs para que las próximas escrituras pasen el guard
+    lastLoadedTs = ts;
     setSyncStatus('ok','Guardado ✓');
   }catch(e){
     setSyncStatus('err','Error — guardado local');
