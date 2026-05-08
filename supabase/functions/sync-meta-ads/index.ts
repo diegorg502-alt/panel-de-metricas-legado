@@ -15,11 +15,30 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 }
 
+// Detecta si una campaña es Quiz Templado por su nombre.
+// Convención global: nombre con "templado", "warm", "tofu", "abo" → templado.
+// Si no, default = QUIZ frío.
+function isQuizTempladoCampaign(name: string): boolean {
+  const n = normalize(name);
+  return n.includes('templado') || n.includes('warm') || n.includes('tofu');
+}
+
+function isQuizFrioCampaign(name: string): boolean {
+  const n = normalize(name);
+  return n.includes('frio') || n.includes('cold') || n.includes('bofu');
+}
+
 function detectCanal(campaignName: string, clientCanales: string[]): string {
   const n = campaignName.toLowerCase();
   if (n.includes('seguidores')) return findClientCanal(clientCanales, 'SOCIAL');
-  if (n.includes('clientes potenciales') || n.includes('formulario') || n.includes('form'))
+  // Quiz Templado: detecta primero por nombre. Si el cliente tiene el canal,
+  // mapea ahí; si no, cae a QUIZ normal (backwards-compat).
+  if (n.includes('clientes potenciales') || n.includes('formulario') || n.includes('form') || n.includes('quiz')) {
+    if (isQuizTempladoCampaign(n)) {
+      return findClientCanal(clientCanales, 'QUIZ TEMPLADO', 'QUIZ', 'ADS');
+    }
     return findClientCanal(clientCanales, 'QUIZ', 'ADS');
+  }
   if (n.includes('vsl')) return findClientCanal(clientCanales, 'VSL', 'VSL ADS', 'ADS');
   for (const [canal, keys] of CANAL_PATTERNS) {
     if (keys.some(k => n.includes(k))) return findClientCanal(clientCanales, canal, 'ADS');
