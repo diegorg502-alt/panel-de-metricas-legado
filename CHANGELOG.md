@@ -36,7 +36,12 @@ Tras mergear, añadir entrada al CHANGELOG con: archivos afectados, qué se camb
 
 ## 2026-05-08
 
-### PR (a abrir) — Vista Global rediseñada: layout vertical + grupos por color
+### PR (a abrir) — Vista Global: separadores verticales entre meses
+- **Archivo**: `index.html` (renderVistaGlobal)
+- **Qué**: añadidas líneas verticales `1px solid var(--border)` entre cada columna de mes para mejorar legibilidad. Línea más fuerte (2px) antes de la columna TOTAL para destacarla. Tabla pasa a `border-collapse: separate; border-spacing: 0` para que los borders no colapsen con los del card contenedor.
+- **Por qué**: a Diego le costaba seguir las filas en la tabla sin separadores entre meses.
+
+### PR #31 — Vista Global rediseñada: layout vertical + grupos por color
 - **Archivo**: `index.html` (`vistaKpisMes`, `renderVistaGlobal`)
 - **Qué**: la Vista Global pasa de tabla horizontal (meses en filas, métricas en columnas) a **vertical** (métricas en filas, meses en columnas). Métricas agrupadas en bandas de color suave:
   - **Publicidad** (azul claro): Inversión · Leads totales · Coste por Lead.

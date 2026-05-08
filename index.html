@@ -3248,22 +3248,26 @@ function renderVistaGlobal(){
     ]},
   ];
 
+  // Línea vertical fina entre meses, ligeramente más fuerte antes de TOTAL.
+  const SEP = '1px solid var(--border)';
+  const SEP_FUERTE = '2px solid var(--border)';
+
   // Construye las filas de la tabla. Cabecera de grupo (banda de color) + filas de métrica con color suave alternado.
   const filasHTML = GRUPOS.map(g => {
     const headerRow = `<tr style="background:${g.bg};border-top:2px solid var(--border)">
-      <td style="padding:10px 14px;font-weight:700;font-size:11px;letter-spacing:.08em;color:${g.label};text-transform:uppercase;position:sticky;left:0;background:${g.bg};z-index:1">${g.titulo}</td>
-      ${MONTHS.map(()=>`<td style="background:${g.bg}"></td>`).join('')}
-      <td style="background:${g.bg}"></td>
+      <td style="padding:10px 14px;font-weight:700;font-size:11px;letter-spacing:.08em;color:${g.label};text-transform:uppercase;position:sticky;left:0;background:${g.bg};z-index:1;border-right:${SEP}">${g.titulo}</td>
+      ${MONTHS.map(()=>`<td style="background:${g.bg};border-right:${SEP}"></td>`).join('')}
+      <td style="background:${g.bg};border-left:${SEP_FUERTE}"></td>
     </tr>`;
     const metricRows = g.filas.map((row, idx) => {
       const stripe = idx % 2 === 0 ? g.bgAlt : 'var(--bg)';
       const cells = filas.map(f => {
         const v = row.get(f);
-        return `<td style="text-align:right;padding:8px 12px;font-variant-numeric:tabular-nums">${row.fmt(v)}</td>`;
+        return `<td style="text-align:right;padding:8px 12px;font-variant-numeric:tabular-nums;border-right:${SEP}">${row.fmt(v)}</td>`;
       }).join('');
-      const totalCell = `<td style="text-align:right;padding:8px 12px;font-weight:700;font-variant-numeric:tabular-nums;background:${g.bg}">${row.fmt(row.get(tot))}</td>`;
+      const totalCell = `<td style="text-align:right;padding:8px 12px;font-weight:700;font-variant-numeric:tabular-nums;background:${g.bg};border-left:${SEP_FUERTE}">${row.fmt(row.get(tot))}</td>`;
       return `<tr style="background:${stripe}">
-        <td style="padding:8px 14px;font-weight:600;font-size:13px;position:sticky;left:0;background:${stripe};z-index:1">${row.label}</td>
+        <td style="padding:8px 14px;font-weight:600;font-size:13px;position:sticky;left:0;background:${stripe};z-index:1;border-right:${SEP}">${row.label}</td>
         ${cells}
         ${totalCell}
       </tr>`;
@@ -3273,7 +3277,7 @@ function renderVistaGlobal(){
 
   // Cabecera con meses + click navegable a "KPIs por mes" del mes
   const headerCols = MONTHS.map((m, i) =>
-    `<th style="text-align:right;padding:10px 12px;font-weight:600;font-size:12px;cursor:pointer;color:var(--blue);min-width:80px" onclick="goTo('mes',${i})">${m}</th>`
+    `<th style="text-align:right;padding:10px 12px;font-weight:600;font-size:12px;cursor:pointer;color:var(--blue);min-width:80px;border-right:${SEP}" onclick="goTo('mes',${i})">${m}</th>`
   ).join('');
 
   document.getElementById('content').innerHTML = `
@@ -3287,12 +3291,12 @@ function renderVistaGlobal(){
 
     <div class="card" style="padding:0;overflow:hidden">
       <div class="tw" style="overflow-x:auto">
-        <table style="min-width:1100px;width:100%">
+        <table style="min-width:1100px;width:100%;border-collapse:separate;border-spacing:0">
           <thead>
             <tr style="background:var(--bg2);border-bottom:1px solid var(--border)">
-              <th style="text-align:left;padding:10px 14px;font-weight:700;font-size:12px;width:200px;position:sticky;left:0;background:var(--bg2);z-index:2">Métrica</th>
+              <th style="text-align:left;padding:10px 14px;font-weight:700;font-size:12px;width:200px;position:sticky;left:0;background:var(--bg2);z-index:2;border-right:${SEP}">Métrica</th>
               ${headerCols}
-              <th style="text-align:right;padding:10px 12px;font-weight:700;font-size:12px;background:var(--bg3);min-width:90px">TOTAL</th>
+              <th style="text-align:right;padding:10px 12px;font-weight:700;font-size:12px;background:var(--bg3);min-width:90px;border-left:${SEP_FUERTE}">TOTAL</th>
             </tr>
           </thead>
           <tbody>${filasHTML}</tbody>
