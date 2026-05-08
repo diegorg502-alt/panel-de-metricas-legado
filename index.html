@@ -789,6 +789,20 @@ async function loadClientConfig(email){
     // Auto-enable UTMs + planes for Zerochats-like clients (auto-renew)
     // Also hide alertas and IA chat for these clients (until matching is fully set up)
     if(data.auto_renew){SHOW_RENOVACIONES=false;HAS_UTMS=true;HAS_PLANES=true;SHOW_ALERTAS=false;SHOW_IA=false;SHOW_ADS_GANADORES=false;HAS_TICKET_MENSUAL=true;}
+    // ── REGLA INVIOLABLE R1 ──────────────────────────────────
+    // El admin siempre ve TODA nueva feature visual, independientemente del
+    // cliente seleccionado. Cuando añadas una feature flag de visibilidad,
+    // súmala aquí. NO incluir flags que cambien interpretación de datos
+    // (HAS_TICKET_MENSUAL, SEMANAS_MODO, auto_renew) — esos romperían el
+    // render de clientes que no lo tienen.
+    if(IS_ADMIN){
+      HAS_VISTA_GLOBAL=true;
+      HAS_LANZAMIENTOS=true;
+      HAS_UTMS=true;
+      HAS_ESCALADO=true;
+      SHOW_RENOVACIONES=true;
+      // futuras feature flags de vista van aquí
+    }
     // Update UI
     const sbbrand=document.querySelector('#sb-brand-text');if(sbbrand)sbbrand.textContent=CLIENT_NOMBRE;
     document.title=CLIENT_NOMBRE+' · Agencia Legado';
