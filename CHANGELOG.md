@@ -5,7 +5,41 @@ Empezamos a partir del 2026-05-07 — cambios anteriores ver `git log`.
 
 ---
 
+## 🔒 Reglas inviolables del proyecto
+
+> Estas reglas se aplican a TODOS los cambios futuros. Si añades una nueva feature, lee esta sección antes y verifica que la cumples.
+
+### R1 — Admin siempre ve toda nueva feature
+**Cualquier nueva sección/página/funcionalidad de UI debe estar visible cuando el usuario es admin (`IS_ADMIN=true`)**, independientemente del cliente que tenga seleccionado en el dropdown. Diego usa el modo admin para inspeccionar, debuguear y soportar — no puede haber features que se le oculten.
+
+Implementación obligatoria: cuando crees una nueva feature flag en `crm_clients` (ej. `has_X`), debes:
+1. Cargarla en `loadClientConfig`: `HAS_X = data.has_x || false;`
+2. Forzarla a `true` en admin: añadirla al bloque `if (IS_ADMIN) { HAS_X = true; ... }` al final de `loadClientConfig`.
+3. Documentar en este CHANGELOG bajo qué condiciones la feature se muestra.
+
+**Excepción**: flags que cambian interpretación de datos (no solo visibilidad), como `HAS_TICKET_MENSUAL`, `SEMANAS_MODO`, `auto_renew` — esos NO se fuerzan en admin porque romperían el render de clientes que no lo tengan.
+
+### R2 — Backups antes de cualquier UPDATE masivo en `crm_data`
+Ver `DATA_PROTECTION_RULES.md`. Resumen:
+- `INSERT INTO crm_backups (client_id, data) SELECT ...` antes de cualquier UPDATE.
+- Per-client UPDATE; nunca subqueries con `FROM crm_data` anidadas.
+- SELECT previo con la misma lógica.
+- Verificar conteos justo después.
+
+### R3 — PR + merge para todo el código
+Nunca commit directo a `main`. Cada cambio: rama → PR → merge. Vercel deploya `main` en cada push.
+
+### R4 — Toda acción se documenta aquí
+Tras mergear, añadir entrada al CHANGELOG con: archivos afectados, qué se cambió, por qué.
+
+---
+
 ## 2026-05-08
+
+### PR (a abrir) — Implementar regla R1: admin ve todas las features
+- **Archivo**: `index.html` (loadClientConfig)
+- **Qué**: añadido bloque `if(IS_ADMIN){...}` al final de `loadClientConfig` que fuerza a `true` todas las feature flags de visibilidad: `HAS_VISTA_GLOBAL`, `HAS_LANZAMIENTOS`, `HAS_UTMS`, `HAS_ESCALADO`, `SHOW_RENOVACIONES`.
+- **Por qué**: Diego usa el modo admin para inspeccionar/debugear/soportar — no puede haber features que se le oculten por estar en otro cliente. Establecida como **Regla R1 inviolable** del proyecto al inicio del CHANGELOG.
 
 ### Lucas Rodriguez — import histórico ENE→MAY 2026
 - **Tabla**: `crm_data` (record_id `lucas_2026`)
