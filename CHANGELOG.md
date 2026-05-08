@@ -36,7 +36,19 @@ Tras mergear, añadir entrada al CHANGELOG con: archivos afectados, qué se camb
 
 ## 2026-05-08
 
-### PR (a abrir) — Implementar regla R1: admin ve todas las features
+### PR (a abrir) — Vista Global rediseñada: layout vertical + grupos por color
+- **Archivo**: `index.html` (`vistaKpisMes`, `renderVistaGlobal`)
+- **Qué**: la Vista Global pasa de tabla horizontal (meses en filas, métricas en columnas) a **vertical** (métricas en filas, meses en columnas). Métricas agrupadas en bandas de color suave:
+  - **Publicidad** (azul claro): Inversión · Leads totales · Coste por Lead.
+  - **Setting** (violeta claro): Llamadas agendadas · % Agendamiento · Coste por llamada · Llamadas asistidas · % Asistencia · Coste por asistencia.
+  - **Closing** (verde claro): % Cierre · Ventas totales.
+  - **Retorno** (ámbar claro): Facturación · Caja · ROI · ROAS · CAC.
+- **Métricas nuevas**: Coste por Asistencia (`inv/realizadas`) y CAC (`inv/ventas`).
+- **Total anual** ahora aparece como **última columna** en lugar de footer (más fácil de leer en vertical).
+- **Stripes alternos suaves** dentro de cada grupo + banda de color del grupo en la cabecera.
+- **Por qué**: la mirada cubre mejor el conjunto cuando las métricas están listadas verticalmente. Diego lo prefiere así.
+
+### PR #30 — Implementar regla R1: admin ve todas las features
 - **Archivo**: `index.html` (loadClientConfig)
 - **Qué**: añadido bloque `if(IS_ADMIN){...}` al final de `loadClientConfig` que fuerza a `true` todas las feature flags de visibilidad: `HAS_VISTA_GLOBAL`, `HAS_LANZAMIENTOS`, `HAS_UTMS`, `HAS_ESCALADO`, `SHOW_RENOVACIONES`.
 - **Por qué**: Diego usa el modo admin para inspeccionar/debugear/soportar — no puede haber features que se le oculten por estar en otro cliente. Establecida como **Regla R1 inviolable** del proyecto al inicio del CHANGELOG.

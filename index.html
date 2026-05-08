@@ -3160,14 +3160,16 @@ function vistaKpisMes(mk, filtro){
   const fact = cv.reduce((s,r)=>s+Number(r.facturacion||0),0);
   const caja = cv.reduce((s,r)=>s+Number(r.caja||0),0);
   const llamadas = cl.length;
+  const ventas = cv.length;
   return {
-    inv, leads, llamadas, realizadas, ventas:cv.length, fact, caja,
+    inv, leads, llamadas, realizadas, ventas, fact, caja,
     cpl: leads&&inv ? inv/leads : null,
     costeLlamada: llamadas&&inv ? inv/llamadas : null,
+    costeAsist: realizadas&&inv ? inv/realizadas : null,
     pctAgend: leads ? llamadas/leads : null,
     pctAsist: llamadas ? realizadas/llamadas : null,
-    pctCierre: realizadas ? cv.length/realizadas : null,
-    cpa: cv.length&&inv ? inv/cv.length : null,
+    pctCierre: realizadas ? ventas/realizadas : null,
+    cac: ventas&&inv ? inv/ventas : null,
     roas: inv ? fact/inv : null,
     roi: inv ? caja/inv : null,
   };
@@ -3188,31 +3190,91 @@ function renderVistaGlobal(){
     return `<div class="chip ${active?'active':''}" onclick="setVistaFiltro('${f}')" style="${active?'background:var(--blue);color:white;border-color:var(--blue)':'cursor:pointer'}">${esc(f)}</div>`;
   }).join('');
 
-  // Por mes
+  // KPIs por mes
   const filas = MONTHS.map((m, i) => {
     const mk = `${curYear}-${m}`;
-    const k = vistaKpisMes(mk, filtro);
-    return { m, mIdx: i, ...k };
+    return { m, mIdx: i, ...vistaKpisMes(mk, filtro) };
   });
 
-  // Totales año
-  const tot = filas.reduce((acc, f) => ({
-    inv: acc.inv + f.inv, leads: acc.leads + f.leads, llamadas: acc.llamadas + f.llamadas,
-    realizadas: acc.realizadas + f.realizadas, ventas: acc.ventas + f.ventas,
-    fact: acc.fact + f.fact, caja: acc.caja + f.caja,
-  }), {inv:0,leads:0,llamadas:0,realizadas:0,ventas:0,fact:0,caja:0});
-  const totCpl = tot.leads&&tot.inv ? tot.inv/tot.leads : null;
-  const totCosteLlamada = tot.llamadas&&tot.inv ? tot.inv/tot.llamadas : null;
-  const totAgend = tot.leads ? tot.llamadas/tot.leads : null;
-  const totAsist = tot.llamadas ? tot.realizadas/tot.llamadas : null;
-  const totCierre = tot.realizadas ? tot.ventas/tot.realizadas : null;
-  const totCpa = tot.ventas&&tot.inv ? tot.inv/tot.ventas : null;
-  const totRoas = tot.inv ? tot.fact/tot.inv : null;
-  const totRoi = tot.inv ? tot.caja/tot.inv : null;
+  // Totales año (recalculados desde sumas, no promedios)
+  const sum = (k) => filas.reduce((s,f)=>s+(Number(f[k])||0),0);
+  const tot = {
+    inv:sum('inv'), leads:sum('leads'), llamadas:sum('llamadas'),
+    realizadas:sum('realizadas'), ventas:sum('ventas'),
+    fact:sum('fact'), caja:sum('caja')
+  };
+  tot.cpl = tot.leads&&tot.inv ? tot.inv/tot.leads : null;
+  tot.costeLlamada = tot.llamadas&&tot.inv ? tot.inv/tot.llamadas : null;
+  tot.costeAsist = tot.realizadas&&tot.inv ? tot.inv/tot.realizadas : null;
+  tot.pctAgend = tot.leads ? tot.llamadas/tot.leads : null;
+  tot.pctAsist = tot.llamadas ? tot.realizadas/tot.llamadas : null;
+  tot.pctCierre = tot.realizadas ? tot.ventas/tot.realizadas : null;
+  tot.cac = tot.ventas&&tot.inv ? tot.inv/tot.ventas : null;
+  tot.roas = tot.inv ? tot.fact/tot.inv : null;
+  tot.roi = tot.inv ? tot.caja/tot.inv : null;
 
-  const fmtPct = v => v==null ? '-' : (v*100).toFixed(1)+'%';
-  const fmtN = v => v==null ? '-' : (typeof v==='number'?v:0).toFixed(2);
-  const cell = (v, color) => `<td style="text-align:right;padding:8px 10px;${color?'color:'+color:''}">${v}</td>`;
+  // Helpers de formato. Cell vacía → '—' para no ensuciar la tabla.
+  const fmtPct = v => v==null ? '—' : (v*100).toFixed(1)+'%';
+  const fmtEur = v => v==null||v===0 ? '—' : fmt(v, 2);
+  const fmtNum = v => v==null||v===0 ? '—' : String(v);
+  const fmtMul = v => v==null ? '—' : v.toFixed(2)+'x';
+
+  // Definición de los grupos. Cada grupo tiene un color de banda y filas.
+  // formatter: cómo formatear el valor; getter: cómo extraerlo del objeto mes.
+  const GRUPOS = [
+    { titulo:'PUBLICIDAD', bg:'#dbeafe', bgAlt:'#eff6ff', label:'#1e40af', filas:[
+      { label:'Inversión',          get:m=>m.inv,          fmt:fmtEur },
+      { label:'Leads totales',      get:m=>m.leads,        fmt:fmtNum },
+      { label:'Coste por Lead',     get:m=>m.cpl,          fmt:fmtEur },
+    ]},
+    { titulo:'SETTING', bg:'#ede9fe', bgAlt:'#f5f3ff', label:'#6d28d9', filas:[
+      { label:'Llamadas agendadas', get:m=>m.llamadas,     fmt:fmtNum },
+      { label:'% Agendamiento',     get:m=>m.pctAgend,     fmt:fmtPct },
+      { label:'Coste por llamada',  get:m=>m.costeLlamada, fmt:fmtEur },
+      { label:'Llamadas asistidas', get:m=>m.realizadas,   fmt:fmtNum },
+      { label:'% Asistencia',       get:m=>m.pctAsist,     fmt:fmtPct },
+      { label:'Coste por asistencia', get:m=>m.costeAsist, fmt:fmtEur },
+    ]},
+    { titulo:'CLOSING', bg:'#d1fae5', bgAlt:'#ecfdf5', label:'#047857', filas:[
+      { label:'% Cierre',           get:m=>m.pctCierre,    fmt:fmtPct },
+      { label:'Ventas totales',     get:m=>m.ventas,       fmt:fmtNum },
+    ]},
+    { titulo:'RETORNO', bg:'#fef3c7', bgAlt:'#fffbeb', label:'#92400e', filas:[
+      { label:'Facturación',        get:m=>m.fact,         fmt:fmtEur },
+      { label:'Caja',               get:m=>m.caja,         fmt:fmtEur },
+      { label:'ROI',                get:m=>m.roi,          fmt:fmtMul },
+      { label:'ROAS',               get:m=>m.roas,         fmt:fmtMul },
+      { label:'CAC',                get:m=>m.cac,          fmt:fmtEur },
+    ]},
+  ];
+
+  // Construye las filas de la tabla. Cabecera de grupo (banda de color) + filas de métrica con color suave alternado.
+  const filasHTML = GRUPOS.map(g => {
+    const headerRow = `<tr style="background:${g.bg};border-top:2px solid var(--border)">
+      <td style="padding:10px 14px;font-weight:700;font-size:11px;letter-spacing:.08em;color:${g.label};text-transform:uppercase;position:sticky;left:0;background:${g.bg};z-index:1">${g.titulo}</td>
+      ${MONTHS.map(()=>`<td style="background:${g.bg}"></td>`).join('')}
+      <td style="background:${g.bg}"></td>
+    </tr>`;
+    const metricRows = g.filas.map((row, idx) => {
+      const stripe = idx % 2 === 0 ? g.bgAlt : 'var(--bg)';
+      const cells = filas.map(f => {
+        const v = row.get(f);
+        return `<td style="text-align:right;padding:8px 12px;font-variant-numeric:tabular-nums">${row.fmt(v)}</td>`;
+      }).join('');
+      const totalCell = `<td style="text-align:right;padding:8px 12px;font-weight:700;font-variant-numeric:tabular-nums;background:${g.bg}">${row.fmt(row.get(tot))}</td>`;
+      return `<tr style="background:${stripe}">
+        <td style="padding:8px 14px;font-weight:600;font-size:13px;position:sticky;left:0;background:${stripe};z-index:1">${row.label}</td>
+        ${cells}
+        ${totalCell}
+      </tr>`;
+    }).join('');
+    return headerRow + metricRows;
+  }).join('');
+
+  // Cabecera con meses + click navegable a "KPIs por mes" del mes
+  const headerCols = MONTHS.map((m, i) =>
+    `<th style="text-align:right;padding:10px 12px;font-weight:600;font-size:12px;cursor:pointer;color:var(--blue);min-width:80px" onclick="goTo('mes',${i})">${m}</th>`
+  ).join('');
 
   document.getElementById('content').innerHTML = `
     <div class="card" style="margin-bottom:14px;padding:14px 18px">
@@ -3220,70 +3282,20 @@ function renderVistaGlobal(){
       <div class="filters-bar" style="border:0;padding:0;flex-wrap:wrap;gap:6px">
         ${chipsHTML}
       </div>
-      <div style="font-size:12px;color:var(--text3);margin-top:10px">Mostrando KPIs ${filtro==='GENERAL'?'agregados de todos los embudos':'del embudo <b style="color:var(--blue)">'+esc(filtro)+'</b>'} para ${curYear}.</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:10px">Mostrando KPIs ${filtro==='GENERAL'?'agregados de todos los embudos':'del embudo <b style="color:var(--blue)">'+esc(filtro)+'</b>'} para ${curYear}. Pulsa el nombre del mes para abrir su detalle.</div>
     </div>
 
     <div class="card" style="padding:0;overflow:hidden">
       <div class="tw" style="overflow-x:auto">
-        <table class="sticky-name" style="min-width:1400px">
+        <table style="min-width:1100px;width:100%">
           <thead>
-            <tr style="background:var(--bg2)">
-              <th style="text-align:left;padding:10px 12px;width:60px;position:sticky;left:0;background:var(--bg2);z-index:2">Mes</th>
-              <th colspan="4" style="text-align:center;padding:8px;border-left:1px solid var(--border);color:#3b82f6;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Tráfico</th>
-              <th colspan="4" style="text-align:center;padding:8px;border-left:1px solid var(--border);color:#8b5cf6;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Embudo</th>
-              <th colspan="3" style="text-align:center;padding:8px;border-left:1px solid var(--border);color:#10b981;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Conversión</th>
-              <th colspan="4" style="text-align:center;padding:8px;border-left:1px solid var(--border);color:#f59e0b;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Resultados</th>
-            </tr>
-            <tr style="font-size:11px;color:var(--text3);background:var(--bg2)">
-              <th style="position:sticky;left:0;background:var(--bg2);z-index:2"></th>
-              <th style="text-align:right;padding:6px 10px;border-left:1px solid var(--border)">Inversión</th>
-              <th style="text-align:right;padding:6px 10px">Leads</th>
-              <th style="text-align:right;padding:6px 10px">CPL</th>
-              <th style="text-align:right;padding:6px 10px">€/Ll</th>
-              <th style="text-align:right;padding:6px 10px;border-left:1px solid var(--border)">Llamadas</th>
-              <th style="text-align:right;padding:6px 10px">% Agend</th>
-              <th style="text-align:right;padding:6px 10px">% Asist</th>
-              <th style="text-align:right;padding:6px 10px">Realiz.</th>
-              <th style="text-align:right;padding:6px 10px;border-left:1px solid var(--border)">Ventas</th>
-              <th style="text-align:right;padding:6px 10px">% Cierre</th>
-              <th style="text-align:right;padding:6px 10px">CPA</th>
-              <th style="text-align:right;padding:6px 10px;border-left:1px solid var(--border)">Facturación</th>
-              <th style="text-align:right;padding:6px 10px">Caja</th>
-              <th style="text-align:right;padding:6px 10px">ROAS</th>
-              <th style="text-align:right;padding:6px 10px">ROI</th>
+            <tr style="background:var(--bg2);border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:10px 14px;font-weight:700;font-size:12px;width:200px;position:sticky;left:0;background:var(--bg2);z-index:2">Métrica</th>
+              ${headerCols}
+              <th style="text-align:right;padding:10px 12px;font-weight:700;font-size:12px;background:var(--bg3);min-width:90px">TOTAL</th>
             </tr>
           </thead>
-          <tbody>
-            ${filas.map(f => `
-              <tr style="border-top:1px solid var(--border)">
-                <td style="padding:10px 12px;font-weight:600;position:sticky;left:0;background:var(--bg);z-index:1;cursor:pointer;color:var(--blue)" onclick="goTo('mes',${f.mIdx})">${f.m}</td>
-                ${cell(fmt(f.inv,2), '#3b82f6')}
-                ${cell(f.leads||'-')}
-                ${cell(f.cpl?fmt(f.cpl,2):'-', '#f59e0b')}
-                ${cell(f.costeLlamada?fmt(f.costeLlamada,2):'-')}
-                ${cell(f.llamadas||'-')}
-                ${cell(fmtPct(f.pctAgend))}
-                ${cell(fmtPct(f.pctAsist))}
-                ${cell(f.realizadas||'-')}
-                ${cell(f.ventas||'-', '#10b981')}
-                ${cell(fmtPct(f.pctCierre), '#3b82f6')}
-                ${cell(f.cpa?fmt(f.cpa,2):'-')}
-                ${cell(fmt(f.fact), '#3b82f6')}
-                ${cell(fmt(f.caja), '#10b981')}
-                ${cell(f.roas?f.roas.toFixed(2)+'x':'-', '#f59e0b')}
-                ${cell(f.roi?f.roi.toFixed(2)+'x':'-', '#8b5cf6')}
-              </tr>
-            `).join('')}
-          </tbody>
-          <tfoot>
-            <tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border)">
-              <td style="padding:12px;position:sticky;left:0;background:var(--bg3);z-index:1">TOTAL</td>
-              ${cell(fmt(tot.inv,2))}${cell(tot.leads)}${cell(totCpl?fmt(totCpl,2):'-')}${cell(totCosteLlamada?fmt(totCosteLlamada,2):'-')}
-              ${cell(tot.llamadas)}${cell(fmtPct(totAgend))}${cell(fmtPct(totAsist))}${cell(tot.realizadas)}
-              ${cell(tot.ventas)}${cell(fmtPct(totCierre))}${cell(totCpa?fmt(totCpa,2):'-')}
-              ${cell(fmt(tot.fact))}${cell(fmt(tot.caja))}${cell(totRoas?totRoas.toFixed(2)+'x':'-')}${cell(totRoi?totRoi.toFixed(2)+'x':'-')}
-            </tr>
-          </tfoot>
+          <tbody>${filasHTML}</tbody>
         </table>
       </div>
     </div>
