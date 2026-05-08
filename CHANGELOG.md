@@ -5,6 +5,41 @@ Empezamos a partir del 2026-05-07 — cambios anteriores ver `git log`.
 
 ---
 
+## 2026-05-08
+
+### Lucas Rodriguez — import histórico ENE→MAY 2026
+- **Tabla**: `crm_data` (record_id `lucas_2026`)
+- **Backup pre-import**: id 60.
+- **Datos importados** desde `KPIS de Ventas Lucas Rodriguez 2026.xlsx`:
+  - 123 llamadas en `S.llamadas['2026-01..05']` (Ene 35 / Feb 27 / Mar 28 / Abr 26 / May 7).
+  - 47 cuotas en `S.cuotas` (auto-generadas desde ventas, facturación total **27.454€**).
+- **Reglas de cuotas aplicadas**:
+  - Facturación < 200€ → 1 cuota.
+  - 200€ ≤ Facturación < 500€ → 3 cuotas.
+  - Facturación ≥ 500€ → 6 cuotas.
+  - `fechaInicio` = primer día del mes de la venta.
+- **Mapeo de estados**: "No venta" → estado vacío (no Perdido), "En seguimiento" / "Venta" se preservan.
+- **ENE** trae fechas reales del Excel; **FEB-MAY** sin fecha (Excel no la tenía) — se respetan vacías y se colocan en el bucket mensual.
+
+### Migración: `crm_clients.has_vista_global`
+- Nueva columna `boolean default false`.
+- Activada solo para `lucas_2026` (test).
+
+### Migración: añadir `QUIZ TEMPLADO` a canales de Lucas
+- Lucas: `canales` ahora = `['VSL','QUIZ','SOCIAL','REFERIDOS','QUIZ TEMPLADO']`.
+- Convención global futura: nombre de campaña con "templado", "warm" o "tofu" → mapea a `QUIZ TEMPLADO`. El default de "QUIZ" se mantiene para campañas frías sin marcador.
+
+### Edge function `sync-meta-ads` v37
+- `detectCanal` añade detección de templado vía `isQuizTempladoCampaign(name)`. Si el cliente tiene el canal `QUIZ TEMPLADO`, las campañas con esa palabra van ahí; si no, fallback a `QUIZ`.
+
+### PR (a abrir) — Vista Global + UI QUIZ TEMPLADO
+- **Archivos**: `index.html`
+- Nueva página **Vista Global** (`vista_global`): KPIs anuales con filtro de embudo (GENERAL · QUIZ · QUIZ TEMPLADO · SOCIAL · REFERIDOS · VSL). Tabla con 12 meses × 16 métricas (Tráfico/Embudo/Conversión/Resultados) + total anual.
+- Flag `HAS_VISTA_GLOBAL` lee `crm_clients.has_vista_global`. Sidebar entry oculta si false.
+- Click en mes → navega a KPIs por mes de ese mes.
+
+---
+
 ## 2026-05-07
 
 ### PR #28 — Fix acordeon ADS en KPIs diarios

@@ -361,6 +361,8 @@ details.acordeon>summary:hover{background:var(--bg3)!important}
         <div class="nav-i" id="ni-balance" onclick="goTo('balance')">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><path d="M2 12 L5 7 L8 9 L11 4 L14 6"/><line x1="2" y1="14" x2="14" y2="14"/></svg>Balance</div>
         <div class="nav-g">Registros</div>
+        <div class="nav-i" id="ni-vista_global" onclick="goTo('vista_global')" style="display:none">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="1.5"/><line x1="1" y1="6" x2="15" y2="6"/><line x1="6" y1="6" x2="6" y2="15"/><line x1="11" y1="6" x2="11" y2="15"/></svg>Vista global</div>
         <div class="nav-gh" id="nhdr-mes" onclick="toggleG('mes')">
           <div style="display:flex;align-items:center;gap:8px">
             <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="13" rx="1.5"/><line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/><line x1="1" y1="7" x2="15" y2="7"/></svg>KPIs por mes</div>
@@ -500,6 +502,8 @@ let HAS_UTMS=false; // true = show UTMs section
 let HAS_PLANES=false; // true = show plan selector in llamadas
 let HAS_TICKET_MENSUAL=false; // true = show Ticket medio con plan ANUAL dividido /12 (solo Zerochats por ahora)
 let HAS_ESCALADO=false; // true = show Estrategia de Escalado section
+let HAS_VISTA_GLOBAL=false; // true = show "Vista global" page con KPIs de todos los embudos a la vez (Lucas test)
+let VISTA_FILTRO='GENERAL'; // filtro activo de la Vista Global
 let MES_FILTERS={embudo:'',closer:'',asistencia:'',estado:'',plan:'',utm_source:'',utm_medium:'',utm_campaign:'',utm_content:'',utm_term:''};
 // Rango de fechas para los KPIs por mes. {from,to} en formato 'YYYY-MM-DD'. Vacío = mes completo.
 let MES_RANGE={from:'',to:''};
@@ -779,6 +783,7 @@ async function loadClientConfig(email){
     HAS_UTMS=data.has_utms||false;
     HAS_PLANES=data.has_planes||false;
     HAS_ESCALADO=data.has_escalado||false;
+    HAS_VISTA_GLOBAL=data.has_vista_global||false;
     // Auto-enable lanzamientos if client has LANZAMIENTO or WORKSHOP channels
     if(!HAS_LANZAMIENTOS&&CANALES.some(c=>c.toUpperCase().includes('LANZAMIENTO')||c.toUpperCase().includes('WORKSHOP')))HAS_LANZAMIENTOS=true;
     // Auto-enable UTMs + planes for Zerochats-like clients (auto-renew)
@@ -1205,6 +1210,9 @@ function buildSidebar(){
   // Escalado nav
   const escNav=document.getElementById('escalado-nav-section');
   if(escNav)escNav.style.display=HAS_ESCALADO?'block':'none';
+  // Vista Global nav (test con Lucas)
+  const viNav=document.getElementById('ni-vista_global');
+  if(viNav)viNav.style.display=HAS_VISTA_GLOBAL?'':'none';
   // Hide renovaciones if auto-renew
   const niRenov=document.getElementById('ni-renovaciones');
   if(niRenov)niRenov.style.display=SHOW_RENOVACIONES?'':'none';
@@ -1234,12 +1242,12 @@ function goTo(page,month,lanzId){
   // Modo admin: edición habilitada en todas las páginas. La clase is-admin solo
   // sirve para mostrar el badge "ADMIN" en el sidebar. Se mantiene desde showApp.
   document.querySelectorAll('.nav-i').forEach(el=>el.classList.remove('active'));
-  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance',lanzamientos:'ni-lanzamientos',utms:'ni-utms',escalado:'ni-escalado'};
+  const ids={dashboard:'ni-dashboard',objetivos:'ni-objetivos',cuotas:'ni-cuotas',renovaciones:'ni-renovaciones',alertas:'ni-alertas',ia:'ni-ia',balance:'ni-balance',lanzamientos:'ni-lanzamientos',utms:'ni-utms',escalado:'ni-escalado',vista_global:'ni-vista_global'};
   if(ids[page])document.getElementById(ids[page])?.classList.add('active');
   if(page==='mes')document.getElementById(`ni-mes-${MONTHS[curMonth]}`)?.classList.add('active');
   if(page==='kpis_d')document.getElementById(`ni-kd-${MONTHS[curMonth]}`)?.classList.add('active');
   if(page==='lanzamiento_detail')document.getElementById(`ni-lanz-${curLanzamiento}`)?.classList.add('active');
-  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación',ia:'Conversa con la IA',balance:'Balance',lanzamientos:'Lanzamientos',utms:'UTMs',escalado:'Estrategia de Escalado'};
+  const titles={dashboard:'Dashboard',objetivos:'Objetivos vs Real',cuotas:'Cuotas y renovaciones',renovaciones:'Renovaciones',alertas:'Alertas de renovación',ia:'Conversa con la IA',balance:'Balance',lanzamientos:'Lanzamientos',utms:'UTMs',escalado:'Estrategia de Escalado',vista_global:'Vista global — KPIs anuales por embudo'};
   updateAlertaBadge();
   let pageTitle=titles[page]||(page==='mes'?`KPIs — ${MFULL[curMonth]} ${curYear}`:page==='kpis_d'?`KPIs diarios — ${MFULL[curMonth]} ${curYear}`:'');
   if(page==='lanzamiento_detail'){const lz=(S.lanzamientos||[]).find(l=>l.id===curLanzamiento);pageTitle=lz?lz.nombre:'Lanzamiento';}
@@ -1251,7 +1259,7 @@ function goTo(page,month,lanzId){
   if(page==='lanzamientos'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nuevo lanzamiento';b.onclick=openAddLanzamiento;ex.appendChild(b);}
   if(page==='lanzamiento_detail'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLanzRow(curLanzamiento);ex.appendChild(b);const bd=document.createElement('button');bd.className='btn btn-red';bd.textContent='Eliminar lanzamiento';bd.style.marginLeft='8px';bd.onclick=()=>deleteLanzamiento(curLanzamiento);ex.appendChild(bd);}
   if(page==='utms'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva UTM';b.onclick=openAddUtm;ex.appendChild(b);}
-  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,ia:renderIA,mes:renderMes,kpis_d:renderKpisD,balance:renderBalance,lanzamientos:renderLanzamientos,lanzamiento_detail:renderLanzamientoDetail,utms:renderUTMs,escalado:renderEscalado}[page]||renderDashboard)();
+  ({dashboard:renderDashboard,objetivos:renderObjetivos,cuotas:renderCuotas,renovaciones:renderRenovaciones,alertas:renderAlertas,ia:renderIA,mes:renderMes,kpis_d:renderKpisD,balance:renderBalance,lanzamientos:renderLanzamientos,lanzamiento_detail:renderLanzamientoDetail,utms:renderUTMs,escalado:renderEscalado,vista_global:renderVistaGlobal}[page]||renderDashboard)();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────
@@ -3115,6 +3123,157 @@ function escaladoZona(cacReal,cac){
   if(cacReal<=cac.agresivo*0.85)   return {key:'estandar-alto',cls:'b-amber',titulo:'Escalar mínimo — acercándote al límite',pct:10,cad:'10 días',cuando:'Con cautela. Optimiza embudo antes de subir',color:'#f59e0b'};
   if(cacReal<=cac.agresivo)        return {key:'agresivo',cls:'b-amber',titulo:'Mantener y optimizar — estás en el límite',pct:0,cad:'',cuando:'Cuando el CAC real baje hasta el escenario estándar',color:'#f97316'};
   return                                  {key:'fuera',cls:'b-red',titulo:'NO escalar — CAC fuera de rango rentable',pct:0,cad:'',cuando:'Cuando el CAC real baje por debajo del agresivo',color:'#dc2626'};
+}
+
+// ── VISTA GLOBAL (ANUAL POR EMBUDO) ───────────────────────
+// KPIs anuales con filtro por embudo. Cada fila = un mes; columnas = métricas.
+// GENERAL agrega todos los embudos del cliente. Filtros activos:
+// GENERAL · QUIZ · QUIZ TEMPLADO · SOCIAL · REFERIDOS · VSL.
+const VISTA_GLOBAL_FILTROS = ['GENERAL','QUIZ','QUIZ TEMPLADO','SOCIAL','REFERIDOS','VSL'];
+
+// Calcula los KPIs de un mes para un filtro de embudo dado.
+// filtro='GENERAL' → todos los embudos; en otro caso, solo ese embudo.
+function vistaKpisMes(mk, filtro){
+  const rows = getMesRows(mk);
+  const kd = getMesKd(mk);
+  const cl = filtro==='GENERAL' ? rows : rows.filter(r=>String(r.embudo||'').toUpperCase()===filtro);
+  const cv = cl.filter(r=>r.estado==='Venta');
+  const realizadas = cl.filter(r=>r.asistencia==='SI').length;
+  const inv = (filtro==='GENERAL' ? kd : kd.filter(k=>String(k.canal||'').toUpperCase()===filtro))
+    .reduce((s,k)=>s+Number(k.inversion||0),0);
+  const leads = (filtro==='GENERAL' ? kd : kd.filter(k=>String(k.canal||'').toUpperCase()===filtro))
+    .reduce((s,k)=>s+Number(k.leads||0),0);
+  const fact = cv.reduce((s,r)=>s+Number(r.facturacion||0),0);
+  const caja = cv.reduce((s,r)=>s+Number(r.caja||0),0);
+  const llamadas = cl.length;
+  return {
+    inv, leads, llamadas, realizadas, ventas:cv.length, fact, caja,
+    cpl: leads&&inv ? inv/leads : null,
+    costeLlamada: llamadas&&inv ? inv/llamadas : null,
+    pctAgend: leads ? llamadas/leads : null,
+    pctAsist: llamadas ? realizadas/llamadas : null,
+    pctCierre: realizadas ? cv.length/realizadas : null,
+    cpa: cv.length&&inv ? inv/cv.length : null,
+    roas: inv ? fact/inv : null,
+    roi: inv ? caja/inv : null,
+  };
+}
+
+function setVistaFiltro(f){
+  VISTA_FILTRO = f;
+  renderVistaGlobal();
+}
+
+function renderVistaGlobal(){
+  const filtro = VISTA_FILTRO || 'GENERAL';
+  const filtrosDisponibles = VISTA_GLOBAL_FILTROS.filter(f =>
+    f==='GENERAL' || (CANALES||[]).map(c=>c.toUpperCase()).includes(f)
+  );
+  const chipsHTML = filtrosDisponibles.map(f => {
+    const active = f===filtro;
+    return `<div class="chip ${active?'active':''}" onclick="setVistaFiltro('${f}')" style="${active?'background:var(--blue);color:white;border-color:var(--blue)':'cursor:pointer'}">${esc(f)}</div>`;
+  }).join('');
+
+  // Por mes
+  const filas = MONTHS.map((m, i) => {
+    const mk = `${curYear}-${m}`;
+    const k = vistaKpisMes(mk, filtro);
+    return { m, mIdx: i, ...k };
+  });
+
+  // Totales año
+  const tot = filas.reduce((acc, f) => ({
+    inv: acc.inv + f.inv, leads: acc.leads + f.leads, llamadas: acc.llamadas + f.llamadas,
+    realizadas: acc.realizadas + f.realizadas, ventas: acc.ventas + f.ventas,
+    fact: acc.fact + f.fact, caja: acc.caja + f.caja,
+  }), {inv:0,leads:0,llamadas:0,realizadas:0,ventas:0,fact:0,caja:0});
+  const totCpl = tot.leads&&tot.inv ? tot.inv/tot.leads : null;
+  const totCosteLlamada = tot.llamadas&&tot.inv ? tot.inv/tot.llamadas : null;
+  const totAgend = tot.leads ? tot.llamadas/tot.leads : null;
+  const totAsist = tot.llamadas ? tot.realizadas/tot.llamadas : null;
+  const totCierre = tot.realizadas ? tot.ventas/tot.realizadas : null;
+  const totCpa = tot.ventas&&tot.inv ? tot.inv/tot.ventas : null;
+  const totRoas = tot.inv ? tot.fact/tot.inv : null;
+  const totRoi = tot.inv ? tot.caja/tot.inv : null;
+
+  const fmtPct = v => v==null ? '-' : (v*100).toFixed(1)+'%';
+  const fmtN = v => v==null ? '-' : (typeof v==='number'?v:0).toFixed(2);
+  const cell = (v, color) => `<td style="text-align:right;padding:8px 10px;${color?'color:'+color:''}">${v}</td>`;
+
+  document.getElementById('content').innerHTML = `
+    <div class="card" style="margin-bottom:14px;padding:14px 18px">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Filtrar por embudo</div>
+      <div class="filters-bar" style="border:0;padding:0;flex-wrap:wrap;gap:6px">
+        ${chipsHTML}
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-top:10px">Mostrando KPIs ${filtro==='GENERAL'?'agregados de todos los embudos':'del embudo <b style="color:var(--blue)">'+esc(filtro)+'</b>'} para ${curYear}.</div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="tw" style="overflow-x:auto">
+        <table class="sticky-name" style="min-width:1400px">
+          <thead>
+            <tr style="background:var(--bg2)">
+              <th style="text-align:left;padding:10px 12px;width:60px;position:sticky;left:0;background:var(--bg2);z-index:2">Mes</th>
+              <th colspan="4" style="text-align:center;padding:8px;border-left:1px solid var(--border);color:#3b82f6;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Tráfico</th>
+              <th colspan="4" style="text-align:center;padding:8px;border-left:1px solid var(--border);color:#8b5cf6;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Embudo</th>
+              <th colspan="3" style="text-align:center;padding:8px;border-left:1px solid var(--border);color:#10b981;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Conversión</th>
+              <th colspan="4" style="text-align:center;padding:8px;border-left:1px solid var(--border);color:#f59e0b;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Resultados</th>
+            </tr>
+            <tr style="font-size:11px;color:var(--text3);background:var(--bg2)">
+              <th style="position:sticky;left:0;background:var(--bg2);z-index:2"></th>
+              <th style="text-align:right;padding:6px 10px;border-left:1px solid var(--border)">Inversión</th>
+              <th style="text-align:right;padding:6px 10px">Leads</th>
+              <th style="text-align:right;padding:6px 10px">CPL</th>
+              <th style="text-align:right;padding:6px 10px">€/Ll</th>
+              <th style="text-align:right;padding:6px 10px;border-left:1px solid var(--border)">Llamadas</th>
+              <th style="text-align:right;padding:6px 10px">% Agend</th>
+              <th style="text-align:right;padding:6px 10px">% Asist</th>
+              <th style="text-align:right;padding:6px 10px">Realiz.</th>
+              <th style="text-align:right;padding:6px 10px;border-left:1px solid var(--border)">Ventas</th>
+              <th style="text-align:right;padding:6px 10px">% Cierre</th>
+              <th style="text-align:right;padding:6px 10px">CPA</th>
+              <th style="text-align:right;padding:6px 10px;border-left:1px solid var(--border)">Facturación</th>
+              <th style="text-align:right;padding:6px 10px">Caja</th>
+              <th style="text-align:right;padding:6px 10px">ROAS</th>
+              <th style="text-align:right;padding:6px 10px">ROI</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filas.map(f => `
+              <tr style="border-top:1px solid var(--border)">
+                <td style="padding:10px 12px;font-weight:600;position:sticky;left:0;background:var(--bg);z-index:1;cursor:pointer;color:var(--blue)" onclick="goTo('mes',${f.mIdx})">${f.m}</td>
+                ${cell(fmt(f.inv,2), '#3b82f6')}
+                ${cell(f.leads||'-')}
+                ${cell(f.cpl?fmt(f.cpl,2):'-', '#f59e0b')}
+                ${cell(f.costeLlamada?fmt(f.costeLlamada,2):'-')}
+                ${cell(f.llamadas||'-')}
+                ${cell(fmtPct(f.pctAgend))}
+                ${cell(fmtPct(f.pctAsist))}
+                ${cell(f.realizadas||'-')}
+                ${cell(f.ventas||'-', '#10b981')}
+                ${cell(fmtPct(f.pctCierre), '#3b82f6')}
+                ${cell(f.cpa?fmt(f.cpa,2):'-')}
+                ${cell(fmt(f.fact), '#3b82f6')}
+                ${cell(fmt(f.caja), '#10b981')}
+                ${cell(f.roas?f.roas.toFixed(2)+'x':'-', '#f59e0b')}
+                ${cell(f.roi?f.roi.toFixed(2)+'x':'-', '#8b5cf6')}
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--border)">
+              <td style="padding:12px;position:sticky;left:0;background:var(--bg3);z-index:1">TOTAL</td>
+              ${cell(fmt(tot.inv,2))}${cell(tot.leads)}${cell(totCpl?fmt(totCpl,2):'-')}${cell(totCosteLlamada?fmt(totCosteLlamada,2):'-')}
+              ${cell(tot.llamadas)}${cell(fmtPct(totAgend))}${cell(fmtPct(totAsist))}${cell(tot.realizadas)}
+              ${cell(tot.ventas)}${cell(fmtPct(totCierre))}${cell(totCpa?fmt(totCpa,2):'-')}
+              ${cell(fmt(tot.fact))}${cell(fmt(tot.caja))}${cell(totRoas?totRoas.toFixed(2)+'x':'-')}${cell(totRoi?totRoi.toFixed(2)+'x':'-')}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  `;
 }
 
 function renderEscalado(){
