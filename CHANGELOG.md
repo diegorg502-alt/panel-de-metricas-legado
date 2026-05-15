@@ -36,7 +36,49 @@ Tras mergear, añadir entrada al CHANGELOG con: archivos afectados, qué se camb
 
 ## 2026-05-08
 
-### PR (a abrir) — Vista Global: separadores verticales entre meses
+### PR (a abrir) — Tanda Zerochats: 8 cambios funcionales
+
+**Archivos**: `index.html`, `supabase/functions/sync-meta-ads/index.ts`, `supabase/functions/sync-ghl-zerochats/index.ts`.
+
+1. **`matchesFilter` en sync-meta-ads pasa a exact match.**
+   - Antes: `n.includes(normalize(f))` (substring).
+   - Ahora: `n === normalize(f)`.
+   - Razón: Diego quería que el filtro de campañas sea preciso. Sin filtro (NULL) sigue trayendo todo.
+2. **Plan ANUAL no autofill importe.**
+   - `upLPlan`: al marcar ANUAL solo setea `mesesServicio=12`; facturación y caja se rellenan manualmente porque el pago único de cuantía variable.
+   - PRO y BUSINESS siguen autofill con sus importes fijos.
+3. **BUSINESS bajado de 397€ a 374€.**
+   - `index.html` `PLAN_AMOUNTS.BUSINESS` y `sync-ghl-zerochats/index.ts`.
+4. **Nueva columna "Agenda llamada" en KPIs por mes** entre Embudo y Closer.
+   - Valores: vacío, `SI`, `NO`. Verde si SI, rojo si NO.
+   - Filas con `agendaLlamada='NO'` NO cuentan en: llamadas agendadas, asistencias, % cierre, CPA.
+   - Sí cuentan en: ventas totales, facturación, caja (porque pueden haber comprado sin llamada).
+   - Helper `agendoLlamada(r)`. Datos antiguos sin el campo = agendado (backwards compat).
+5. **Dashboard Zerochats auto-actualiza facturación/caja.**
+   - `syncCuota`: si HAS_TICKET_MENSUAL y la llamada es Venta, añade `c.pagos[mk] = caja` automáticamente.
+   - Se respeta `source='ghl'` (cuotas que vienen del webhook GHL no se sobrescriben).
+   - `renderCuotas` ya no se salta el sync para HAS_TICKET_MENSUAL.
+6. **Churn rate añadido a "Bajas por mes"** en página Cuotas.
+   - Cálculo: `bajas / activos` por mes; promedio anual mostrado junto a "Media".
+   - Activos = clientes con `fechaInicio <= fin_mes` y (no perdido o perdido tras inicio del mes).
+   - Visual: rojo si > 5%.
+7. **ROAS / ROI / CAC desaparecen del bloque "Resultados" general.**
+   - En `renderMes` (KPIs totales del mes): solo Facturación, Caja, Ticket medio.
+   - En `renderVistaGlobal`: ROI/ROAS/CAC solo cuando el filtro es un canal de ads (no GENERAL, no REFERIDOS, no ORGÁNICO).
+   - Razón: el ratio sobre la inversión total mezcla canales y costes operativos.
+8. **Botón "+ Cobro recurrente"** en KPIs por mes (solo Zerochats / HAS_TICKET_MENSUAL).
+   - Crea una fila con `recurrente=true`, estado=Venta, agendaLlamada='NO'.
+   - `esRecurrente(r)` la excluye de embudo, CPA, ventas como cliente nuevo, ticket medio.
+   - Sí cuenta en facturación/caja y se persiste en `c.pagos[mk]` de la cuota existente.
+   - Visual: fondo gris + badge `♻ REC`.
+
+### Edge function `sync-meta-ads` v38 (a desplegar)
+- Cambio #1: exact match en `matchesFilter`.
+
+### Edge function `sync-ghl-zerochats` (a desplegar)
+- Cambio #3: BUSINESS = 374€.
+
+### PR #32 — Vista Global: separadores verticales entre meses
 - **Archivo**: `index.html` (renderVistaGlobal)
 - **Qué**: añadidas líneas verticales `1px solid var(--border)` entre cada columna de mes para mejorar legibilidad. Línea más fuerte (2px) antes de la columna TOTAL para destacarla. Tabla pasa a `border-collapse: separate; border-spacing: 0` para que los borders no colapsen con los del card contenedor.
 - **Por qué**: a Diego le costaba seguir las filas en la tabla sin separadores entre meses.

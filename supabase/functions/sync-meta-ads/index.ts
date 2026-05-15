@@ -90,10 +90,14 @@ function getMonthStart(dateStr: string): string {
   return dateStr.substring(0, 8) + '01';
 }
 
+// matchesFilter: comparación EXACTA contra cada elemento del filtro.
+// Antes era includes (substring), pero Diego pidió exact match para evitar
+// que campañas con nombres parecidos se cuelen como "ADS".
+// Si el filtro es null/[] → pasa todo.
 function matchesFilter(campaignName: string, filters: string[] | null | undefined): boolean {
   if (!filters || !filters.length) return true;
   const n = normalize(campaignName);
-  return filters.some(f => n.includes(normalize(f)));
+  return filters.some(f => n === normalize(f));
 }
 
 async function fetchCampaignInsights(adAccountId: string, date: string, token: string) {

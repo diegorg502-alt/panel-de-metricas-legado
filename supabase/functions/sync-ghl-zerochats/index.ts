@@ -23,7 +23,8 @@ const PLAN_TAGS: Record<string, string> = {
   'plan bussiness': 'BUSINESS',
   'plan anual': 'ANUAL',
 };
-const PLAN_AMOUNTS: Record<string, number> = { PRO: 247, BUSINESS: 397, ANUAL: 0 };
+// Diego pidió bajar BUSINESS de 397 a 374€ (caja y cuotas mensuales).
+const PLAN_AMOUNTS: Record<string, number> = { PRO: 247, BUSINESS: 374, ANUAL: 0 };
 const PLAN_PRIORITY: Record<string, number> = { ANUAL: 3, BUSINESS: 2, PRO: 1 };
 const PERDIDO_TAG = 'perdido';
 const MONTHS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
