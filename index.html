@@ -1267,7 +1267,15 @@ function goTo(page,month,lanzId){
   if(page==='lanzamiento_detail'){const lz=(S.lanzamientos||[]).find(l=>l.id===curLanzamiento);pageTitle=lz?lz.nombre:'Lanzamiento';}
   document.getElementById('topbar-title').textContent=pageTitle;
   const ex=document.getElementById('topbar-extra');ex.innerHTML='';
-  if(page==='mes'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLlamadaRow(curMonth);ex.appendChild(b);const bcsv=document.createElement('button');bcsv.className='btn';bcsv.textContent='⬇ Exportar CSV';bcsv.style.marginLeft='8px';bcsv.onclick=()=>exportCSV(curMonth);ex.appendChild(bcsv);}
+  if(page==='mes'){
+    const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva fila';b.onclick=()=>addLlamadaRow(curMonth);ex.appendChild(b);
+    // Solo para Zerochats (HAS_TICKET_MENSUAL): botón para registrar cobros recurrentes
+    // (clientes ya existentes que pagan otra cuota, sin contar como cliente nuevo).
+    if(HAS_TICKET_MENSUAL){
+      const br=document.createElement('button');br.className='btn';br.textContent='+ Cobro recurrente';br.style.marginLeft='8px';br.title='Cliente que ya pagó antes y solo está cobrando otra cuota. Solo cuenta en facturación/caja.';br.onclick=()=>addCobroRecurrente(curMonth);ex.appendChild(br);
+    }
+    const bcsv=document.createElement('button');bcsv.className='btn';bcsv.textContent='⬇ Exportar CSV';bcsv.style.marginLeft='8px';bcsv.onclick=()=>exportCSV(curMonth);ex.appendChild(bcsv);
+  }
   if(page==='cuotas'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Añadir cliente';b.onclick=openAddCuota;ex.appendChild(b);}
   if(page==='renovaciones'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nueva renovación';b.onclick=openAddRenov;ex.appendChild(b);}
   if(page==='lanzamientos'){const b=document.createElement('button');b.className='btn btn-p';b.textContent='+ Nuevo lanzamiento';b.onclick=openAddLanzamiento;ex.appendChild(b);}
@@ -1396,24 +1404,39 @@ function rangeLabel(){
   return '';
 }
 
+// ── Filtros AGENDA LLAMADA + RECURRENTE ─────────────────────────
+// Una fila cuenta como "llamada agendada" si agendaLlamada !== 'NO'.
+// Datos antiguos sin el campo se consideran agendados (backwards compat).
+function agendoLlamada(r){ return r && r.agendaLlamada !== 'NO'; }
+// Una fila "recurrente" (cobro de cuota antigua) NO cuenta como cliente nuevo,
+// ni en ventas, ni en CPA, ni en embudo. Solo en facturación y caja.
+function esRecurrente(r){ return r && r.recurrente === true; }
+
 function kpisCanal(mk, canal){
   const rows=getMesRows(mk);
   const cl=rows.filter(r=>r.embudo===canal);
-  const cv=cl.filter(r=>r.estado==='Venta');
-  const realizadas=cl.filter(r=>r.asistencia==='SI').length;
+  // Llamadas agendadas (excluye agendaLlamada='NO' y cobros recurrentes)
+  const clAgend=cl.filter(r=>agendoLlamada(r) && !esRecurrente(r));
+  // Ventas reales (cliente NUEVO). Excluye cobros recurrentes.
+  const cv=cl.filter(r=>r.estado==='Venta' && !esRecurrente(r));
+  // Cierres: ventas entre las que agendaron Y asistieron
+  const cvAgendAsist=clAgend.filter(r=>r.estado==='Venta' && r.asistencia==='SI').length;
+  const realizadas=clAgend.filter(r=>r.asistencia==='SI').length;
   const kd=getMesKd(mk);
   const inv=kd.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.inversion||0),0);
   const leads=kd.filter(k=>k.canal===canal).reduce((s,k)=>s+Number(k.leads||0),0);
-  const fact=cv.reduce((s,r)=>s+Number(r.facturacion||0),0);
-  const caja=cv.reduce((s,r)=>s+Number(r.caja||0),0);
-  const llamadas=cl.length;
+  // Facturación y caja: TODAS las filas con estado=Venta del canal (incluye recurrentes para reflejar ingresos reales)
+  const cvIngresos=cl.filter(r=>r.estado==='Venta');
+  const fact=cvIngresos.reduce((s,r)=>s+Number(r.facturacion||0),0);
+  const caja=cvIngresos.reduce((s,r)=>s+Number(r.caja||0),0);
+  const llamadas=clAgend.length;
   const ticketMedio=cv.length?cv.reduce((s,r)=>s+ticketMensualizado(r),0)/cv.length:null;
   return{inv,leads,llamadas,realizadas,ventas:cv.length,fact,caja,ticketMedio,
     cpl:leads&&inv?inv/leads:null,
     costeLlamada:llamadas&&inv?inv/llamadas:null,
     pctAgend:leads?llamadas/leads:null,
     pctAsist:llamadas?realizadas/llamadas:null,
-    pctCierre:realizadas?cv.length/realizadas:null,
+    pctCierre:realizadas?cvAgendAsist/realizadas:null,
     roas:inv?fact/inv:null,roi:inv?caja/inv:null,cpa:cv.length&&inv?inv/cv.length:null};
 }
 
@@ -1464,20 +1487,26 @@ function toggleAcordeon(id){
 function renderMes(){
   const mk=mKey(curMonth);if(!S.llamadas[mk])S.llamadas[mk]=[];
   const rows=getMesRows(mk);
-  const ventas=rows.filter(r=>r.estado==='Venta');
-  const realizadas=rows.filter(r=>r.asistencia==='SI').length;
+  // Filas que SÍ agendaron llamada (excluye agendaLlamada='NO' y recurrentes).
+  const rowsAgend=rows.filter(r=>agendoLlamada(r) && !esRecurrente(r));
+  // Ventas como cliente NUEVO (excluye recurrentes).
+  const ventas=rows.filter(r=>r.estado==='Venta' && !esRecurrente(r));
+  // Ventas + recurrentes: para facturación y caja (refleja ingresos reales).
+  const ingresos=rows.filter(r=>r.estado==='Venta');
+  const realizadas=rowsAgend.filter(r=>r.asistencia==='SI').length;
+  const ventasAgendAsist=rowsAgend.filter(r=>r.estado==='Venta' && r.asistencia==='SI').length;
   const kd=getMesKd(mk);
   const inv=kd.reduce((s,k)=>s+Number(k.inversion||0),0);
   const leads=kd.reduce((s,k)=>s+Number(k.leads||0),0);
-  const fact=ventas.reduce((s,r)=>s+Number(r.facturacion||0),0);
-  const caja=ventas.reduce((s,r)=>s+Number(r.caja||0),0);
-  const llamadasTotal=rows.length;
+  const fact=ingresos.reduce((s,r)=>s+Number(r.facturacion||0),0);
+  const caja=ingresos.reduce((s,r)=>s+Number(r.caja||0),0);
+  const llamadasTotal=rowsAgend.length;
   const cpl=leads&&inv?inv/leads:null;
   const costeLlamada=llamadasTotal&&inv?inv/llamadasTotal:null;
   const pctAgend=leads?llamadasTotal/leads:null;
   const pctAsist=llamadasTotal?realizadas/llamadasTotal:null;
-  const pctCierre=realizadas?ventas.length/realizadas:null;
-  const roas=inv?fact/inv:null;const roi=inv?caja/inv:null;const cpa=ventas.length&&inv?inv/ventas.length:null;
+  const pctCierre=realizadas?ventasAgendAsist/realizadas:null;
+  const cpa=ventas.length&&inv?inv/ventas.length:null;
   const ticketMedio=ventas.length?ventas.reduce((s,r)=>s+ticketMensualizado(r),0)/ventas.length:null;
 
   const cbc={YOUTUBE:'b-red',SOCIAL:'b-blue',VSL:'b-purple','VSL ADS':'b-purple','ADS':'b-purple',QUIZ:'b-amber',WORKSHOP:'b-blue',LANZAMIENTO:'b-amber',GOOGLE:'b-red','ORGÁNICO':'b-green',ORGANICO:'b-green',REFERIDOS:'b-gray'};
@@ -1577,9 +1606,10 @@ function renderMes(){
         {title:'Resultados',dot:'#f59e0b',items:[
           ['Facturación',fmt(fact),'blue'],
           ['Caja',fmt(caja),'green'],
-          HAS_TICKET_MENSUAL?['Ticket medio',ticketMedio?fmt(ticketMedio,0):'-','purple']:null,
-          ['ROAS',roas?roas.toFixed(2)+'x':'-','amber'],
-          ['ROI',roi?roi.toFixed(2)+'x':'-','purple']
+          HAS_TICKET_MENSUAL?['Ticket medio',ticketMedio?fmt(ticketMedio,0):'-','purple']:null
+          // ROAS y ROI movidos al apartado de ADS por canal (Diego). En el agregado
+          // general no tiene sentido: la inversión está por canal, los gastos
+          // totales no incluyen costes operativos, etc.
         ]}
       ])}
     </div>
@@ -1606,6 +1636,7 @@ function renderMes(){
           <th style="min-width:120px">Fecha</th>
           <th style="min-width:120px">Teléfono</th>
           <th style="min-width:110px">Embudo</th>
+          <th style="min-width:110px" title="¿Esta persona agendó una llamada? Si NO, no cuenta en llamadas/asistencias/cierre.">Agenda llamada</th>
           <th style="min-width:90px">Closer</th>
           ${SETTERS.length?'<th style="min-width:100px">Setter</th>':''}
           <th style="min-width:100px">Asistencia</th>
@@ -1669,11 +1700,12 @@ function renderLlamadasRows(mk){
   const rows=S.llamadas[mk]||[];const tbody=document.getElementById('lb');if(!tbody)return;
   const filtered=rows.map((r,i)=>[r,i]).filter(([r])=>mesFilterMatch(r));
   const fc=document.getElementById('fcount');if(fc)fc.textContent=filtered.length===rows.length?`${rows.length} filas`:`${filtered.length} de ${rows.length} filas`;
-  tbody.innerHTML=filtered.map(([r,i])=>`<tr id="lr-${i}" style="${r.estado==='Venta'?'background:#f0fdf4':r.estado==='Perdido'?'background:#fef2f2':r.estado==='Reserva'?'background:#eff6ff':''}">
-    <td style="white-space:nowrap;display:flex;align-items:center;gap:2px"><input class="ce" value="${esc(r.nombre)}" oninput="upL('${mk}',${i},'nombre',this.value)" placeholder="Nombre completo" style="min-width:100px"><button onclick="openFicha('${mk}',${i})" title="Ver ficha" style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--blue);font-size:12px;line-height:1;flex-shrink:0">👤</button></td>
+  tbody.innerHTML=filtered.map(([r,i])=>`<tr id="lr-${i}" style="${esRecurrente(r)?'background:#f3f4f6;font-style:italic':r.estado==='Venta'?'background:#f0fdf4':r.estado==='Perdido'?'background:#fef2f2':r.estado==='Reserva'?'background:#eff6ff':''}">
+    <td style="white-space:nowrap;display:flex;align-items:center;gap:4px">${esRecurrente(r)?'<span title="Cobro recurrente — solo cuenta en facturación y caja" style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;background:#e5e7eb;color:#374151">♻ REC</span>':''}<input class="ce" value="${esc(r.nombre)}" oninput="upL('${mk}',${i},'nombre',this.value)" placeholder="Nombre completo" style="min-width:100px"><button onclick="openFicha('${mk}',${i})" title="Ver ficha" style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--blue);font-size:12px;line-height:1;flex-shrink:0">👤</button></td>
     <td><input class="ce" type="date" value="${r.fecha||''}" oninput="upL('${mk}',${i},'fecha',this.value)"></td>
     <td><input class="ce" value="${esc(r.telefono)}" oninput="upL('${mk}',${i},'telefono',this.value)" placeholder="+34..."></td>
     <td style="${colorStyle(EMBUDO_COLORS,r.embudo)}"><select class="ce" onchange="upL('${mk}',${i},'embudo',this.value)" style="min-width:100px;background:transparent;${r.embudo?'font-weight:600':''}"><option value="">-</option>${CANALES.map(c=>`<option value="${c}"${r.embudo===c?' selected':''}>${c}</option>`).join('')}</select></td>
+    <td style="${r.agendaLlamada==='NO'?'background:#fef2f2;color:#c81e1e':r.agendaLlamada==='SI'?'background:#ecfdf5;color:#047857':''}"><select class="ce" onchange="upL('${mk}',${i},'agendaLlamada',this.value)" style="min-width:90px;background:transparent;${r.agendaLlamada?'font-weight:600':''}"><option value="">-</option><option value="SI"${r.agendaLlamada==='SI'?' selected':''}>SI</option><option value="NO"${r.agendaLlamada==='NO'?' selected':''}>NO</option></select></td>
     <td><select class="ce" onchange="upL('${mk}',${i},'closer',this.value)" style="min-width:80px"><option value="">-</option>${CLOSERS.map(c=>`<option value="${c}"${r.closer===c?' selected':''}>${c}</option>`).join('')}</select></td>
     ${SETTERS.length?`<td><input class="ce" value="${esc(r.setter||'')}" oninput="upL('${mk}',${i},'setter',this.value)" placeholder="Setter" style="min-width:90px"></td>`:''}
     <td style="${colorStyle(ASISTENCIA_COLORS,r.asistencia)}"><select class="ce" onchange="upL('${mk}',${i},'asistencia',this.value)" style="min-width:95px;background:transparent;${r.asistencia?'font-weight:600':''}"><option value="">-</option>${['SI','NO','PENDIENTE'].map(v=>`<option value="${v}"${r.asistencia===v?' selected':''}>${v}</option>`).join('')}</select></td>
@@ -1723,12 +1755,17 @@ function upLNum(mk,i,f,v){
 function upLPlan(mk,i,plan){
   const row=S.llamadas[mk][i];
   row.plan=plan;
-  // Auto-fill facturación + caja based on plan
-  const PLAN_AMOUNTS={PRO:247,BUSINESS:397,ANUAL:4000};
-  if(plan && PLAN_AMOUNTS[plan]){
+  // Auto-fill facturación + caja según plan.
+  // PRO y BUSINESS: importe fijo (suscripción recurrente).
+  // ANUAL = pago único de cuantía variable → Diego lo rellena manualmente.
+  const PLAN_AMOUNTS={PRO:247,BUSINESS:374};
+  if(plan==='ANUAL'){
+    // Solo setear mesesServicio. NO tocar facturación ni caja (Diego rellena).
+    row.mesesServicio=12;
+  } else if(plan && PLAN_AMOUNTS[plan]){
     row.facturacion=PLAN_AMOUNTS[plan];
     row.caja=PLAN_AMOUNTS[plan];
-    row.mesesServicio=plan==='ANUAL'?12:1;
+    row.mesesServicio=1;
   }
   save();syncCuota(mk,i);renderLlamadasRows(mk);
 }
@@ -1769,20 +1806,44 @@ function syncCuota(mk,i){
   if(r.estado!=='Venta') return;
   const key=(r.nombre||'').toUpperCase().trim();
   if(!key) return;
-  const fechaI=r.fecha||mKey(curMonth)+'-01';
+  const fechaI=r.fecha||mk+'-01';
   const q=inferirNCuotas(r);
   const meses=Number(r.mesesServicio)||q||1;
   const existing=S.cuotas.find(c=>c.nombre===key);
+  // En cobros recurrentes (cliente ya existente que paga otra cuota) NO recrear,
+  // solo añadir el pago al mes mk de la cuota persistente.
+  if(esRecurrente(r)){
+    if(!existing) return; // sin cuota previa, no sabemos a quién imputar
+    if(!existing.pagos||typeof existing.pagos!=='object')existing.pagos={};
+    // Sumar (no sobreescribir) por si hay varios cobros recurrentes en el mismo mes.
+    existing.pagos[mk]=(Number(existing.pagos[mk])||0)+(Number(r.caja)||0);
+    return;
+  }
   if(existing){
-    existing.ticket=r.facturacion||0;
-    existing.nCuotas=q;
-    existing.fechaInicio=fechaI;
-    existing.embudo=r.embudo||existing.embudo;
-    existing.entrenador=r.entrenador||existing.entrenador;
-    // Always update mesesServicio — this drives getVenc()
-    existing.mesesServicio=meses;
+    // No pisar las cuotas que vienen de GHL (source='ghl'): solo actualiza
+    // datos básicos y el pago del mes.
+    if(existing.source!=='ghl'){
+      existing.ticket=r.facturacion||existing.ticket||0;
+      existing.nCuotas=q;
+      existing.fechaInicio=fechaI;
+      existing.embudo=r.embudo||existing.embudo;
+      existing.entrenador=r.entrenador||existing.entrenador;
+      existing.mesesServicio=meses;
+    }
+    // Para HAS_TICKET_MENSUAL (Zerochats): registrar el cobro del mes actual
+    // en pagos persistentes para que dashboard/cuotas lo vean automáticamente.
+    if(HAS_TICKET_MENSUAL){
+      if(!existing.pagos||typeof existing.pagos!=='object')existing.pagos={};
+      const caja=Number(r.caja)||0;
+      if(caja>0)existing.pagos[mk]=caja;
+    }
   } else {
-    S.cuotas.push({nombre:key,fechaInicio:fechaI,ticket:r.facturacion||0,nCuotas:q,mesesServicio:meses,pagos:{},embudo:r.embudo||'YOUTUBE',entrenador:r.entrenador||''});
+    const pagos={};
+    if(HAS_TICKET_MENSUAL){
+      const caja=Number(r.caja)||0;
+      if(caja>0)pagos[mk]=caja;
+    }
+    S.cuotas.push({nombre:key,fechaInicio:fechaI,ticket:r.facturacion||0,nCuotas:q,mesesServicio:meses,pagos,embudo:r.embudo||'YOUTUBE',entrenador:r.entrenador||'',source:'manual',plan:r.plan||null});
   }
 }
 // Sync masivo: recorre TODAS las ventas en S.llamadas y sincroniza con S.cuotas.
@@ -1838,7 +1899,25 @@ function delL(mk,i){
 }
 function addLlamadaRow(mi){
   const mk=mKey(mi);if(!S.llamadas[mk])S.llamadas[mk]=[];
-  S.llamadas[mk].push({nombre:'',fecha:'',telefono:'',embudo:'',closer:'',asistencia:'',incidencia:'',estado:'',facturacion:0,caja:0,nCuotas:1,comentarios:'',entrenador:'',year:curYear});
+  S.llamadas[mk].push({nombre:'',fecha:'',telefono:'',embudo:'',agendaLlamada:'',closer:'',asistencia:'',incidencia:'',estado:'',facturacion:0,caja:0,nCuotas:1,comentarios:'',entrenador:'',year:curYear});
+  save();renderMes();
+  setTimeout(()=>{const lb=document.getElementById('lb');if(lb){const last=lb.querySelector('tr:last-child');if(last){last.scrollIntoView({behavior:'smooth',block:'nearest'});const inp=last.querySelector('input');if(inp)inp.focus();}}},80);
+}
+
+// Añade una fila de "cobro recurrente": un pago de un cliente ya existente que
+// pagó en cuotas. Solo cuenta en facturación/caja, NO en embudo/CPA/ventas-nuevas.
+// Diego marca recurrente=true; el flag esRecurrente(r) excluye estas filas de
+// llamadas agendadas, asistencias, cierre, CPA, ticket medio, etc.
+function addCobroRecurrente(mi){
+  const mk=mKey(mi);
+  if(!S.llamadas[mk])S.llamadas[mk]=[];
+  S.llamadas[mk].push({
+    nombre:'',fecha:'',telefono:'',embudo:'',agendaLlamada:'NO',
+    closer:'',asistencia:'',incidencia:'',estado:'Venta',
+    facturacion:0,caja:0,nCuotas:1,comentarios:'Cobro recurrente',
+    entrenador:'',year:curYear,
+    recurrente:true
+  });
   save();renderMes();
   setTimeout(()=>{const lb=document.getElementById('lb');if(lb){const last=lb.querySelector('tr:last-child');if(last){last.scrollIntoView({behavior:'smooth',block:'nearest'});const inp=last.querySelector('input');if(inp)inp.focus();}}},80);
 }
@@ -2294,12 +2373,12 @@ let cuotaPlanFilter='all';   // 'all' | 'PRO' | 'BUSINESS' | 'ANUAL' | 'sin'
 let cuotaFechaDesde='';      // YYYY-MM-DD
 let cuotaFechaHasta='';      // YYYY-MM-DD
 function renderCuotas(){
-  // Auto-sync: cualquier venta en S.llamadas que no esté en S.cuotas se crea automáticamente.
-  // Skip Zerochats (HAS_TICKET_MENSUAL) porque tiene su propio modelo persistente.
-  if(!HAS_TICKET_MENSUAL){
-    const r=syncTodasLlamadasACuotas();
-    if(r && (r.creadas>0 || r.actualizadas>0)) save();
-  }
+  // Auto-sync: cualquier venta en S.llamadas que no esté en S.cuotas se crea
+  // automáticamente. Para Zerochats (HAS_TICKET_MENSUAL) syncCuota respeta
+  // las cuotas de GHL (source='ghl') y solo añade el pago del mes mk a
+  // c.pagos para que el dashboard refleje las ventas manuales sin pisar GHL.
+  const r=syncTodasLlamadasACuotas();
+  if(r && (r.creadas>0 || r.actualizadas>0)) save();
   const todayM=todayMonth();
   let totalFact, totalCaja, cajaPendiente;
   if(HAS_TICKET_MENSUAL){
@@ -2347,11 +2426,37 @@ function renderCuotas(){
       const hoyM = new Date().getMonth();
       const hoyY = new Date().getFullYear();
 
-      function fila(titulo, emoji, datosAnio, colorPos, colorPosL, mediaVal) {
+      // Churn rate: bajas / activos. Calculado por mes y promedio.
+      // Activos = clientes activos al inicio del mes (no perdidos antes del mes).
+      const activosPorMes = MONTHS.map((_,mi) => {
+        const finMes = new Date(curYear, mi+1, 0);
+        return S.cuotas.filter(c => {
+          if(c.source==='auto-renew') return false; // las propias renovaciones autogeneradas no son clientes
+          if(!c.fechaInicio) return false;
+          const inicio = new Date(c.fechaInicio);
+          if(inicio > finMes) return false; // todavía no era cliente
+          if(c.perdido && c.fechaPerdido){
+            const fp = new Date(c.fechaPerdido);
+            if(fp < new Date(curYear, mi, 1)) return false; // se perdió antes del mes
+          }
+          return true;
+        }).length;
+      });
+      const churnPorMes = MONTHS.map((_,mi) => {
+        const a = activosPorMes[mi] || 0;
+        const b = bajasAnio[mi].length;
+        return a ? (b/a) : 0;
+      });
+      const churnMedio = mesesTrans
+        ? churnPorMes.slice(0, mesesTrans).reduce((s,v)=>s+v,0) / mesesTrans
+        : 0;
+      const fmtPctC = v => v ? (v*100).toFixed(1)+'%' : '0%';
+
+      function fila(titulo, emoji, datosAnio, colorPos, colorPosL, mediaVal, extra) {
         return `<div class="card" style="margin-bottom:10px;padding:14px 18px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap">
             <span style="font-size:13px;font-weight:600">${emoji} ${titulo} — ${curYear}</span>
-            <span style="font-size:12px;color:var(--text3)">Media: <strong style="color:var(--text)">${mediaVal}/mes</strong></span>
+            <span style="font-size:12px;color:var(--text3)">Media: <strong style="color:var(--text)">${mediaVal}/mes</strong>${extra||''}</span>
           </div>
           <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:6px;text-align:center">
             ${MONTHS.map((m,mi)=>{
@@ -2369,8 +2474,11 @@ function renderCuotas(){
         </div>`;
       }
 
+      // Extra para la fila de Bajas: % churn (bajas / activos medios).
+      const churnExtra = ` &nbsp;·&nbsp; Churn: <strong style="color:${churnMedio>0.05?'var(--red)':'var(--text)'}">${fmtPctC(churnMedio)}</strong>`;
+
       return fila('Altas por mes','📈',altasAnio,'var(--green)','var(--green-l)',mediaAltas)
-           + fila('Bajas por mes','📉',bajasAnio,'var(--red)','var(--red-l)',mediaBajas)
+           + fila('Bajas por mes','📉',bajasAnio,'var(--red)','var(--red-l)',mediaBajas, churnExtra)
            + fila('Renovaciones por mes','🔄',renovsAnio,'var(--blue)','var(--blue-l)',mediaRenovs);
     })()}
     <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Caja por cobrar desde ${MFULL[todayM]} (día ${todayDayOfMonth()}) en adelante.</div>`:''}
@@ -3151,15 +3259,21 @@ function vistaKpisMes(mk, filtro){
   const rows = getMesRows(mk);
   const kd = getMesKd(mk);
   const cl = filtro==='GENERAL' ? rows : rows.filter(r=>String(r.embudo||'').toUpperCase()===filtro);
-  const cv = cl.filter(r=>r.estado==='Venta');
-  const realizadas = cl.filter(r=>r.asistencia==='SI').length;
+  // Llamadas agendadas (excluye agendaLlamada='NO' y cobros recurrentes)
+  const clAgend = cl.filter(r=>agendoLlamada(r) && !esRecurrente(r));
+  // Ventas (cliente nuevo) excluye recurrentes
+  const cv = cl.filter(r=>r.estado==='Venta' && !esRecurrente(r));
+  // Ingresos: TODAS las ventas (incluye recurrentes) para facturación/caja
+  const ingresos = cl.filter(r=>r.estado==='Venta');
+  const realizadas = clAgend.filter(r=>r.asistencia==='SI').length;
+  const ventasAgendAsist = clAgend.filter(r=>r.estado==='Venta' && r.asistencia==='SI').length;
   const inv = (filtro==='GENERAL' ? kd : kd.filter(k=>String(k.canal||'').toUpperCase()===filtro))
     .reduce((s,k)=>s+Number(k.inversion||0),0);
   const leads = (filtro==='GENERAL' ? kd : kd.filter(k=>String(k.canal||'').toUpperCase()===filtro))
     .reduce((s,k)=>s+Number(k.leads||0),0);
-  const fact = cv.reduce((s,r)=>s+Number(r.facturacion||0),0);
-  const caja = cv.reduce((s,r)=>s+Number(r.caja||0),0);
-  const llamadas = cl.length;
+  const fact = ingresos.reduce((s,r)=>s+Number(r.facturacion||0),0);
+  const caja = ingresos.reduce((s,r)=>s+Number(r.caja||0),0);
+  const llamadas = clAgend.length;
   const ventas = cv.length;
   return {
     inv, leads, llamadas, realizadas, ventas, fact, caja,
@@ -3168,7 +3282,7 @@ function vistaKpisMes(mk, filtro){
     costeAsist: realizadas&&inv ? inv/realizadas : null,
     pctAgend: leads ? llamadas/leads : null,
     pctAsist: llamadas ? realizadas/llamadas : null,
-    pctCierre: realizadas ? ventas/realizadas : null,
+    pctCierre: realizadas ? ventasAgendAsist/realizadas : null,
     cac: ventas&&inv ? inv/ventas : null,
     roas: inv ? fact/inv : null,
     roi: inv ? caja/inv : null,
@@ -3239,13 +3353,24 @@ function renderVistaGlobal(){
       { label:'% Cierre',           get:m=>m.pctCierre,    fmt:fmtPct },
       { label:'Ventas totales',     get:m=>m.ventas,       fmt:fmtNum },
     ]},
-    { titulo:'RETORNO', bg:'#fef3c7', bgAlt:'#fffbeb', label:'#92400e', filas:[
-      { label:'Facturación',        get:m=>m.fact,         fmt:fmtEur },
-      { label:'Caja',               get:m=>m.caja,         fmt:fmtEur },
-      { label:'ROI',                get:m=>m.roi,          fmt:fmtMul },
-      { label:'ROAS',               get:m=>m.roas,         fmt:fmtMul },
-      { label:'CAC',                get:m=>m.cac,          fmt:fmtEur },
-    ]},
+    { titulo:'RETORNO', bg:'#fef3c7', bgAlt:'#fffbeb', label:'#92400e', filas:(()=>{
+      // ROI / ROAS / CAC solo tienen sentido cuando hay inversión asignada al
+      // filtro. En GENERAL la inversión total no incluye costes operativos
+      // (solo ads), así que el ratio es engañoso. En REFERIDOS/ORGÁNICO no hay
+      // inversión publicitaria. Por eso solo se muestran en canales de ads.
+      const NO_ADS_FILTROS = ['GENERAL','REFERIDOS','ORGÁNICO','ORGANICO'];
+      const mostrarRatios = !NO_ADS_FILTROS.includes(filtro);
+      const base = [
+        { label:'Facturación',        get:m=>m.fact,         fmt:fmtEur },
+        { label:'Caja',               get:m=>m.caja,         fmt:fmtEur },
+      ];
+      if(mostrarRatios){
+        base.push({ label:'ROI',  get:m=>m.roi,  fmt:fmtMul });
+        base.push({ label:'ROAS', get:m=>m.roas, fmt:fmtMul });
+        base.push({ label:'CAC',  get:m=>m.cac,  fmt:fmtEur });
+      }
+      return base;
+    })()},
   ];
 
   // Línea vertical fina entre meses, ligeramente más fuerte antes de TOTAL.
