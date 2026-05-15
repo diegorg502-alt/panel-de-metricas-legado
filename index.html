@@ -1502,7 +1502,12 @@ function renderMes(){
   const ventasAgendAsist=rowsAgend.filter(r=>r.estado==='Venta' && r.asistencia==='SI').length;
   const kd=getMesKd(mk);
   const inv=kd.reduce((s,k)=>s+Number(k.inversion||0),0);
-  const leads=kd.reduce((s,k)=>s+Number(k.leads||0),0);
+  // LEADS TOTALES (agregado): todas las personas registradas en el mes,
+  // independientemente del embudo (ads, referidos, orgánico, webhook GHL...).
+  // No es lo mismo que los "leads de ads" (esos viven en cada acordeón de canal
+  // ADS y vienen de S.kpis_diarios / Meta API). Aquí: 1 fila = 1 lead. Se
+  // excluyen recurrentes (no son leads nuevos, solo cobros).
+  const leads=rows.filter(r=>!esRecurrente(r)).length;
   const fact=ingresos.reduce((s,r)=>s+Number(r.facturacion||0),0);
   const caja=ingresos.reduce((s,r)=>s+Number(r.caja||0),0);
   const llamadasTotal=rowsAgend.length;
@@ -1591,13 +1596,13 @@ function renderMes(){
         </div>
       </div>
       ${kpiGroups([
-        // KPIs totales agregados — Diego pidió métricas operativas, no de tráfico.
-        // Inversión/CPL/€-Llamada/CPA se ven en cada acordeón de canal de ads,
-        // donde la inversión sí está asignada a un embudo concreto.
-        {title:'Tráfico',dot:'#3b82f6',items:[
-          ['Leads totales',leads,'']
-        ]},
+        // KPIs totales agregados — métricas operativas globales.
+        // "Tráfico" (inversión/CPL/CPA/etc) NO va aquí porque solo aplica a ads;
+        // está en los acordeones de cada canal ADS.
+        // Leads totales = TODAS las personas registradas en el mes (cualquier
+        // embudo), no solo las que vienen de ads.
         {title:'Embudo',dot:'#8b5cf6',items:[
+          ['Leads totales',leads,''],
           ['Llamadas agendadas',llamadasTotal,''],
           ['% Agendamiento',pctAgend!=null?(pctAgend*100).toFixed(1)+'%':'-',''],
           ['% Asistencia',pctAsist!=null?(pctAsist*100).toFixed(1)+'%':'-',''],
@@ -3272,8 +3277,19 @@ function vistaKpisMes(mk, filtro){
   const ventasAgendAsist = clAgend.filter(r=>r.estado==='Venta' && r.asistencia==='SI').length;
   const inv = (filtro==='GENERAL' ? kd : kd.filter(k=>String(k.canal||'').toUpperCase()===filtro))
     .reduce((s,k)=>s+Number(k.inversion||0),0);
-  const leads = (filtro==='GENERAL' ? kd : kd.filter(k=>String(k.canal||'').toUpperCase()===filtro))
-    .reduce((s,k)=>s+Number(k.leads||0),0);
+  // Leads:
+  // - GENERAL → todas las personas registradas en el mes (no solo ads).
+  // - Canal específico → leads de Meta Ads para ese canal (de S.kpis_diarios).
+  //   Si el canal no tiene datos de Meta (REFERIDOS/ORGÁNICO), cuenta filas
+  //   filtradas por embudo en S.llamadas.
+  let leads;
+  if(filtro==='GENERAL'){
+    leads = cl.filter(r=>!esRecurrente(r)).length;
+  } else {
+    const metaLeads = kd.filter(k=>String(k.canal||'').toUpperCase()===filtro)
+      .reduce((s,k)=>s+Number(k.leads||0),0);
+    leads = metaLeads > 0 ? metaLeads : cl.filter(r=>!esRecurrente(r)).length;
+  }
   const fact = ingresos.reduce((s,r)=>s+Number(r.facturacion||0),0);
   const caja = ingresos.reduce((s,r)=>s+Number(r.caja||0),0);
   const llamadas = clAgend.length;
