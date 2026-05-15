@@ -9,15 +9,14 @@ Empezamos a partir del 2026-05-07 — cambios anteriores ver `git log`.
 
 > Estas reglas se aplican a TODOS los cambios futuros. Si añades una nueva feature, lee esta sección antes y verifica que la cumples.
 
-### R1 — Admin siempre ve toda nueva feature
-**Cualquier nueva sección/página/funcionalidad de UI debe estar visible cuando el usuario es admin (`IS_ADMIN=true`)**, independientemente del cliente que tenga seleccionado en el dropdown. Diego usa el modo admin para inspeccionar, debuguear y soportar — no puede haber features que se le oculten.
+### R1 — Admin = vista del cliente activo (DEROGADA la versión 2026-05-08)
+**Cuando el admin selecciona un cliente del dropdown, ve EXACTAMENTE las mismas secciones que vería ese cliente al loguearse.** Si un cliente no tiene una feature activada, el admin tampoco la ve para ese cliente.
 
-Implementación obligatoria: cuando crees una nueva feature flag en `crm_clients` (ej. `has_X`), debes:
-1. Cargarla en `loadClientConfig`: `HAS_X = data.has_x || false;`
-2. Forzarla a `true` en admin: añadirla al bloque `if (IS_ADMIN) { HAS_X = true; ... }` al final de `loadClientConfig`.
-3. Documentar en este CHANGELOG bajo qué condiciones la feature se muestra.
+Razón del cambio: Zerochats (auto_renew) no tiene lanzamientos ni renovaciones; cuando admin lo seleccionaba aparecían igualmente y confundían el panel. Diego pidió respetar los flags del cliente al 100%.
 
-**Excepción**: flags que cambian interpretación de datos (no solo visibilidad), como `HAS_TICKET_MENSUAL`, `SEMANAS_MODO`, `auto_renew` — esos NO se fuerzan en admin porque romperían el render de clientes que no lo tengan.
+Implementación: en `loadClientConfig` NO hay overrides para admin. Los flags `HAS_LANZAMIENTOS`, `HAS_UTMS`, `HAS_ESCALADO`, `HAS_VISTA_GLOBAL`, `SHOW_RENOVACIONES`, `SHOW_ALERTAS`, `SHOW_IA`, etc., toman su valor directamente de `crm_clients` (o de la lógica derivada como `auto_renew`).
+
+Si Diego necesita probar una feature en un cliente que no la tiene, debe activar el flag temporalmente en `crm_clients`.
 
 ### R2 — Backups antes de cualquier UPDATE masivo en `crm_data`
 Ver `DATA_PROTECTION_RULES.md`. Resumen:
@@ -35,6 +34,13 @@ Tras mergear, añadir entrada al CHANGELOG con: archivos afectados, qué se camb
 ---
 
 ## 2026-05-15
+
+### Admin = vista del cliente activo (derogada R1 original)
+- **Archivo**: `index.html` (loadClientConfig)
+- **Qué**: eliminado el bloque `if(IS_ADMIN){...}` que forzaba `HAS_VISTA_GLOBAL`, `HAS_LANZAMIENTOS`, `HAS_UTMS`, `HAS_ESCALADO` y `SHOW_RENOVACIONES` a `true` cuando el usuario es admin.
+- **Resultado**: cuando Diego (admin) selecciona Zerochats del dropdown, NO ve Lanzamientos ni Renovaciones (porque Zerochats es auto_renew). Si selecciona Lucas, sí ve Vista global (porque Lucas la tiene activada).
+- **Por qué**: la R1 original confundía el panel — admin veía secciones que el cliente real no tiene. Diego prefiere fidelidad 1:1 con la vista del cliente.
+- **Regla R1 actualizada** al inicio del CHANGELOG.
 
 ### BUSINESS: facturación 397€ vs caja 374€ (Diego corrige modelo)
 - **Razón**: BUSINESS factura **397€** (precio plan) y entra **374€** en caja (comisión Stripe 23€). Antes lo había unificado erróneamente todo a 374€.
