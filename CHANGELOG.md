@@ -36,6 +36,18 @@ Tras mergear, añadir entrada al CHANGELOG con: archivos afectados, qué se camb
 
 ## 2026-05-15
 
+### KPIs totales del mes — limpieza (solo métricas operativas)
+- **Archivo**: `index.html` (`renderMes`)
+- **Qué**: el bloque "KPIs totales — Mayo 2026" del mes pasa a mostrar SOLO:
+  - **Tráfico**: Leads totales
+  - **Embudo**: Llamadas agendadas, % Agendamiento, % Asistencia, Llamadas realizadas
+  - **Conversión**: Ventas, % Cierre
+  - **Resultados**: Facturación, Caja, Ticket medio
+- **Quitado del agregado**: Inversión, CPL, €/Llamada, CPA. Estas métricas dependen del canal (cada ads tiene su inversión) y mezclarlas en el total general daba ratios engañosos.
+- **Ticket medio** ya no condicionado a HAS_TICKET_MENSUAL — ahora se muestra para todos los clientes.
+- **Acordeones de ADS por canal**: siguen completos con Tráfico (incluye Inversión/CPL/€-Llamada) + Embudo + Conversión (con CPA) + Resultados (con ROAS/ROI). Ahí la inversión está asignada al canal y los ratios tienen sentido.
+- **Acordeones de Referidos/Orgánico**: sin cambios (siguen reducidos sin inversión ni ratios).
+
 ### Color en celda AGENDA LLAMADA (KPIs por mes)
 - **Archivo**: `index.html`
 - **Qué**: la celda "Agenda llamada" ahora usa el mismo patrón visual que Asistencia/Estado/Embudo via `AGENDA_COLORS` + `colorStyle()`. Verde claro para SI, rojo claro para NO, vacío sin color.
