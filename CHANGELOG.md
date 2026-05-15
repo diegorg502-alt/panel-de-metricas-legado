@@ -36,6 +36,19 @@ Tras mergear, añadir entrada al CHANGELOG con: archivos afectados, qué se camb
 
 ## 2026-05-15
 
+### agendoLlamada estricto + nueva métrica "% Cierre leads"
+- **Archivo**: `index.html` (`agendoLlamada`, `renderMes`, `kpisCanal`, `vistaKpisMes`, `renderVistaGlobal`)
+- **agendoLlamada(r)** ahora es estricto:
+  - `agendaLlamada === 'SI'` → cuenta como agendada ✓
+  - `agendaLlamada === 'NO'` → no cuenta ✓
+  - **vacío / undefined** → **NO cuenta** (antes contaba)
+  - **Excepción de compat**: filas sin `agendaLlamada` pero con `asistencia` marcada (SI/NO) — se consideran agendadas. Esto preserva los datos importados de Lucas que no tienen el campo nuevo pero sí asistencia.
+- **% Cierre leads** (nueva): `ventas / leads totales`. Conversión completa del embudo (a diferencia del % Cierre clásico que es `ventas / realizadas` = closing skill). Visible en:
+  - KPIs totales del mes (grupo Conversión).
+  - Acordeones de canal ADS (grupo Conversión).
+  - Vista Global (grupo CLOSING, justo debajo de % Cierre).
+- **Por qué**: las filas de Zerochats actuales (leads del webhook GHL) llegan con `asistencia=PENDIENTE` y sin `agendaLlamada`. Antes contaban todas como agendadas → 100% Agendamiento falso. Ahora solo cuentan cuando Diego marca explícitamente SI.
+
 ### Leads totales del mes = TODAS las personas registradas (no solo de ads)
 - **Archivo**: `index.html` (`renderMes`, `vistaKpisMes`)
 - **Qué**: la métrica "Leads totales" del agregado mensual pasa a contar **TODAS las filas no recurrentes de `S.llamadas[mk]`** (cualquier embudo: ads, referidos, orgánico, webhook GHL...) en lugar de solo los leads de Meta Ads (`S.kpis_diarios`).

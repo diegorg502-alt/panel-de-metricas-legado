@@ -1410,9 +1410,19 @@ function rangeLabel(){
 }
 
 // ── Filtros AGENDA LLAMADA + RECURRENTE ─────────────────────────
-// Una fila cuenta como "llamada agendada" si agendaLlamada !== 'NO'.
-// Datos antiguos sin el campo se consideran agendados (backwards compat).
-function agendoLlamada(r){ return r && r.agendaLlamada !== 'NO'; }
+// Una fila cuenta como "llamada agendada" si:
+//   - agendaLlamada === 'SI' (explícito)
+//   - o si tiene asistencia marcada (SI/NO) sin el campo agendaLlamada
+//     definido (backwards compat con datos importados antes de añadir la columna,
+//     ej. import histórico de Lucas).
+// agendaLlamada === 'NO' o vacío sin asistencia → NO cuenta.
+function agendoLlamada(r){
+  if (!r) return false;
+  if (r.agendaLlamada === 'SI') return true;
+  if (r.agendaLlamada === 'NO') return false;
+  // Compat: datos antiguos sin agendaLlamada pero con asistencia=SI/NO
+  return r.asistencia === 'SI' || r.asistencia === 'NO';
+}
 // Una fila "recurrente" (cobro de cuota antigua) NO cuenta como cliente nuevo,
 // ni en ventas, ni en CPA, ni en embudo. Solo en facturación y caja.
 function esRecurrente(r){ return r && r.recurrente === true; }
@@ -1442,6 +1452,7 @@ function kpisCanal(mk, canal){
     pctAgend:leads?llamadas/leads:null,
     pctAsist:llamadas?realizadas/llamadas:null,
     pctCierre:realizadas?cvAgendAsist/realizadas:null,
+    pctCierreLeads:leads?cv.length/leads:null,
     roas:inv?fact/inv:null,roi:inv?caja/inv:null,cpa:cv.length&&inv?inv/cv.length:null};
 }
 
@@ -1516,6 +1527,8 @@ function renderMes(){
   const pctAgend=leads?llamadasTotal/leads:null;
   const pctAsist=llamadasTotal?realizadas/llamadasTotal:null;
   const pctCierre=realizadas?ventasAgendAsist/realizadas:null;
+  // % Cierre sobre leads totales: ventas / leads (conversión completa del embudo).
+  const pctCierreLeads=leads?ventas.length/leads:null;
   const cpa=ventas.length&&inv?inv/ventas.length:null;
   const ticketMedio=ventas.length?ventas.reduce((s,r)=>s+ticketMensualizado(r),0)/ventas.length:null;
 
@@ -1546,6 +1559,7 @@ function renderMes(){
       {title:'Conversión',dot:'#10b981',items:[
         ['Ventas',ks.ventas,'green'],
         ['% Cierre',ks.pctCierre!=null?(ks.pctCierre*100).toFixed(1)+'%':'-','blue'],
+        ['% Cierre leads',ks.pctCierreLeads!=null?(ks.pctCierreLeads*100).toFixed(1)+'%':'-','blue'],
         ['CPA',ks.cpa?fmt(ks.cpa,2):'-','']
       ]},
       {title:'Resultados',dot:'#f59e0b',items:[
@@ -1610,7 +1624,10 @@ function renderMes(){
         ]},
         {title:'Conversión',dot:'#10b981',items:[
           ['Ventas',ventas.length,'green'],
-          ['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue']
+          // % Cierre = ventas que asistieron / realizadas (closing skill)
+          ['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue'],
+          // % Cierre leads = ventas / leads totales (conversión completa del embudo)
+          ['% Cierre leads',pctCierreLeads!=null?(pctCierreLeads*100).toFixed(1)+'%':'-','blue']
         ]},
         {title:'Resultados',dot:'#f59e0b',items:[
           ['Facturación',fmt(fact),'blue'],
@@ -3302,6 +3319,7 @@ function vistaKpisMes(mk, filtro){
     pctAgend: leads ? llamadas/leads : null,
     pctAsist: llamadas ? realizadas/llamadas : null,
     pctCierre: realizadas ? ventasAgendAsist/realizadas : null,
+    pctCierreLeads: leads ? ventas/leads : null,
     cac: ventas&&inv ? inv/ventas : null,
     roas: inv ? fact/inv : null,
     roi: inv ? caja/inv : null,
@@ -3342,6 +3360,7 @@ function renderVistaGlobal(){
   tot.pctAgend = tot.leads ? tot.llamadas/tot.leads : null;
   tot.pctAsist = tot.llamadas ? tot.realizadas/tot.llamadas : null;
   tot.pctCierre = tot.realizadas ? tot.ventas/tot.realizadas : null;
+  tot.pctCierreLeads = tot.leads ? tot.ventas/tot.leads : null;
   tot.cac = tot.ventas&&tot.inv ? tot.inv/tot.ventas : null;
   tot.roas = tot.inv ? tot.fact/tot.inv : null;
   tot.roi = tot.inv ? tot.caja/tot.inv : null;
@@ -3369,8 +3388,9 @@ function renderVistaGlobal(){
       { label:'Coste por asistencia', get:m=>m.costeAsist, fmt:fmtEur },
     ]},
     { titulo:'CLOSING', bg:'#d1fae5', bgAlt:'#ecfdf5', label:'#047857', filas:[
-      { label:'% Cierre',           get:m=>m.pctCierre,    fmt:fmtPct },
-      { label:'Ventas totales',     get:m=>m.ventas,       fmt:fmtNum },
+      { label:'% Cierre',           get:m=>m.pctCierre,      fmt:fmtPct },
+      { label:'% Cierre leads',     get:m=>m.pctCierreLeads, fmt:fmtPct },
+      { label:'Ventas totales',     get:m=>m.ventas,         fmt:fmtNum },
     ]},
     { titulo:'RETORNO', bg:'#fef3c7', bgAlt:'#fffbeb', label:'#92400e', filas:(()=>{
       // ROI / ROAS / CAC solo tienen sentido cuando hay inversión asignada al
