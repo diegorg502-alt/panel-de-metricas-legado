@@ -36,6 +36,14 @@ Tras mergear, añadir entrada al CHANGELOG con: archivos afectados, qué se camb
 
 ## 2026-05-15
 
+### Leads totales del mes = TODAS las personas registradas (no solo de ads)
+- **Archivo**: `index.html` (`renderMes`, `vistaKpisMes`)
+- **Qué**: la métrica "Leads totales" del agregado mensual pasa a contar **TODAS las filas no recurrentes de `S.llamadas[mk]`** (cualquier embudo: ads, referidos, orgánico, webhook GHL...) en lugar de solo los leads de Meta Ads (`S.kpis_diarios`).
+- **Por qué**: los leads de ads son un subconjunto. Hasta ahora coincidían porque solo se metían leads de ads, pero al activar el webhook GHL llegan registros de otros embudos. El agregado debe reflejar TODO.
+- **% Agendamiento** del agregado ahora se calcula sobre el total de leads CRM (`llamadasAgendadas / leadsTotales`). Algunos leads no agendarán llamada → % < 100%.
+- **Tráfico** desaparece del bloque de KPIs totales (solo aplicaba a ads). La inversión/CPL/CPA siguen visibles en los acordeones por canal de ADS.
+- **Vista Global**: filtro GENERAL usa la misma lógica (leads CRM). Filtros por canal específico siguen usando leads de Meta Ads (precisos para ads), con fallback a filas del CRM cuando Meta no tiene datos (REFERIDOS/ORGÁNICO).
+
 ### KPIs totales del mes — limpieza (solo métricas operativas)
 - **Archivo**: `index.html` (`renderMes`)
 - **Qué**: el bloque "KPIs totales — Mayo 2026" del mes pasa a mostrar SOLO:
