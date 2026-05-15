@@ -34,9 +34,19 @@ Tras mergear, añadir entrada al CHANGELOG con: archivos afectados, qué se camb
 
 ---
 
+## 2026-05-15
+
+### Edge function nueva: `ghl-registrado-webhook` v1
+- **Archivo nuevo**: `supabase/functions/ghl-registrado-webhook/index.ts`.
+- **Endpoint**: `POST https://obeopzavwnquapjdjwrx.supabase.co/functions/v1/ghl-registrado-webhook`.
+- **Verify JWT**: false. Auth opcional con header `X-Webhook-Secret` (env var `GHL_WEBHOOK_SECRET`).
+- **Qué hace**: cuando GHL POSTea un contacto (tag "registrado"), añade una fila a `S.llamadas[YYYY-MM]` del cliente correspondiente. Mapeo `locationId → record_id` (hoy solo Zerochats). Embudo detectado por tags ("templado"/"warm"→QUIZ TEMPLADO, "vsl"→VSL, etc., default QUIZ).
+- **Idempotencia**: si ya existe llamada con ese `ghl_contact_id` en cualquier mes del año, no duplica.
+- **Por qué**: complementa el cron diario `sync-ghl-zerochats` (que solo trae quien YA tiene plan) con sync real-time de leads recién registrados.
+
 ## 2026-05-08
 
-### PR (a abrir) — Tanda Zerochats: 8 cambios funcionales
+### PR #33 — Tanda Zerochats: 8 cambios funcionales
 
 **Archivos**: `index.html`, `supabase/functions/sync-meta-ads/index.ts`, `supabase/functions/sync-ghl-zerochats/index.ts`.
 
