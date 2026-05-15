@@ -1091,9 +1091,29 @@ function getLTV(c){
   const rs=S.renovaciones.filter(r=>r.nombre===c.nombre);
   return Number(c.ticket||0)+rs.reduce((s,r)=>s+Number(r.ticket||0),0);
 }
-// Facturación de una cuota: suma de TODOS los pagos del año (incluye futuros del mismo año).
+// Mapeo caja neta → facturación bruta para clientes Zerochats.
+// El sistema almacena pagos[mes] = caja real cobrada (después de comisiones).
+// Para mostrar facturación bruta en dashboard convertimos cada cobro a su precio
+// del plan original. Caja distinta de los valores conocidos se devuelve tal cual.
+const CAJA_TO_FACTURACION = { 247: 247, 374: 397 };
+function pagoAFacturacion(cajaMes){
+  const n = Number(cajaMes||0);
+  if (!n) return 0;
+  if (CAJA_TO_FACTURACION[n] !== undefined) return CAJA_TO_FACTURACION[n];
+  return n;
+}
+// Facturación de una cuota: suma de pagos convertidos a "precio del plan".
+// Para Zerochats (HAS_TICKET_MENSUAL): pagos[mes] tiene la caja neta (374 BUSINESS,
+// 247 PRO). pagoAFacturacion mapea cada caja a su facturación bruta (397/247).
+// Sostiene a clientes que cambian de plan (cobros históricos PRO se mantienen
+// a 247€ de facturación; cobros BUSINESS suben a 397€).
+// Para cuotas legacy (ANUAL, otras): suma de pagos directa.
 function getCuotaFacturacion(c,year){
   const pagos=getPagos(c);
+  if (typeof HAS_TICKET_MENSUAL !== 'undefined' && HAS_TICKET_MENSUAL) {
+    return Object.entries(pagos).reduce((s,[k,v]) =>
+      (year && !String(k).startsWith(`${year}-`)) ? s : s + pagoAFacturacion(v), 0);
+  }
   return Object.entries(pagos).reduce((s,[k,v])=>(year&&!String(k).startsWith(`${year}-`))?s:s+Number(v||0),0);
 }
 // Caja cobrada: pagos hasta el mes actual (incluido). Pagos de años pasados también se consideran cobrados.
@@ -1781,15 +1801,17 @@ function upLPlan(mk,i,plan){
   const row=S.llamadas[mk][i];
   row.plan=plan;
   // Auto-fill facturación + caja según plan.
-  // PRO y BUSINESS: importe fijo (suscripción recurrente).
-  // ANUAL = pago único de cuantía variable → Diego lo rellena manualmente.
-  const PLAN_AMOUNTS={PRO:247,BUSINESS:374};
+  // Facturación = precio plan. Caja = neto que entra después de comisión Stripe.
+  // BUSINESS: 397 plan, 374 neto (23€ comisión).
+  // PRO: 247 plan, 247 neto (sin comisión registrada por ahora).
+  // ANUAL = pago único variable → Diego rellena manualmente.
+  const PLAN_TICKETS={PRO:247,BUSINESS:397};
+  const PLAN_CAJAS={PRO:247,BUSINESS:374};
   if(plan==='ANUAL'){
-    // Solo setear mesesServicio. NO tocar facturación ni caja (Diego rellena).
     row.mesesServicio=12;
-  } else if(plan && PLAN_AMOUNTS[plan]){
-    row.facturacion=PLAN_AMOUNTS[plan];
-    row.caja=PLAN_AMOUNTS[plan];
+  } else if(plan && PLAN_TICKETS[plan]){
+    row.facturacion=PLAN_TICKETS[plan];
+    row.caja=PLAN_CAJAS[plan];
     row.mesesServicio=1;
   }
   save();syncCuota(mk,i);renderLlamadasRows(mk);

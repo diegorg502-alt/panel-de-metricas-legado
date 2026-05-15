@@ -36,6 +36,18 @@ Tras mergear, añadir entrada al CHANGELOG con: archivos afectados, qué se camb
 
 ## 2026-05-15
 
+### BUSINESS: facturación 397€ vs caja 374€ (Diego corrige modelo)
+- **Razón**: BUSINESS factura **397€** (precio plan) y entra **374€** en caja (comisión Stripe 23€). Antes lo había unificado erróneamente todo a 374€.
+- **Migración SQL** (backup #113, solo Zerochats):
+  - 47 filas en `S.llamadas` BUSINESS: revertido `facturacion: 374→397`. Caja se queda a 374.
+  - 95 cuotas en `S.cuotas` BUSINESS: revertido `ticket: 374→397`. `pagos[mes]` se mantienen a 374 (caja real).
+- **`upLPlan`** (`index.html`): separados `PLAN_TICKETS` y `PLAN_CAJAS`. Al marcar BUSINESS, autofill `facturacion=397` + `caja=374`. PRO sin cambio.
+- **`sync-ghl-zerochats` v4** (edge function desplegada): `PLAN_AMOUNTS` separado en `PLAN_TICKETS` (precio plan) y `PLAN_CAJAS` (caja neta). Nuevas cuotas crean `ticket=PLAN_TICKETS[plan]` y backfill de pagos usa `PLAN_CAJAS[plan]`.
+- **`getCuotaFacturacion`** (`index.html`): nuevo mapeo `CAJA_TO_FACTURACION = {247:247, 374:397}`. Para HAS_TICKET_MENSUAL, suma `pagos[mes]` convertidos a facturación bruta. Esto soporta clientes que cambian de plan (cobros PRO antiguos mantienen su precio, cobros BUSINESS suben a 397€).
+- **Dashboard Zerochats** ahora distingue:
+  - Facturación = suma de `pagoAFacturacion(pagos[mes])` → bruto
+  - Caja cobrada = suma de `pagos[mes]` directa → neto
+
 ### agendoLlamada estricto + nueva métrica "% Cierre leads"
 - **Archivo**: `index.html` (`agendoLlamada`, `renderMes`, `kpisCanal`, `vistaKpisMes`, `renderVistaGlobal`)
 - **agendoLlamada(r)** ahora es estricto:

@@ -23,8 +23,11 @@ const PLAN_TAGS: Record<string, string> = {
   'plan bussiness': 'BUSINESS',
   'plan anual': 'ANUAL',
 };
-// Diego pidió bajar BUSINESS de 397 a 374€ (caja y cuotas mensuales).
-const PLAN_AMOUNTS: Record<string, number> = { PRO: 247, BUSINESS: 374, ANUAL: 0 };
+// Distinguimos ticket (precio del plan / facturación) y caja (neto que entra
+// después de comisión Stripe). BUSINESS: 397€ facturación, 374€ caja (23€ comisión).
+// PRO: igual sin comisión registrada. ANUAL: variable, Diego rellena manualmente.
+const PLAN_TICKETS: Record<string, number> = { PRO: 247, BUSINESS: 397, ANUAL: 0 };
+const PLAN_CAJAS:   Record<string, number> = { PRO: 247, BUSINESS: 374, ANUAL: 0 };
 const PLAN_PRIORITY: Record<string, number> = { ANUAL: 3, BUSINESS: 2, PRO: 1 };
 const PERDIDO_TAG = 'perdido';
 const MONTHS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
@@ -159,7 +162,8 @@ Deno.serve(async () => {
         const fechaInicio = isFirstSync && !isNaN(dateAdded.getTime()) ? dateAdded : today;
         const fechaInicioISO = fechaInicio.toISOString().split('T')[0];
 
-        const ticket = PLAN_AMOUNTS[plan];
+        const ticket = PLAN_TICKETS[plan]; // precio del plan (facturación)
+        const cajaMes = PLAN_CAJAS[plan];   // caja neta mensual tras comisión
 
         const newCuota: any = {
           ghl_contact_id: ct.id,
@@ -187,15 +191,15 @@ Deno.serve(async () => {
           bajasNuevas++;
         }
 
-        // Backfill de pagos: del mes de alta hasta hoy (o hasta fechaPerdido si está perdido)
-        // Solo para PRO/BUSINESS — ANUAL queda con pagos vacíos para que Diego rellene.
-        if (ticket > 0) {
+        // Backfill de pagos: pagos[mes] = caja NETA del mes (no facturación).
+        // El ticket queda como referencia del precio del plan (397/247).
+        if (cajaMes > 0) {
           const endDate = newCuota.fechaPerdido ? new Date(newCuota.fechaPerdido) : today;
           if (endDate >= fechaInicio) {
             for (const { y, m } of monthsBetween(fechaInicio, endDate)) {
               const key = `${y}-${MONTHS[m]}`;
               if (!newCuota.pagos[key]) {
-                newCuota.pagos[key] = ticket;
+                newCuota.pagos[key] = cajaMes;
                 pagosBackfill++;
               }
             }
@@ -215,10 +219,10 @@ Deno.serve(async () => {
         // (caso: cliente subió de PRO a BUSINESS)
         if (cuota.plan && PLAN_PRIORITY[plan] > (PLAN_PRIORITY[cuota.plan] || 0)) {
           cuota.plan = plan;
-          cuota.ticket = PLAN_AMOUNTS[plan] || cuota.ticket;
+          cuota.ticket = PLAN_TICKETS[plan] || cuota.ticket;
         } else if (!cuota.plan) {
           cuota.plan = plan;
-          cuota.ticket = PLAN_AMOUNTS[plan] || cuota.ticket || 0;
+          cuota.ticket = PLAN_TICKETS[plan] || cuota.ticket || 0;
         }
 
         // Marcar baja si tag perdido apareció
