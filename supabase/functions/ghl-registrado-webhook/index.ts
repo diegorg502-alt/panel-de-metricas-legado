@@ -4,44 +4,44 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // Cuando un contacto recibe el tag "registrado" (o el que configures), GHL
 // envía POST aquí con sus datos. Esta función:
 // 1. Valida origen (locationId → record_id del cliente).
-// 2. Valida secret opcional (X-Webhook-Secret == env var GHL_WEBHOOK_SECRET).
-// 3. Idempotente: si ya hay una llamada con ese ghl_contact_id no duplica.
-// 4. Crea una entrada en S.llamadas[YYYY-MM] del cliente con embudo detectado
-//    por tags y los datos del contacto.
+// 2. Idempotente: si ya hay una llamada con ese ghl_contact_id no duplica.
+// 3. Crea una entrada en S.llamadas[YYYY-MM] del cliente con embudo detectado
+//    por tags, datos del contacto y UTMs.
 //
 // Endpoint: POST /functions/v1/ghl-registrado-webhook
-//
-// Body esperado (cualquier formato GHL, robusto a múltiples alias):
-// {
-//   "location": {"id": "pJyuDyDmqRLuYm63c6Oj"},   // o "locationId"
-//   "contact_id": "abc123",                       // o "id"
-//   "first_name": "...", "last_name": "...",      // o "full_name"
-//   "email": "...", "phone": "...",
-//   "tags": ["registrado", ...]
-// }
-//
-// Headers:
-//   X-Webhook-Secret: <secret>     (opcional; obligatorio si env var presente)
 
 // Mapa locationId → record_id. Añade más clientes aquí.
 const LOCATION_TO_RECORD: Record<string, string> = {
   'pJyuDyDmqRLuYm63c6Oj': 'zerochats_2026',
 };
 
-const MONTHS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
-
 function mKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 // Detecta embudo según los tags del contacto. Default: 'QUIZ'.
-function detectEmbudo(tags: string[]): string {
+function detectEmbudo(tags: string[], utmSource?: string): string {
   const ts = tags.map(t => String(t).toLowerCase());
+  const us = String(utmSource || '').toLowerCase();
+  // Prioriza por tag explícito
   if (ts.some(t => t.includes('templado') || t.includes('warm') || t.includes('tofu'))) return 'QUIZ TEMPLADO';
   if (ts.some(t => t.includes('vsl'))) return 'VSL';
   if (ts.some(t => t.includes('referido') || t.includes('referral'))) return 'REFERIDOS';
   if (ts.some(t => t.includes('seguidor') || t.includes('social'))) return 'SOCIAL';
+  // Fallback por utm_source
+  if (us.includes('templado') || us.includes('warm')) return 'QUIZ TEMPLADO';
+  if (us.includes('vsl')) return 'VSL';
+  if (us.includes('referral') || us.includes('referido')) return 'REFERIDOS';
+  if (us.includes('ig') || us.includes('instagram') || us.includes('facebook') || us.includes('fb')) return 'SOCIAL';
   return 'QUIZ';
+}
+
+function pickFirst(obj: any, keys: string[]): string {
+  for (const k of keys) {
+    const v = k.split('.').reduce((acc: any, part: string) => (acc == null ? undefined : acc[part]), obj);
+    if (v != null && String(v).trim() !== '') return String(v).trim();
+  }
+  return '';
 }
 
 function corsHeaders() {
@@ -53,7 +53,6 @@ function corsHeaders() {
 }
 
 Deno.serve(async (req) => {
-  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders() });
   }
@@ -63,7 +62,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Auth opcional: si env var GHL_WEBHOOK_SECRET está definida, exigirla en header.
   const expected = Deno.env.get('GHL_WEBHOOK_SECRET');
   if (expected) {
     const got = req.headers.get('x-webhook-secret') || '';
@@ -83,13 +81,8 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Extraer locationId (varios alias posibles)
-  const locationId =
-    body.location?.id ||
-    body.locationId ||
-    body.location_id ||
-    body.locationid;
-
+  // locationId (varios alias)
+  const locationId = pickFirst(body, ['location.id', 'locationId', 'location_id', 'locationid']);
   if (!locationId) {
     return new Response(JSON.stringify({ error: 'sin_location_id', body_keys: Object.keys(body) }), {
       status: 400, headers: { ...corsHeaders(), 'Content-Type': 'application/json' }
@@ -103,18 +96,25 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Extraer datos del contacto (varios alias)
-  const contactId = body.contact_id || body.contactId || body.contact?.id || body.id;
-  const firstName = String(body.first_name || body.firstName || body.contact?.firstName || '').trim();
-  const lastName  = String(body.last_name  || body.lastName  || body.contact?.lastName  || '').trim();
-  const rawName   = body.full_name || body.fullName || body.contact?.fullName || body.name || body.contact_name;
-  const fullName = String(rawName || `${firstName} ${lastName}`.trim()).trim().toUpperCase();
-  const email = body.email || body.contact?.email || '';
-  const phone = body.phone || body.contact?.phone || '';
+  // Datos del contacto (múltiples alias)
+  const contactId = pickFirst(body, ['contact_id', 'contactId', 'contact.id', 'id']);
+  const firstName = pickFirst(body, ['first_name', 'firstName', 'contact.firstName', 'contact.first_name']);
+  const lastName  = pickFirst(body, ['last_name', 'lastName', 'contact.lastName', 'contact.last_name']);
+  const rawName   = pickFirst(body, ['full_name', 'fullName', 'contact.fullName', 'contact.name', 'name', 'contact_name', 'full_name_lowercase']);
+  const fullName = (rawName || `${firstName} ${lastName}`.trim()).toUpperCase();
+  const email = pickFirst(body, ['email', 'contact.email']);
+  const phone = pickFirst(body, ['phone', 'contact.phone']);
   const tagsRaw = body.tags || body.contact?.tags || [];
   const tags: string[] = Array.isArray(tagsRaw)
-    ? tagsRaw
+    ? tagsRaw.map((t: any) => String(t))
     : (typeof tagsRaw === 'string' ? tagsRaw.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+
+  // UTMs (múltiples alias — GHL las puede mandar como flat o anidadas en attributionSource)
+  const utm_source   = pickFirst(body, ['utm_source', 'utmSource', 'contact.attributionSource.utmSource', 'attributionSource.utmSource']);
+  const utm_medium   = pickFirst(body, ['utm_medium', 'utmMedium', 'contact.attributionSource.utmMedium', 'attributionSource.utmMedium', 'medium']);
+  const utm_campaign = pickFirst(body, ['utm_campaign', 'utmCampaign', 'contact.attributionSource.campaign', 'attributionSource.campaign', 'campaign']);
+  const utm_content  = pickFirst(body, ['utm_content', 'utmContent', 'contact.attributionSource.utmContent', 'attributionSource.utmContent']);
+  const utm_term     = pickFirst(body, ['utm_term', 'utmTerm', 'contact.attributionSource.utmTerm', 'attributionSource.utmTerm']);
 
   if (!fullName) {
     return new Response(JSON.stringify({ error: 'sin_nombre' }), {
@@ -122,9 +122,8 @@ Deno.serve(async (req) => {
     });
   }
 
-  const embudo = detectEmbudo(tags);
+  const embudo = detectEmbudo(tags, utm_source);
 
-  // Cargar S del cliente
   const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const { data: cd, error } = await sb.from('crm_data').select('data').eq('id', recordId).single();
   if (error || !cd) {
@@ -141,27 +140,47 @@ Deno.serve(async (req) => {
   if (!Array.isArray(S.llamadas[mk])) S.llamadas[mk] = [];
 
   // Idempotencia: si ya existe llamada con este ghl_contact_id en cualquier mes
-  // del año actual, no duplicar.
+  // del año actual, no duplicar (pero sí actualizar campos vacíos).
   if (contactId) {
     for (const k of Object.keys(S.llamadas)) {
       if (!k.startsWith(String(today.getFullYear()))) continue;
       const list = S.llamadas[k];
-      if (Array.isArray(list) && list.some((r: any) => r.ghl_contact_id === contactId)) {
-        return new Response(JSON.stringify({ success: true, skipped: 'duplicate', ghl_contact_id: contactId, mes: k }), {
-          status: 200, headers: { ...corsHeaders(), 'Content-Type': 'application/json' }
-        });
+      if (Array.isArray(list)) {
+        const idx = list.findIndex((r: any) => r.ghl_contact_id === contactId);
+        if (idx >= 0) {
+          // Update campos vacíos con datos nuevos (no pisa lo que ya tenga valor)
+          const r = list[idx];
+          if (!r.email && email) r.email = email;
+          if (!r.telefono && phone) r.telefono = phone;
+          if (!r.utm_source && utm_source) r.utm_source = utm_source;
+          if (!r.utm_medium && utm_medium) r.utm_medium = utm_medium;
+          if (!r.utm_campaign && utm_campaign) r.utm_campaign = utm_campaign;
+          if (!r.utm_content && utm_content) r.utm_content = utm_content;
+          if (!r.utm_term && utm_term) r.utm_term = utm_term;
+          // Si los tags se actualizaron en GHL, fusionar
+          if (tags.length) {
+            const existing: string[] = Array.isArray(r.ghl_tags) ? r.ghl_tags : [];
+            const merged = Array.from(new Set([...existing.map(String), ...tags.map(String)]));
+            r.ghl_tags = merged;
+          }
+          const ts = new Date().toISOString();
+          const { error: upErr } = await sb.from('crm_data').upsert({ id: recordId, data: S, updated_at: ts });
+          return new Response(JSON.stringify({ success: true, updated: true, ghl_contact_id: contactId, mes: k, upsert_error: upErr?.message || null }), {
+            status: 200, headers: { ...corsHeaders(), 'Content-Type': 'application/json' }
+          });
+        }
       }
     }
   }
 
   // Crear la fila de llamada
-  const row = {
+  const row: any = {
     nombre: fullName,
     fecha: today.toISOString().split('T')[0],
     telefono: phone,
     email,
     embudo,
-    agendaLlamada: '',     // se actualizará si agenda llamada
+    agendaLlamada: '',
     closer: '',
     asistencia: 'PENDIENTE',
     incidencia: '',
@@ -177,9 +196,13 @@ Deno.serve(async (req) => {
     ghl_contact_id: contactId,
     ghl_tags: tags,
   };
+  if (utm_source)   row.utm_source = utm_source;
+  if (utm_medium)   row.utm_medium = utm_medium;
+  if (utm_campaign) row.utm_campaign = utm_campaign;
+  if (utm_content)  row.utm_content = utm_content;
+  if (utm_term)     row.utm_term = utm_term;
   S.llamadas[mk].push(row);
 
-  // Upsert con updated_at explícito para que el trigger anti-rollback no bloquee.
   const ts = new Date().toISOString();
   const { error: upErr } = await sb.from('crm_data').upsert({ id: recordId, data: S, updated_at: ts });
   if (upErr) {
@@ -195,5 +218,6 @@ Deno.serve(async (req) => {
     nombre: fullName,
     embudo,
     ghl_contact_id: contactId,
+    utm: { utm_source, utm_medium, utm_campaign, utm_content, utm_term },
   }), { status: 200, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } });
 });

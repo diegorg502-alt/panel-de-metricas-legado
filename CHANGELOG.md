@@ -36,6 +36,12 @@ Tras mergear, añadir entrada al CHANGELOG con: archivos afectados, qué se camb
 
 ## 2026-05-15
 
+### Edge function `ghl-registrado-webhook` v4 — UTMs + sin auth + prioridad tag>utm
+- Captura UTMs del body en múltiples alias (`utm_source`/`utmSource`/`attributionSource.utmSource`, etc.) y las persiste en la fila de llamada como `utm_source`/`utm_medium`/`utm_campaign`/`utm_content`/`utm_term`.
+- Si la llamada ya existe (por `ghl_contact_id`), se actualizan los campos vacíos sin pisar lo que tenga valor + se fusionan tags.
+- Auth deshabilitada (la URL actúa como secret + locationId filtra). Si se quiere reactivar, definir env var `GHL_WEBHOOK_SECRET` y enviar header `X-Webhook-Secret`.
+- `detectEmbudo`: prioriza tag explícito (`quiz`, `templado`, `vsl`, `referido`, `social`/`seguidores`) sobre `utm_source`. Solo cuando no hay tag claro se usa el utm_source como fallback. Default: QUIZ.
+
 ### Edge function nueva: `ghl-registrado-webhook` v1
 - **Archivo nuevo**: `supabase/functions/ghl-registrado-webhook/index.ts`.
 - **Endpoint**: `POST https://obeopzavwnquapjdjwrx.supabase.co/functions/v1/ghl-registrado-webhook`.
