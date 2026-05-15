@@ -36,6 +36,12 @@ Tras mergear, añadir entrada al CHANGELOG con: archivos afectados, qué se camb
 
 ## 2026-05-15
 
+### Color en celda AGENDA LLAMADA (KPIs por mes)
+- **Archivo**: `index.html`
+- **Qué**: la celda "Agenda llamada" ahora usa el mismo patrón visual que Asistencia/Estado/Embudo via `AGENDA_COLORS` + `colorStyle()`. Verde claro para SI, rojo claro para NO, vacío sin color.
+- **upL**: re-renderiza la fila al cambiar `agendaLlamada` para que el color se aplique en caliente.
+- **Por qué**: consistencia visual con las otras columnas categóricas.
+
 ### Edge function `ghl-registrado-webhook` v4 — UTMs + sin auth + prioridad tag>utm
 - Captura UTMs del body en múltiples alias (`utm_source`/`utmSource`/`attributionSource.utmSource`, etc.) y las persiste en la fila de llamada como `utm_source`/`utm_medium`/`utm_campaign`/`utm_content`/`utm_term`.
 - Si la llamada ya existe (por `ghl_contact_id`), se actualizan los campos vacíos sin pisar lo que tenga valor + se fusionan tags.

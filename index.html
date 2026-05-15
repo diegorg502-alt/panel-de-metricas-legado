@@ -479,6 +479,11 @@ const ASISTENCIA_COLORS={
   NO:        {bg:'#fee2e2',fg:'#b91c1c',bd:'#fecaca'},
   PENDIENTE: {bg:'#fef3c7',fg:'#b45309',bd:'#fde68a'}
 };
+// Mismo patrón visual que asistencia para coherencia visual en KPIs por mes.
+const AGENDA_COLORS={
+  SI: {bg:'#dcfce7',fg:'#15803d',bd:'#bbf7d0'},
+  NO: {bg:'#fee2e2',fg:'#b91c1c',bd:'#fecaca'}
+};
 const ESTADO_COLORS={
   Venta:           {bg:'#dcfce7',fg:'#15803d',bd:'#bbf7d0'},
   Perdido:         {bg:'#fee2e2',fg:'#b91c1c',bd:'#fecaca'},
@@ -1705,7 +1710,7 @@ function renderLlamadasRows(mk){
     <td><input class="ce" type="date" value="${r.fecha||''}" oninput="upL('${mk}',${i},'fecha',this.value)"></td>
     <td><input class="ce" value="${esc(r.telefono)}" oninput="upL('${mk}',${i},'telefono',this.value)" placeholder="+34..."></td>
     <td style="${colorStyle(EMBUDO_COLORS,r.embudo)}"><select class="ce" onchange="upL('${mk}',${i},'embudo',this.value)" style="min-width:100px;background:transparent;${r.embudo?'font-weight:600':''}"><option value="">-</option>${CANALES.map(c=>`<option value="${c}"${r.embudo===c?' selected':''}>${c}</option>`).join('')}</select></td>
-    <td style="${r.agendaLlamada==='NO'?'background:#fef2f2;color:#c81e1e':r.agendaLlamada==='SI'?'background:#ecfdf5;color:#047857':''}"><select class="ce" onchange="upL('${mk}',${i},'agendaLlamada',this.value)" style="min-width:90px;background:transparent;${r.agendaLlamada?'font-weight:600':''}"><option value="">-</option><option value="SI"${r.agendaLlamada==='SI'?' selected':''}>SI</option><option value="NO"${r.agendaLlamada==='NO'?' selected':''}>NO</option></select></td>
+    <td style="${colorStyle(AGENDA_COLORS,r.agendaLlamada)}"><select class="ce" onchange="upL('${mk}',${i},'agendaLlamada',this.value)" style="min-width:90px;background:transparent;${r.agendaLlamada?'font-weight:600':''}"><option value="">-</option><option value="SI"${r.agendaLlamada==='SI'?' selected':''}>SI</option><option value="NO"${r.agendaLlamada==='NO'?' selected':''}>NO</option></select></td>
     <td><select class="ce" onchange="upL('${mk}',${i},'closer',this.value)" style="min-width:80px"><option value="">-</option>${CLOSERS.map(c=>`<option value="${c}"${r.closer===c?' selected':''}>${c}</option>`).join('')}</select></td>
     ${SETTERS.length?`<td><input class="ce" value="${esc(r.setter||'')}" oninput="upL('${mk}',${i},'setter',this.value)" placeholder="Setter" style="min-width:90px"></td>`:''}
     <td style="${colorStyle(ASISTENCIA_COLORS,r.asistencia)}"><select class="ce" onchange="upL('${mk}',${i},'asistencia',this.value)" style="min-width:95px;background:transparent;${r.asistencia?'font-weight:600':''}"><option value="">-</option>${['SI','NO','PENDIENTE'].map(v=>`<option value="${v}"${r.asistencia===v?' selected':''}>${v}</option>`).join('')}</select></td>
@@ -1728,7 +1733,7 @@ function upL(mk,i,f,v){
   save();
   // embudo/asistencia se cambian con <select onchange>, dispara solo al elegir.
   // Re-render no afecta focus de inputs porque ya se cerró el dropdown.
-  if(f==='embudo'||f==='asistencia') renderLlamadasRows(mk);
+  if(f==='embudo'||f==='asistencia'||f==='agendaLlamada') renderLlamadasRows(mk);
 }
 // Mapa de facturación → semanas (solo si SEMANAS_MODO=true).
 // Acumulable: añade más entradas cuando aparezcan nuevos precios.
