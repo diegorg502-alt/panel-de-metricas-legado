@@ -1591,30 +1591,28 @@ function renderMes(){
         </div>
       </div>
       ${kpiGroups([
+        // KPIs totales agregados — Diego pidió métricas operativas, no de tráfico.
+        // Inversión/CPL/€-Llamada/CPA se ven en cada acordeón de canal de ads,
+        // donde la inversión sí está asignada a un embudo concreto.
         {title:'Tráfico',dot:'#3b82f6',items:[
-          ['Inversión',fmt(inv),'blue'],
-          ['Leads/Seg.',leads,''],
-          ['CPL',cpl?fmt(cpl,2):'-','amber'],
-          ['€/Llamada',costeLlamada?fmt(costeLlamada,2):'-','amber']
+          ['Leads totales',leads,'']
         ]},
         {title:'Embudo',dot:'#8b5cf6',items:[
-          ['Llamadas agend.',llamadasTotal,''],
+          ['Llamadas agendadas',llamadasTotal,''],
           ['% Agendamiento',pctAgend!=null?(pctAgend*100).toFixed(1)+'%':'-',''],
           ['% Asistencia',pctAsist!=null?(pctAsist*100).toFixed(1)+'%':'-',''],
-          ['Realizadas',realizadas,'']
+          ['Llamadas realizadas',realizadas,'']
         ]},
         {title:'Conversión',dot:'#10b981',items:[
           ['Ventas',ventas.length,'green'],
-          ['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue'],
-          ['CPA',cpa?fmt(cpa,2):'-','']
+          ['% Cierre',pctCierre!=null?(pctCierre*100).toFixed(1)+'%':'-','blue']
         ]},
         {title:'Resultados',dot:'#f59e0b',items:[
           ['Facturación',fmt(fact),'blue'],
           ['Caja',fmt(caja),'green'],
-          HAS_TICKET_MENSUAL?['Ticket medio',ticketMedio?fmt(ticketMedio,0):'-','purple']:null
-          // ROAS y ROI movidos al apartado de ADS por canal (Diego). En el agregado
-          // general no tiene sentido: la inversión está por canal, los gastos
-          // totales no incluyen costes operativos, etc.
+          ['Ticket medio',ticketMedio?fmt(ticketMedio,0):'-','purple']
+          // ROAS y ROI viven en los acordeones de canal de ADS, donde la
+          // inversión sí está asignada al embudo.
         ]}
       ])}
     </div>
